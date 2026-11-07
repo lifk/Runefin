@@ -1,0 +1,26 @@
+{
+  "id": 196950,
+  "name": "Example Show",
+  "firstAirDate": "2026-10-02",
+  "numberOfSeasons": 1,
+  "seasons": [
+    { "seasonNumber": 1, "name": "Season 1", "episodeCount": 12, "airDate": "2026-10-02" }
+  ],
+  "posterPath": "/example-poster.jpg",
+  "backdropPath": "/example-backdrop.jpg",
+  "overview": "An example series.",
+  "voteAverage": 7.2,
+  "mediaInfo": {
+    "id": 101,
+    "tmdbId": 196950,
+    "tvdbId": 12345,
+    "mediaType": "tv",
+    "status": 4,
+    "status4k": 1,
+    "downloadStatus": [],
+    "downloadStatus4k": [],
+    "jellyfinMediaId": "item-123",
+    "mediaUrl": "https://jellyfin.example/web/index.html#!/details?id=item-123",
+    "serviceUrl": "https://sonarr.example/series/example"
+  }
+}

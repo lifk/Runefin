@@ -1,0 +1,33 @@
+[workspace]
+resolver = "3"
+members = ["crates/jellyfin-api", "crates/seerr-api", "crates/runefin"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/lifk/Runefin"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+unused_must_use = "deny"
+
+[workspace.lints.clippy]
+todo = "deny"
+unimplemented = "deny"
+dbg_macro = "deny"
+unwrap_used = "warn"
+print_stdout = "warn"
+
+# Debug info is off on purpose. A debug build of Rune plus wgpu at full `debug = 2` is ~6 GB of
+# artifacts, which does not fit a small dev box; frame asserts and snapshot tests do not need it.
+# This mirrors Rune's own workspace, which sets `debug = false` for every dependency.
+[profile.dev]
+debug = 0
+
+[profile.dev.package."*"]
+debug = false
+
+# Rune is pinned to one rev: it is pre-1.0 and its `dev` branch moves ~100 commits a day.
+# Bump deliberately, one commit, and rerun `scripts/snapshots.sh` before and after.
+# https://github.com/anomalyco/rune/commit/f5def6d4f9259580cbbd6472498e4de6b4d754b6

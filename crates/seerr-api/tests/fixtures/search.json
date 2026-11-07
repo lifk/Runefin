@@ -1,0 +1,51 @@
+{
+  "page": 1,
+  "totalPages": 1,
+  "totalResults": 3,
+  "results": [
+    {
+      "id": 438631,
+      "mediaType": "movie",
+      "title": "Dune",
+      "releaseDate": "2021-09-15",
+      "posterPath": "/d5NXSklXo0qyIYkgV94XAgMIckC.jpg",
+      "backdropPath": "/jYEW5xZkZk2WTrdbMGAPFuBqbDc.jpg",
+      "overview": "Paul Atreides.",
+      "voteAverage": 7.8,
+      "mediaInfo": {
+        "id": 4,
+        "tmdbId": 438631,
+        "mediaType": "movie",
+        "status": 5,
+        "downloadStatus": [],
+        "jellyfinMediaId": "item-456"
+      }
+    },
+    {
+      "id": 196950,
+      "mediaType": "tv",
+      "name": "Example Show",
+      "firstAirDate": "2026-10-02",
+      "posterPath": "/example-poster.jpg",
+      "backdropPath": "/example-backdrop.jpg",
+      "overview": "An example series.",
+      "voteAverage": 7.2,
+      "mediaInfo": {
+        "id": 101,
+        "tmdbId": 196950,
+        "mediaType": "tv",
+        "status": 3,
+        "downloadStatus": []
+      }
+    },
+    {
+      "id": 999999,
+      "mediaType": "movie",
+      "title": "Never Requested",
+      "releaseDate": "2026-01-01",
+      "posterPath": "/never.jpg",
+      "overview": "No media row.",
+      "voteAverage": 0.0
+    }
+  ]
+}

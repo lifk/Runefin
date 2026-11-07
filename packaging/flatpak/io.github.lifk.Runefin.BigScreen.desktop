@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Runefin Big Screen
+Comment=Jellyfin client laid out for a TV and a controller
+Exec=runefin --big-screen
+Icon=io.github.lifk.Runefin
+Terminal=false
+Type=Application
+Categories=AudioVideo;Video;Player;TV;
+Keywords=jellyfin;media;player;tv;big screen;
+StartupNotify=true
+StartupWMClass=runefin

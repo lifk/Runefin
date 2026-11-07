@@ -1,0 +1,43 @@
+{
+  "id": 1683343,
+  "cast": [
+    {
+      "id": 945961,
+      "mediaType": "movie",
+      "title": "Alien: Romulus",
+      "character": "Rain",
+      "releaseDate": "2024-08-13",
+      "posterPath": "/2uSWRTtCG336nuBiG8jOTEUKSy8.jpg",
+      "voteAverage": 7.156
+    },
+    {
+      "id": 1020006,
+      "mediaType": "movie",
+      "title": "Priscilla",
+      "character": "Priscilla",
+      "releaseDate": "2023-10-27",
+      "posterPath": "/uDCeELWWpsNq7ErM61Yuq70WAE9.jpg",
+      "voteAverage": 6.7
+    },
+    {
+      "id": 81349,
+      "mediaType": "tv",
+      "name": "Devs",
+      "character": "Lyndon",
+      "firstAirDate": "2020-03-05",
+      "posterPath": "/2nO9Jw1b0i0i0i0i0i0i0i0i0i0.jpg",
+      "voteAverage": 7.5,
+      "episodeCount": 8
+    }
+  ],
+  "crew": [
+    {
+      "id": 1206030,
+      "mediaType": "movie",
+      "title": "The Making of Priscilla",
+      "releaseDate": "2023-11-16",
+      "posterPath": "/M6l7c0dNShjIdg4jyKlH1p3Izf.jpg",
+      "voteAverage": 6.2
+    }
+  ]
+}

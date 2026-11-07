@@ -1,0 +1,16 @@
+[package]
+name = "seerr-api"
+description = "Typed, blocking Seerr/Jellyseerr REST client: catalogue, requests and download progress."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+ureq = "3.5"
+
+[lints]
+workspace = true

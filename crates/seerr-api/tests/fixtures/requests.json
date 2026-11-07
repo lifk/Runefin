@@ -1,0 +1,141 @@
+{
+  "pageInfo": { "page": 1, "pages": 1, "pageSize": 50, "results": 3 },
+  "results": [
+    {
+      "id": 10,
+      "status": 2,
+      "type": "movie",
+      "is4k": false,
+      "seasonCount": 0,
+      "seasons": [],
+      "requestedBy": {
+        "id": 1,
+        "username": null,
+        "email": "user@example.invalid",
+        "displayName": "example-user",
+        "jellyfinUsername": "example-user",
+        "permissions": 2,
+        "requestCount": 3
+      },
+      "media": {
+        "id": 100,
+        "tmdbId": 438631,
+        "tvdbId": null,
+        "mediaType": "movie",
+        "status": 3,
+        "status4k": 1,
+        "downloadStatus": [],
+        "downloadStatus4k": [],
+        "jellyfinMediaId": null,
+        "mediaUrl": null,
+        "serviceUrl": "https://radarr.example/movie/438631"
+      },
+      "canRemove": true,
+      "createdAt": "2026-11-05T00:00:00.000Z",
+      "updatedAt": "2026-11-05T00:00:00.000Z"
+    },
+    {
+      "id": 11,
+      "status": 2,
+      "type": "tv",
+      "is4k": false,
+      "seasonCount": 1,
+      "seasons": [{ "id": 1, "seasonNumber": 1 }],
+      "requestedBy": {
+        "id": 1,
+        "username": null,
+        "email": "user@example.invalid",
+        "displayName": "example-user",
+        "jellyfinUsername": "example-user",
+        "permissions": 2,
+        "requestCount": 3
+      },
+      "media": {
+        "id": 101,
+        "tmdbId": 196950,
+        "tvdbId": 12345,
+        "mediaType": "tv",
+        "status": 4,
+        "status4k": 1,
+        "downloadStatus": [
+          {
+            "title": "Example.Show.S01.1080p",
+            "status": "completed",
+            "size": 43063640191,
+            "sizeLeft": 0,
+            "timeLeft": "00:00:00",
+            "estimatedCompletionTime": "2026-11-05T17:42:57.000Z",
+            "downloadId": "pack-1",
+            "mediaType": "tv",
+            "externalId": 167,
+            "episode": { "seasonNumber": 1, "episodeNumber": 1, "absoluteEpisodeNumber": 1, "id": 1 }
+          },
+          {
+            "title": "Example.Show.S01.1080p",
+            "status": "completed",
+            "size": 43063640191,
+            "sizeLeft": 0,
+            "timeLeft": "00:00:00",
+            "estimatedCompletionTime": "2026-11-05T17:42:57.000Z",
+            "downloadId": "pack-1",
+            "mediaType": "tv",
+            "externalId": 167,
+            "episode": { "seasonNumber": 1, "episodeNumber": 2, "absoluteEpisodeNumber": 2, "id": 2 }
+          },
+          {
+            "title": "Example.Show.S01.1080p",
+            "status": "completed",
+            "size": 43063640191,
+            "sizeLeft": 0,
+            "timeLeft": "00:00:00",
+            "estimatedCompletionTime": "2026-11-05T17:42:57.000Z",
+            "downloadId": "pack-1",
+            "mediaType": "tv",
+            "externalId": 167,
+            "episode": { "seasonNumber": 1, "episodeNumber": 3, "absoluteEpisodeNumber": 3, "id": 3 }
+          }
+        ],
+        "downloadStatus4k": [],
+        "jellyfinMediaId": "item-123",
+        "mediaUrl": "https://jellyfin.example/web/index.html#!/details?id=item-123",
+        "serviceUrl": "https://sonarr.example/series/example"
+      },
+      "canRemove": true,
+      "createdAt": "2026-11-04T00:00:00.000Z",
+      "updatedAt": "2026-11-04T00:00:00.000Z"
+    },
+    {
+      "id": 12,
+      "status": 5,
+      "type": "movie",
+      "is4k": false,
+      "seasonCount": 0,
+      "seasons": [],
+      "requestedBy": {
+        "id": 1,
+        "username": null,
+        "email": "user@example.invalid",
+        "displayName": "example-user",
+        "jellyfinUsername": "example-user",
+        "permissions": 2,
+        "requestCount": 3
+      },
+      "media": {
+        "id": 102,
+        "tmdbId": 693134,
+        "tvdbId": null,
+        "mediaType": "movie",
+        "status": 5,
+        "status4k": 1,
+        "downloadStatus": [],
+        "downloadStatus4k": [],
+        "jellyfinMediaId": "item-456",
+        "mediaUrl": "https://jellyfin.example/web/index.html#!/details?id=item-456",
+        "serviceUrl": "https://radarr.example/movie/693134"
+      },
+      "canRemove": true,
+      "createdAt": "2026-10-01T00:00:00.000Z",
+      "updatedAt": "2026-10-02T00:00:00.000Z"
+    }
+  ]
+}

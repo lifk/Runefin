@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.lifk.Runefin</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>Runefin</name>
+  <summary>A Jellyfin client drawn entirely by Rune</summary>
+  <developer id="io.github.lifk">
+    <name>Luis Jurado</name>
+  </developer>
+  <description>
+    <p>
+      Runefin browses a Jellyfin server and plays video in the same window, with no web view
+      and no second render stack.
+    </p>
+    <p>
+      It has a desktop layout and a Big Screen layout for a TV: a 1280x720 design height,
+      full-screen launch, a 64 pt safe gutter and native gamepad navigation.
+    </p>
+    <p>
+      The in-app player supports direct play and transcoding, text and bitmap subtitles,
+      chapters, a queue and playback reporting.
+    </p>
+  </description>
+  <launchable type="desktop-id">io.github.lifk.Runefin.desktop</launchable>
+  <url type="homepage">https://github.com/lifk/Runefin</url>
+  <url type="bugtracker">https://github.com/lifk/Runefin/issues</url>
+  <categories>
+    <category>AudioVideo</category>
+    <category>Video</category>
+    <category>Player</category>
+  </categories>
+  <screenshots>
+    <screenshot type="default">
+      <caption>Continue Watching in Big Screen</caption>
+      <image type="source">https://raw.githubusercontent.com/lifk/Runefin/main/docs/snapshots/home-big.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>A library at 1080p with the TV toolbar</caption>
+      <image type="source">https://raw.githubusercontent.com/lifk/Runefin/main/docs/snapshots/library-big.png</image>
+    </screenshot>
+  </screenshots>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="0.1.0" date="2026-11-07"/>
+  </releases>
+</component>

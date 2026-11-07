@@ -1,0 +1,54 @@
+app-id: io.github.lifk.Runefin
+runtime: org.freedesktop.Platform
+runtime-version: '26.08'
+sdk: org.freedesktop.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+command: runefin
+
+finish-args:
+  - --share=network
+  - --share=ipc
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --socket=pulseaudio
+  - --require-version=1.16.0
+  - --device=dri
+  # Native gilrs gamepad input. Flatpak 1.15.6+ understands `input`; SteamOS 3.8 ships a
+  # newer Flatpak. Do not grant `all`: it would expose every device to the sandbox.
+  - --device=input
+  - --filesystem=xdg-run/pipewire-0
+  - --talk-name=org.freedesktop.Notifications
+  - --own-name=org.mpris.MediaPlayer2.runefin
+
+build-options:
+  append-path: /usr/lib/sdk/rust-stable/bin
+  env:
+    CARGO_HOME: /run/build/cargo
+  # `cargo` fetches crates and the pinned Rune fork. A release build can replace this with
+  # vendored sources from `cargo vendor`; see docs/plans/2026-11-07-steam-machine-packaging.md.
+  build-args:
+    - --share=network
+
+modules:
+  - name: runefin
+    buildsystem: simple
+    build-commands:
+      - cargo build --release --locked
+      - install -Dm755 target/release/runefin /app/bin/runefin
+      - install -Dm644 packaging/flatpak/io.github.lifk.Runefin.desktop /app/share/applications/io.github.lifk.Runefin.desktop
+      - install -Dm644 packaging/flatpak/io.github.lifk.Runefin.BigScreen.desktop /app/share/applications/io.github.lifk.Runefin.BigScreen.desktop
+      - install -Dm644 packaging/flatpak/io.github.lifk.Runefin.metainfo.xml /app/share/metainfo/io.github.lifk.Runefin.metainfo.xml
+      - install -Dm644 packaging/flatpak/icons/512x512/io.github.lifk.Runefin.png /app/share/icons/hicolor/512x512/apps/io.github.lifk.Runefin.png
+      - install -Dm644 packaging/flatpak/icons/256x256/io.github.lifk.Runefin.png /app/share/icons/hicolor/256x256/apps/io.github.lifk.Runefin.png
+      - install -Dm644 packaging/flatpak/icons/128x128/io.github.lifk.Runefin.png /app/share/icons/hicolor/128x128/apps/io.github.lifk.Runefin.png
+    sources:
+      - type: dir
+        path: ../..
+        skip:
+          - .git
+          - .flatpak-builder
+          - build-dir
+          - dist
+          - target
+          - docs/snapshots

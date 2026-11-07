@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  # Headless tests and snapshot rendering need an ICD; lavapipe is enough.
+  VK_ICD_FILENAMES: /usr/share/vulkan/icd.d/lvp_icd.json
+
+jobs:
+  check:
+    name: Build, lint and test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libxkbcommon-dev libwayland-dev libudev-dev \
+            libvulkan1 mesa-vulkan-drivers vulkan-tools \
+            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
+            gstreamer1.0-plugins-good gstreamer1.0-libav libgstreamer-plugins-bad1.0-dev
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Formatting
+        run: cargo fmt --all -- --check
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: jellyfin-api
+        run: cargo test -p jellyfin-api
+
+      - name: seerr-api
+        run: cargo test -p seerr-api
+
+      - name: runefin (headless)
+        run: cargo test -p runefin -- --test-threads=1
+
+      - name: Release build
+        run: cargo build --release --locked -p runefin
+
+  hardening:
+    name: Publication checks
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Required files
+        run: |
+          for f in LICENSE THIRD_PARTY_NOTICES.md SECURITY.md CONTRIBUTING.md README.md; do
+            test -s "$f" || { echo "missing $f"; exit 1; }
+          done
+
+      - name: No private hosts or identities in the tree
+        run: |
+          # Full hostnames and paths only, so the plan's notes do not match; this workflow
+          # itself is excluded because it contains the pattern.
+          if git grep -nE 'forgejo\.home\.luis|git\.home\.luis|jellyfin\.home\.luis|jellyseerr\.home\.luis|hermes@home\.luis|/home/luis/' -- . ':!.github/workflows/ci.yml' ; then
+            echo "private reference found"; exit 1
+          fi
+
+      - name: Cargo.lock has no private sources
+        run: |
+          if grep -nE 'git\+https?://(forgejo|git\.home)|source = "git\+.*home\.luis' Cargo.lock; then
+            echo "private git source in Cargo.lock"; exit 1
+          fi
+
+      - name: Secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

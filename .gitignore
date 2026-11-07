@@ -1,0 +1,18 @@
+/target
+*.log
+.DS_Store
+
+# Flatpak build products
+/.flatpak-build
+/.flatpak-builder
+/dist
+
+# Local tooling and secrets
+.cargo/config.toml
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.jks
+runefin.gpg

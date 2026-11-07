@@ -1,0 +1,51 @@
+# Sample ~/.config/cecd/config.toml for Runefin on a Steam Machine.
+#
+# cecd maps HDMI-CEC remote UI commands to Linux key codes. Runefin's big-screen
+# cards take Return through focus_highlight, but some controls still only take
+# Space; mapping Select to KEY_SPACE makes every control work. The player and
+# live-TV buttons are mapped to the keys Runefin already handles.
+#
+# Keep this file under your home directory (it survives SteamOS updates) and
+# restart cecd after editing:
+#
+#   systemctl --user restart cecd
+#
+# Numeric values are from /usr/include/linux/input-event-codes.h.
+
+[mappings]
+# D-pad
+up = 103          # KEY_UP
+down = 108        # KEY_DOWN
+left = 105        # KEY_LEFT
+right = 106       # KEY_RIGHT
+
+# Select / OK / Back
+select = 57       # KEY_SPACE: activate the focused control
+ok = 57
+back = 1          # KEY_ESC
+exit = 1
+
+# Menu / context
+contents-menu = 438              # KEY_CONTEXT_MENU
+media-context-sensitive-menu = 438
+help = 59                        # KEY_F1: Runefin's controls sheet
+
+# Transport (player only; outside the player these are harmless navigation)
+play = 57         # KEY_SPACE: play/pause in the player
+pause = 57
+stop = 1          # KEY_ESC: stop / back
+skip-forward = 106  # KEY_RIGHT: seek +10 s
+skip-backward = 105 # KEY_LEFT: seek -10 s
+fast-forward = 106
+rewind = 105
+
+# Live TV
+channel-up = 104    # KEY_PAGEUP
+channel-down = 109  # KEY_PAGEDOWN
+
+# Leave these as standard keys so the TV/AVR can handle volume; Runefin's
+# player volume is still on the D-pad.
+volume-up = 115     # KEY_VOLUMEUP
+volume-down = 114   # KEY_VOLUMEDOWN
+mute = 113          # KEY_MUTE
+power = 116         # KEY_POWER

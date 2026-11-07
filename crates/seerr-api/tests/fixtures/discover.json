@@ -1,0 +1,34 @@
+{
+  "page": 1,
+  "totalPages": 1001,
+  "totalResults": 20001,
+  "results": [
+    {
+      "id": 1423191,
+      "mediaType": "movie",
+      "title": "Resident Evil",
+      "releaseDate": "2026-09-18",
+      "posterPath": "/gAgWJhUSQWCgtKR8170nMkYlBda.jpg",
+      "backdropPath": "/3icyRAqgakNcQn6aDVz9libFmBA.jpg",
+      "overview": "A new adaptation.",
+      "voteAverage": 7.0
+    },
+    {
+      "id": 90228,
+      "mediaType": "tv",
+      "name": "Dune: Prophecy",
+      "firstAirDate": "2024-11-17",
+      "posterPath": "/oWVohNsxkxA3u92EzRo8fTuXIS0.jpg",
+      "backdropPath": "/example-backdrop.jpg",
+      "overview": "Ten thousand years before Paul.",
+      "voteAverage": 7.4,
+      "mediaInfo": {
+        "id": 350,
+        "tmdbId": 90228,
+        "mediaType": "tv",
+        "status": 3,
+        "downloadStatus": []
+      }
+    }
+  ]
+}

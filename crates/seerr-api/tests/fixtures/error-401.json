@@ -1,0 +1,1 @@
+{"message": "cookie 'connect.sid' required", "errors": [{"path": "/api/v1/request/count", "message": "cookie 'connect.sid' required"}]}

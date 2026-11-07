@@ -1,0 +1,40 @@
+[package]
+name = "runefin"
+description = "Jellyfin desktop client drawn with Rune."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+jellyfin-api = { path = "../jellyfin-api" }
+seerr-api = { path = "../seerr-api" }
+# Blur-up placeholders: downscale fetched bytes to 27×17 on the image worker. Rune already uses
+# this crate for decoding, so it adds no second codec stack.
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+serde = { version = "1", features = ["derive"] }
+# mpv's JSON IPC (`handoff.rs`); already in the workspace through jellyfin-api, see design.md §6.
+serde_json = "1"
+# Bitmap subtitles: PGS/VobSub/DVB decode to RGBA in-process. See design.md §6.
+libbitsub-core = "1.13.2"
+# IMDb's public ratings dataset is a gzipped TSV; built into a small sorted index once.
+flate2 = "1"
+# In-app playback: GStreamer owns demux/decode/clock; see design-player.md §3.3.
+gstreamer = "0.25"
+gstreamer-app = "0.25"
+gstreamer-base = "0.25"
+gstreamer-video = { version = "0.25", features = ["v1_18"] }
+gstreamer-allocators = "0.25"
+toml = "0.8"
+# D5: the access token is a bearer credential; wipe the heap copy when the session ends.
+zeroize = "1"
+# Pinned on purpose (see the workspace Cargo.toml). `dev` moves ~100 commits a day; a floating
+# dep means a red build nobody changed.
+zbus = { version = "6", default-features = false, features = ["tokio", "service"] }
+tokio = { version = "1", features = ["rt", "net", "time"] }
+rune = { git = "https://github.com/lifk/rune", rev = "5da4bbf6e9dea29eb51422d77a162d7f8abb97af", default-features = false, features = ["embedded-fonts", "svg", "dbus"] }
+gilrs = "0.11.2"
+
+[lints]
+workspace = true

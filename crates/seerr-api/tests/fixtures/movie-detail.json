@@ -1,0 +1,57 @@
+{
+  "id": 438631,
+  "title": "Dune",
+  "releaseDate": "2021-09-15",
+  "runtime": 155,
+  "posterPath": "/d5NXSklXo0qyIYkgV94XAgMIckC.jpg",
+  "backdropPath": "/jYEW5xZkZk2WTrdbMGAPFuBqbDc.jpg",
+  "overview": "Paul Atreides, a brilliant and gifted young man born into a great destiny.",
+  "voteAverage": 7.8,
+  "mediaInfo": {
+    "id": 4,
+    "tmdbId": 438631,
+    "mediaType": "movie",
+    "status": 5,
+    "status4k": 1,
+    "downloadStatus": [],
+    "downloadStatus4k": [],
+    "jellyfinMediaId": "item-456",
+    "mediaUrl": "https://jellyfin.example/web/index.html#!/details?id=item-456",
+    "serviceUrl": "https://radarr.example/movie/438631"
+  },
+  "tagline": "Beyond fear, destiny awaits.",
+  "genres": [
+    {
+      "id": 878,
+      "name": "Science Fiction"
+    },
+    {
+      "id": 12,
+      "name": "Adventure"
+    }
+  ],
+  "credits": {
+    "cast": [
+      {
+        "id": 1190668,
+        "name": "Timoth\u00e9e Chalamet",
+        "character": "Paul Atreides",
+        "profilePath": "/beSE0PCS0C0NrcHDE4uzHt8wAdZ.jpg"
+      },
+      {
+        "id": 933238,
+        "name": "Rebecca Ferguson",
+        "character": "Lady Jessica",
+        "profilePath": "/lJloTOheuQSirSLXNA3JHsrMNfH.jpg"
+      }
+    ],
+    "crew": [
+      {
+        "id": 137427,
+        "name": "Denis Villeneuve",
+        "job": "Director",
+        "profilePath": "/zd30KpXH0j0j0j0j0j0j0j0j0j0.jpg"
+      }
+    ]
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "id": 1,
+  "username": null,
+  "email": "user@example.invalid",
+  "displayName": "example-user",
+  "jellyfinUsername": "example-user",
+  "permissions": 2,
+  "requestCount": 3
+}

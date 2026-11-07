@@ -1,0 +1,100 @@
+{
+  "pageInfo": { "page": 1, "pages": 1, "pageSize": 50, "results": 2 },
+  "results": [
+    {
+      "id": 20,
+      "status": 2,
+      "type": "movie",
+      "is4k": false,
+      "seasonCount": 0,
+      "seasons": [],
+      "requestedBy": { "id": 1, "displayName": "example-user", "permissions": 2, "requestCount": 3 },
+      "media": {
+        "id": 200,
+        "tmdbId": 693134,
+        "mediaType": "movie",
+        "status": 3,
+        "status4k": 1,
+        "downloadStatus": [
+          {
+            "title": "Dune.Part.Two.2024.2160p",
+            "status": "downloading",
+            "size": 10000000000,
+            "sizeLeft": 4000000000,
+            "timeLeft": "00:12:34",
+            "estimatedCompletionTime": "2026-11-05T18:00:00.000Z",
+            "downloadId": "movie-1",
+            "mediaType": "movie",
+            "externalId": 59
+          }
+        ],
+        "downloadStatus4k": [],
+        "jellyfinMediaId": null,
+        "mediaUrl": null,
+        "serviceUrl": "https://radarr.example/movie/693134"
+      },
+      "canRemove": true,
+      "createdAt": "2026-11-05T00:00:00.000Z",
+      "updatedAt": "2026-11-05T00:00:00.000Z"
+    },
+    {
+      "id": 21,
+      "status": 2,
+      "type": "tv",
+      "is4k": false,
+      "seasonCount": 1,
+      "seasons": [{ "id": 1, "seasonNumber": 1 }],
+      "requestedBy": { "id": 1, "displayName": "example-user", "permissions": 2, "requestCount": 3 },
+      "media": {
+        "id": 201,
+        "tmdbId": 196950,
+        "tvdbId": 12345,
+        "mediaType": "tv",
+        "status": 3,
+        "status4k": 1,
+        "downloadStatus": [
+          {
+            "title": "Example.Show.S01.1080p",
+            "status": "downloading",
+            "size": 43063640191,
+            "sizeLeft": 20000000000,
+            "timeLeft": "00:20:00",
+            "downloadId": "pack-2",
+            "mediaType": "tv",
+            "externalId": 167,
+            "episode": { "seasonNumber": 1, "episodeNumber": 1, "absoluteEpisodeNumber": 1, "id": 1 }
+          },
+          {
+            "title": "Example.Show.S01.1080p",
+            "status": "downloading",
+            "size": 43063640191,
+            "sizeLeft": 20000000000,
+            "timeLeft": "00:20:00",
+            "downloadId": "pack-2",
+            "mediaType": "tv",
+            "externalId": 167,
+            "episode": { "seasonNumber": 1, "episodeNumber": 2, "absoluteEpisodeNumber": 2, "id": 2 }
+          },
+          {
+            "title": "Example.Show.S01E03.1080p",
+            "status": "downloading",
+            "size": 43063640191,
+            "sizeLeft": 20000000000,
+            "timeLeft": "00:20:00",
+            "downloadId": "pack-3",
+            "mediaType": "tv",
+            "externalId": 167,
+            "episode": { "seasonNumber": 1, "episodeNumber": 3, "absoluteEpisodeNumber": 3, "id": 3 }
+          }
+        ],
+        "downloadStatus4k": [],
+        "jellyfinMediaId": null,
+        "mediaUrl": null,
+        "serviceUrl": "https://sonarr.example/series/example"
+      },
+      "canRemove": true,
+      "createdAt": "2026-11-05T00:00:00.000Z",
+      "updatedAt": "2026-11-05T00:00:00.000Z"
+    }
+  ]
+}
