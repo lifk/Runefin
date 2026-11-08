@@ -1,8 +1,9 @@
 # Public release hardening — execution plan
 
-**Status:** published, 2026-11-08. The public tree is `lifk/Runefin@aa9bdc5` (one initial
-commit) and the pinned fork is `lifk/rune#runefin/player@5da4bbf6`. Remaining work is the first
-release, not the publication gate.
+**Status:** published, 2026-11-08. The public tree is `lifk/Runefin@ee9ae08` (one initial
+commit) and the pinned fork is `lifk/rune#runefin/player@5da4bbf6`. `v0.1.0` is tagged with the
+Flatpak bundle attached. Remaining work is Flathub and release signing, not the publication
+gate.
 **Goal:** a public repository that anyone can clone, audit, build and install without access to
 the current private network, and without exposing private infrastructure, identities or secrets.
 
@@ -54,14 +55,18 @@ name and the fixture addresses changed.
 
 - `https://github.com/lifk/rune` — public, default branch `runefin/player` at `5da4bbf6`, the
   exact rev the app pins. The fork's other branches stay in the private mirror.
-- `https://github.com/lifk/Runefin` — public, `main` is the single initial commit `aa9bdc5`,
+- `https://github.com/lifk/Runefin` — public, `main` is the single initial commit `ee9ae08`,
   authored `Luis Jurado <lifk@users.noreply.github.com>`; no private object was pushed.
+- **Identity incident and fix.** The first publication carried `hermes@home.luis.quest` in the
+  author field of two commits (the sync commits, not the initial one) and of the fork's eleven
+  commits. Both histories were rewritten to `lifk@users.noreply.github.com`, the two
+  repositories were deleted and recreated rather than force-pushed, and the pre-rewrite hashes
+  now answer 422. Trees are byte-identical; only the identities and the pin changed.
 - Repository settings: description, homepage, ten topics, MIT recognised, issues on, wiki and
   projects off, vulnerability alerts and Dependabot security updates on, `main` protected
   against force-push and deletion.
-- The first CI run passed on the initial push: both jobs green, including the clean
-  `cargo build --release --locked` on a fresh Ubuntu 24.04 runner
-  (`actions/runs/42425620911`).
+- The first CI run passed: both jobs green, including the clean
+  `cargo build --release --locked` on a fresh Ubuntu 24.04 runner and the publication checks.
 
 ### Publishing a later commit
 
@@ -83,14 +88,14 @@ git checkout main
 - A fresh clone of `https://github.com/lifk/Runefin` builds with `cargo build --release
   --locked` (Rune fetched from `https://github.com/lifk/rune` at the pinned rev), no private
   network and no local override.
-- The Flatpak rebuilt under `io.github.lifk.Runefin`, installed side by side with the old
-  `quest.luis.home.Runefin`, and rendered a frame; its config lives under
-  `~/.var/app/io.github.lifk.Runefin/`.
+- The Flatpak rebuilt under `io.github.lifk.Runefin` against the public Rune commit, installed
+  side by side with the old `quest.luis.home.Runefin`, and rendered a frame; its config lives
+  under `~/.var/app/io.github.lifk.Runefin/`.
 
 ### Released
 
-- Tag `v0.1.0` on `41a0523` and a GitHub release with notes and
-  `Runefin-0.1.0-x86_64.flatpak` (10.7 MB) attached.
+- Tag `v0.1.0` on `ee9ae08` and a GitHub release with notes and
+  `Runefin-0.1.0-x86_64.flatpak` (10.7 MB) built from the repinned tree.
 
 ### Still required
 
