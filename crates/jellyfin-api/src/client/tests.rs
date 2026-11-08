@@ -55,10 +55,10 @@ fn a_library_query_names_its_parent_types_and_page() {
 
 #[test]
 fn a_search_query_escapes_the_term() {
-    let mut q = ItemQuery::search("blade runner & co");
+    let mut q = ItemQuery::search("example film & co");
     q.limit = 40;
     let s = q.to_query();
-    assert!(s.contains("searchTerm=blade%20runner%20%26%20co"));
+    assert!(s.contains("searchTerm=example%20film%20%26%20co"));
     // Values are percent-encoded, so commas travel as %2C and the server decodes them.
     assert!(s.contains("includeItemTypes=Movie%2CSeries%2CEpisode%2CBoxSet%2CPerson"));
 }
@@ -204,10 +204,10 @@ fn a_server_relative_url_gets_the_client_base() {
 fn a_direct_stream_can_name_its_media_source() {
     let client = Client::new("https://media.example", "device").with_session("token", "user");
     let url = client
-        .direct_stream_url_with_source("dune 2", Some("4k source"))
+        .direct_stream_url_with_source("example 2", Some("4k source"))
         .expect("a URL");
     assert!(url.contains("mediaSourceId=4k%20source"), "{url}");
-    assert!(url.contains("/Videos/dune%202/stream"), "{url}");
+    assert!(url.contains("/Videos/example%202/stream"), "{url}");
 }
 
 #[test]
