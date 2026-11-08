@@ -6,8 +6,8 @@ user-facing inventory is [`features.md`](features.md); the contracts are
 
 **Repositories**
 
-- App: https://github.com/lifk/Runefin (public release mirror; development happens on a
-  private remote and is published as reviewed commits)
+- App: https://github.com/lifk/Runefin — `main` is the source of truth. The pre-rewrite
+  development history lives only on a private archive remote and is never pushed to `origin`.
 - Rune fork: https://github.com/lifk/rune — `runefin/player` carries the patches the app
   depends on; the default branch is `runefin/player`
 - Upstream: https://github.com/anomalyco/rune (moves ~100 commits/day)

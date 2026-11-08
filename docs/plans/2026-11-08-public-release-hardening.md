@@ -70,18 +70,13 @@ name and the fixture addresses changed.
 
 ### Publishing a later commit
 
-The public repository carries reviewed snapshots of `main`, never the private history:
+Development now happens directly on GitHub. `origin` is `https://github.com/lifk/Runefin` in
+both checkouts; the pre-rewrite history survives only as the `private-archive` branch of the old
+private remote (`forgejo`), which is never pushed to `origin`:
 
 ```sh
-# on main, with everything committed and scripts/check.sh green
-git checkout public
-git read-tree -u --reset main     # the public branch takes main's tree, its own history stays
-git commit -m "sync: <what changed since the last publication>"
-git push github public:main
-git checkout main
+git push origin main     # after scripts/check.sh is green
 ```
-
-`git diff public main` must stay empty; if it is not, a file was added to one side only.
 
 ### Verified after publication
 

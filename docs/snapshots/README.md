@@ -180,3 +180,6 @@ the light theme; the others use the dark theme.
 There is intentionally no snapshot for MPRIS (a bus service, not a surface), for the HDR tone
 curve (it is GPU math pinned by CPU tests), or for a fullscreen window (the chip and shortcut are
 captured; the window manager owns the mode).
+
+The fixtures behind these frames are public-domain films and invented series, episodes, channels
+and people; the scene code never fetches artwork, so no third-party still is committed.
