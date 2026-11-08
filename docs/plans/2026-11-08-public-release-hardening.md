@@ -57,8 +57,8 @@ name and the fixture addresses changed.
   exact rev the app pins. The fork's other branches stay in the private mirror.
 - `https://github.com/lifk/Runefin` — public, `main` is the single initial commit `ee9ae08`,
   authored `Luis Jurado <lifk@users.noreply.github.com>`; no private object was pushed.
-- **Identity incident and fix.** The first publication carried `hermes@home.luis.quest` in the
-  author field of two commits (the sync commits, not the initial one) and of the fork's eleven
+- **Identity incident and fix.** The first publication carried the private development
+  identity in the author field of two commits (the sync commits, not the initial one) and of the fork's eleven
   commits. Both histories were rewritten to `lifk@users.noreply.github.com`, the two
   repositories were deleted and recreated rather than force-pushed, and the pre-rewrite hashes
   now answer 422. Trees are byte-identical; only the identities and the pin changed.
