@@ -71,9 +71,9 @@ jobs:
 
       - name: No private hosts or identities in the tree
         run: |
-          # Full hostnames and paths only, so the plan's notes do not match; this workflow
-          # itself is excluded because it contains the pattern.
-          if git grep -nE 'forgejo\.home\.luis|git\.home\.luis|jellyfin\.home\.luis|jellyseerr\.home\.luis|hermes@home\.luis|/home/luis/' -- . ':!.github/workflows/ci.yml' ; then
+          # Full hostnames and paths only, so the plan's notes do not match. This workflow and
+          # the pre-commit hook are excluded because they contain the patterns themselves.
+          if git grep -nE 'forgejo\.home\.luis|git\.home\.luis|jellyfin\.home\.luis|jellyseerr\.home\.luis|hermes@home\.luis|/home/luis/' -- . ':!.github/workflows/ci.yml' ':!.githooks/pre-commit' ; then
             echo "private reference found"; exit 1
           fi
 
