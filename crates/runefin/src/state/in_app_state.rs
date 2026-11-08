@@ -1542,17 +1542,38 @@ impl State {
         let Some(session) = self.in_app.as_ref() else {
             return changed;
         };
-        let reported = session.player.position_ms();
+        // Ten clock queries a second, not sixty: the pipeline lock is held by the streaming
+        // thread during a flush or a renegotiation, and a blocked query freezes the whole
+        // window. A held seek target keeps winning until a fresh query settles it.
+        let hold_expired = session
+            .seek_hold
+            .is_some_and(|(_, at)| at.elapsed() >= Duration::from_secs(4));
+        let query_due =
+            hold_expired || self.in_app_query_at.elapsed() >= Duration::from_millis(100);
+        if query_due {
+            self.in_app_query_at = Instant::now();
+        }
+        let reported = if query_due {
+            session.player.position_ms()
+        } else {
+            session.position_ms
+        };
         let (position, seek_settled) = match session.seek_hold {
-            Some((target, at))
-                if (reported - target).abs() > 1_000 && at.elapsed() < Duration::from_secs(4) =>
-            {
-                (target, false)
+            Some((target, at)) => {
+                let expired = at.elapsed() >= Duration::from_secs(4);
+                if !expired && (!query_due || (reported - target).abs() > 1_000) {
+                    (target, false)
+                } else {
+                    (reported, true)
+                }
             }
-            Some(_) => (reported, true),
             None => (reported, false),
         };
-        let duration = session.player.duration_ms();
+        let duration = if query_due {
+            session.player.duration_ms()
+        } else {
+            session.duration_ms
+        };
         let paused = session.player.is_paused();
         let paused_changed = paused != session.paused;
         let buffering = session.player.buffering();

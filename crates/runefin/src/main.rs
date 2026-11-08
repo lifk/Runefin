@@ -24,6 +24,7 @@ mod library;
 mod mpris;
 mod net;
 mod pad;
+mod playback_trace;
 mod player;
 mod ratings;
 mod screens;
@@ -195,6 +196,7 @@ fn setup(s: &mut State, waker: rune::Waker) {
 
 /// Every frame. Drains finished work; true only when something visible changed.
 fn poll(s: &mut State, _clock: f64, tx: &mut Tx) -> bool {
+    let started = std::time::Instant::now();
     let mut changed = s.poll();
     if let Some(key) = s.take_focus_key() {
         tx.focus_key(key);
@@ -218,7 +220,26 @@ fn poll(s: &mut State, _clock: f64, tx: &mut Tx) -> bool {
     {
         std::thread::sleep(std::time::Duration::from_millis(ms.min(50)));
     }
+    trace_slow_poll(started.elapsed());
     changed
+}
+
+/// With `RUNEFIN_TRACE_PLAYBACK=1`, name a UI frame that took long enough to be felt. At most
+/// one line a second, so a pathological screen does not flood the terminal.
+fn trace_slow_poll(took: std::time::Duration) {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static LAST: AtomicU64 = AtomicU64::new(0);
+    if took < std::time::Duration::from_millis(12)
+        || std::env::var_os("RUNEFIN_TRACE_PLAYBACK").is_none()
+    {
+        return;
+    }
+    let now = crate::playback_trace::now_us();
+    if now.saturating_sub(LAST.load(Ordering::Relaxed)) < 1_000_000 {
+        return;
+    }
+    LAST.store(now, Ordering::Relaxed);
+    eprintln!("playback: the UI frame took {} ms", took.as_millis());
 }
 
 /// Esc pops the top screen: detail goes back to its card, a library goes home.

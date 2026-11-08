@@ -405,6 +405,46 @@ gst-libav` for the in-app player. `libudev-dev` is needed to compile the control
    ban an IP on repeated or admin-path requests; the `jellyfin-api` client sends one request at a
    time and never touches `/System/Configuration`. If a 403 appears, stop rather than retrying.
 
+## 4b. Measuring playback stutter
+
+A report of "it slows down and then races to catch up" has two possible shapes, and they look
+almost the same to the eye:
+
+- the **sink backlog**: the pipeline fell behind, then the sink rendered every queued frame as
+  fast as it could (a GStreamer `BaseSink` with the default `max-lateness = -1` never drops a
+  late frame), which looks like a freeze followed by fast-forward;
+- the **pipeline stall**: the source, decoder or audio clock stopped, the picture froze, and
+  when it resumed it jumped to the current position.
+
+Run with `RUNEFIN_TRACE_PLAYBACK=1` and read the line printed every four seconds:
+
+    playback: DMA-BUF P010 | renders 96 in 4 s (24.0/s), stalls 0, bursts 0,
+              longest gap 41 ms | clock frozen samples 0, jumps 1
+
+- `renders` far below the source rate with `stalls` above zero: frames are not reaching the
+  sink; look at the decoder (VA-API device, 4K HDR) or the network.
+- `bursts` above zero after a stall: the sink had a backlog. The app already sets
+  `max-lateness` (20 ms on the DMA-BUF sink, 40 ms on the CPU sink) so a late frame is dropped
+  instead of drawn in a race; if bursts still appear, the sink is not the one falling behind.
+- `clock frozen samples` above zero: the media clock did not advance for a 100 ms sample, so the
+  source or the audio device stalled rather than the renderer.
+
+The same switch names a UI frame that took longer than 12 ms and any flush seek that took longer
+than 20 ms; both run on the UI thread, and both freeze the picture while they last.
+
+For a repeatable marker without a server, generate a clip and run the ignored probe:
+
+```sh
+ffmpeg -f lavfi -i testsrc2=size=1920x1080:rate=24 -t 30 -c:v libx264 -preset ultrafast \
+  -pix_fmt yuv420p /tmp/pace-1080p.mp4
+RUNEFIN_TRACE_PLAYBACK=1 cargo test -p runefin a_local_file_holds_its_frame_pacing \
+  -- --ignored --nocapture
+```
+
+A healthy run prints `24.0/s, stalls 0, bursts 0, longest gap 41 ms` for 24 fps source material.
+On a machine that stutters, run it again with a 4K HEVC file; `stalls` above zero localises the
+problem to decode rather than the network.
+
 ## 5. Decisions already made (do not re-litigate)
 
 - **D1/D3 superseded**: no mpv subprocess on Wayland; in-app playback via DMA-BUF. mpv stays as a

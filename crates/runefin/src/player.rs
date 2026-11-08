@@ -17,6 +17,8 @@ use gstreamer_video::VideoInfo;
 use rune::NativeSurface;
 use rune::native_surface::{ByteFrame, ColorInfo, Format, Matrix, Transfer};
 
+use crate::playback_trace::{self, Trace};
+
 pub struct Player {
     pipeline: gst::Pipeline,
     bus: gst::Bus,
@@ -41,6 +43,10 @@ pub struct Player {
     downmix: Option<gst::Element>,
     delay: Option<gst::Element>,
     dynamic: Option<gst::Element>,
+    /// Frame pacing counters, shared with the sink; read by the opt-in trace reporter.
+    trace: Arc<Trace>,
+    /// Tells the trace reporter to stop before the pipeline is torn down.
+    stopped: Arc<AtomicBool>,
 }
 
 impl Player {
@@ -73,6 +79,8 @@ impl Player {
             downmix: None,
             delay: None,
             dynamic: None,
+            trace: Arc::new(Trace::default()),
+            stopped: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -99,7 +107,10 @@ impl Player {
         // six seconds on every such file; two seconds is enough for a healthy first frame.
         let dmabuf = match start_pipeline(url, surface.clone(), true) {
             Ok(player) => match player.wait_for_first_frame(Duration::from_secs(2)) {
-                Ok(()) => return Ok(player),
+                Ok(()) => {
+                    player.begin_trace();
+                    return Ok(player);
+                }
                 Err(error) => error,
             },
             Err(error) => error,
@@ -157,6 +168,8 @@ impl Player {
             downmix: None,
             delay: None,
             dynamic: None,
+            trace: Arc::new(Trace::default()),
+            stopped: Arc::new(AtomicBool::new(false)),
         })
     }
 
@@ -175,6 +188,26 @@ impl Player {
             std::thread::sleep(Duration::from_millis(50));
         }
         Err("no frames arrived before the startup timeout".into())
+    }
+
+    /// Start the opt-in reporter once the first frame has arrived, so its path label is the
+    /// negotiated one rather than a guess.
+    fn begin_trace(&self) {
+        if std::env::var_os("RUNEFIN_TRACE_PLAYBACK").is_none() {
+            return;
+        }
+        playback_trace::spawn_reporter(
+            Arc::clone(&self.trace),
+            self.pipeline.clone(),
+            self.path_label(),
+            Arc::clone(&self.stopped),
+        );
+    }
+
+    /// Frame pacing since the player started, for the ignored probe.
+    #[cfg(test)]
+    pub fn pacing(&self) -> crate::playback_trace::TraceSnapshot {
+        self.trace.snapshot()
     }
 
     pub fn frames(&self) -> u64 {
@@ -336,6 +369,7 @@ impl Player {
     }
 
     pub fn seek_ms(&self, position_ms: i64) {
+        let started = Instant::now();
         // `seek_simple` resets the rate to 1.0. A seek while watching at 1.25× must stay at
         // 1.25×, so use the full seek with the tracked rate.
         let rate = f64::from_bits(self.rate.load(Ordering::Relaxed));
@@ -347,6 +381,14 @@ impl Player {
             gst::SeekType::None,
             gst::ClockTime::NONE,
         );
+        if started.elapsed() > Duration::from_millis(20)
+            && std::env::var_os("RUNEFIN_TRACE_PLAYBACK").is_some()
+        {
+            eprintln!(
+                "playback: flush seek took {} ms (on the UI thread)",
+                started.elapsed().as_millis()
+            );
+        }
     }
 
     pub fn has_ended(&self) -> bool {
@@ -402,6 +444,7 @@ impl Player {
     }
 
     pub fn stop(&self) {
+        self.stopped.store(true, Ordering::Relaxed);
         // Wait for the streaming threads to leave PLAYING before the process can drop the
         // sink and surface; a bare asynchronous Null can race a flush seek at shutdown.
         let _ = self.pipeline.set_state(gst::State::Null);
@@ -411,6 +454,7 @@ impl Player {
 
 impl Drop for Player {
     fn drop(&mut self) {
+        self.stopped.store(true, Ordering::Relaxed);
         let _ = self.pipeline.set_state(gst::State::Null);
         let _ = self.pipeline.state(gst::ClockTime::from_seconds(2));
         // The sink's streaming thread can still be unwinding a flush seek when the state
@@ -453,6 +497,8 @@ fn start_pipeline(
     let eos = Arc::new(AtomicBool::new(false));
     let error = Arc::new(Mutex::new(None));
     let dmabuf_kind = Arc::new(Mutex::new(None));
+    let trace = Arc::new(Trace::default());
+    let stopped = Arc::new(AtomicBool::new(false));
     let sink: gst::Element = if prefer_dmabuf {
         let caps = dmabuf_caps(&convert)
             .ok_or_else(|| "VA-API exposes no AR24 DMA-BUF modifier".to_string())?;
@@ -466,8 +512,15 @@ fn start_pipeline(
             Arc::clone(&error),
             Arc::clone(&frame_id),
             Arc::clone(&dmabuf_kind),
+            Arc::clone(&trace),
         );
         let sink = dmabuf.upcast::<gst::Element>();
+        // A late frame is dropped rather than drawn immediately: the default (-1) renders the
+        // whole backlog as fast as possible after any hiccup, which is the "freeze, then race"
+        // report. 20 ms is under one frame at 30 fps, so healthy pacing is untouched.
+        sink.set_property("sync", true);
+        sink.set_property("qos", true);
+        sink.set_property("max-lateness", 20_000_000i64);
         let bin = gst::Bin::new();
         bin.add_many([&convert, &filter, &sink])
             .map_err(|error| format!("GStreamer video sink: {error}"))?;
@@ -490,12 +543,16 @@ fn start_pipeline(
             .build()
             .map_err(|error| format!("GStreamer capsfilter: {error}"))?;
         let sink = AppSink::builder().max_buffers(3).sync(true).build();
+        // The CPU path is slower to fill, so allow a little more slack before dropping.
+        sink.set_property("qos", true);
+        sink.set_property("max-lateness", 40_000_000i64);
         set_cpu_callbacks(
             &sink,
             surface.clone(),
             Arc::clone(&eos),
             Arc::clone(&error),
             Arc::clone(&frame_id),
+            Arc::clone(&trace),
         );
         let bin = gst::Bin::new();
         bin.add_many([&convert, &filter, sink.upcast_ref::<gst::Element>()])
@@ -576,6 +633,8 @@ fn start_pipeline(
         downmix,
         delay,
         dynamic,
+        trace: Arc::clone(&trace),
+        stopped: Arc::clone(&stopped),
     })
 }
 
@@ -679,6 +738,7 @@ fn set_cpu_callbacks(
     eos: Arc<AtomicBool>,
     error: Arc<Mutex<Option<String>>>,
     frame_id: Arc<AtomicU64>,
+    trace: Arc<Trace>,
 ) {
     sink.set_callbacks(
         gstreamer_app::AppSinkCallbacks::builder()
@@ -741,6 +801,7 @@ fn set_cpu_callbacks(
                     color,
                     planes: [y_plane, uv_plane],
                 };
+                trace.tick();
                 if let Err(message) =
                     surface.push_bytes(frame, frame_id.fetch_add(1, Ordering::Relaxed))
                 {
@@ -759,6 +820,27 @@ fn set_cpu_callbacks(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    #[ignore = "needs a local media file; measures frame pacing for ten seconds"]
+    fn a_local_file_holds_its_frame_pacing() {
+        let media = std::env::var("RUNEFIN_TEST_MEDIA")
+            .unwrap_or_else(|_| "/tmp/opencode/pace-1080p.mp4".into());
+        let player = Player::start(&format!("file://{media}"), NativeSurface::new(), None)
+            .expect("the pacing clip plays");
+        std::thread::sleep(Duration::from_secs(10));
+        let pacing = player.pacing();
+        eprintln!(
+            "pacing: {} frames, {} stalls, {} bursts, longest gap {} ms, path {}",
+            pacing.frames,
+            pacing.stalls,
+            pacing.bursts,
+            pacing.max_gap_ms,
+            player.path_label()
+        );
+        assert!(pacing.frames > 60, "the sink rendered frames: {pacing:?}");
+        player.stop();
+    }
 
     #[test]
     #[ignore = "needs a generated local clip and a GStreamer runtime"]

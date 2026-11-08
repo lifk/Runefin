@@ -20,6 +20,8 @@ use gstreamer_base::BaseSink;
 use gstreamer_base::subclass::prelude::*;
 use gstreamer_video::{VideoInfo, VideoMeta};
 use rune::NativeSurface;
+
+use crate::playback_trace::Trace;
 use rune::native_surface::dmabuf::{DmabufFrame, Lease, Plane};
 use rune::native_surface::{ColorInfo, Format, Matrix, Transfer};
 
@@ -58,6 +60,7 @@ pub struct Imp {
     error: Mutex<Arc<Mutex<Option<String>>>>,
     frame_id: Mutex<Arc<AtomicU64>>,
     format_label: Mutex<Arc<Mutex<Option<&'static str>>>>,
+    trace: Mutex<Arc<Trace>>,
 }
 
 #[glib::object_subclass]
@@ -263,6 +266,9 @@ impl BaseSinkImpl for Imp {
             }
             gst::FlowError::Error
         })?;
+        if let Ok(trace) = self.trace.lock() {
+            trace.tick();
+        }
         Ok(gst::FlowSuccess::Ok)
     }
 
@@ -305,6 +311,7 @@ impl DmabufSink {
         error: Arc<Mutex<Option<String>>>,
         frame_id: Arc<AtomicU64>,
         format_label: Arc<Mutex<Option<&'static str>>>,
+        trace: Arc<Trace>,
     ) -> Self {
         let sink: Self = glib::Object::builder().build();
         let imp = sink.imp();
@@ -321,6 +328,9 @@ impl DmabufSink {
         *imp.format_label
             .lock()
             .unwrap_or_else(|poison| poison.into_inner()) = format_label;
+        *imp.trace
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner()) = trace;
         sink
     }
 }

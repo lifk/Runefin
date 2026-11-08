@@ -556,6 +556,10 @@ pub struct State {
     pub in_app_run_episodes: u32,
     pub in_app_last_input: Instant,
     pub in_app_play_since: Instant,
+    /// When the player's clock was last queried. `query_position` and `query_duration` take the
+    /// pipeline lock, which the streaming thread holds during a flush or renegotiation; asking
+    /// every frame turns that into UI stalls. Ten times a second is plenty for the bar.
+    pub in_app_query_at: Instant,
     pub still_watching_open: bool,
     pub still_watching_next: Option<Item>,
     /// When the card opened, so its 60 s countdown can stop the run quietly.
@@ -925,6 +929,7 @@ impl State {
             in_app_run_episodes: 0,
             in_app_last_input: Instant::now(),
             in_app_play_since: Instant::now(),
+            in_app_query_at: Instant::now(),
             still_watching_open: false,
             still_watching_next: None,
             still_watching_since: None,
@@ -4202,6 +4207,7 @@ mod tests {
             in_app_run_episodes: 0,
             in_app_last_input: Instant::now(),
             in_app_play_since: Instant::now(),
+            in_app_query_at: Instant::now(),
             still_watching_open: false,
             still_watching_next: None,
             still_watching_since: None,
