@@ -4488,7 +4488,7 @@ mod tests {
         let config = Config {
             server_url: "http://198.51.100.2:8096".into(),
             user_id: "u1".into(),
-            user_name: "luis".into(),
+            user_name: "example-user".into(),
             token: "stale".into(),
             ..Config::default()
         };
@@ -4549,7 +4549,7 @@ mod tests {
         let config = Config {
             server_url: "http://198.51.100.2:8096".into(),
             user_id: "u1".into(),
-            user_name: "luis".into(),
+            user_name: "example-user".into(),
             server_name: "example".into(),
             token: "tok".into(),
             device_id: "dev".into(),
@@ -4601,12 +4601,12 @@ mod tests {
             server_name: "example".into(),
             version: "12.4.0".into(),
             user_id: "u1".into(),
-            user_name: "luis".into(),
+            user_name: "example-user".into(),
             token: "tok".into(),
         })));
         assert!(s.is_signed_in());
         assert_eq!(s.config.token, "tok");
-        assert_eq!(s.config.user_name, "luis");
+        assert_eq!(s.config.user_name, "example-user");
     }
 
     #[test]
@@ -4631,7 +4631,7 @@ mod tests {
         home.latest[0].items[0].backdrop_image_tags = Some(vec!["ambient".into()]);
         s.home_data = home;
         let key = s.home_backdrop_key().expect("a backdrop is available");
-        assert!(key.contains("past-lives"));
+        assert!(key.contains("his-girl-friday"));
         assert!(key.contains("1280"));
     }
 
@@ -4643,7 +4643,7 @@ mod tests {
             server_name: "example".into(),
             version: "12.4.0".into(),
             user_id: "u1".into(),
-            user_name: "luis".into(),
+            user_name: "example-user".into(),
             token: "tok".into(),
         })));
         s.sign_out();

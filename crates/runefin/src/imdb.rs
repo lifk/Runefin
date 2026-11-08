@@ -144,10 +144,10 @@ mod tests {
 
     #[test]
     fn the_index_finds_a_rating_and_reports_missing_titles() {
-        let ratings =
-            ImdbRatings::from_records(vec![(289_043, 75), (11_280_740, 86), (15_239_678, 85)]);
+        let ratings = ImdbRatings::from_records(vec![(289_043, 75), (1_520_000, 86), (17_136, 85)]);
         assert_eq!(ratings.rating("tt0289043"), Some(7.5));
-        assert_eq!(ratings.rating("tt11280740"), Some(8.6));
+        assert_eq!(ratings.rating("tt1520000"), Some(8.6));
+        assert_eq!(ratings.rating("tt0017136"), Some(8.5));
         assert_eq!(ratings.rating("tt0000000"), None);
         assert_eq!(ratings.rating("not-an-id"), None);
     }

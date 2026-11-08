@@ -218,14 +218,14 @@ mod tests {
     fn the_snapshot_names_the_playing_episode() {
         let mut state = State::from_config(Config::fresh());
         let mut session = crate::demo::in_app();
-        session.item.series_name = Some("Severance".into());
+        session.item.series_name = Some("The Quiet Floor".into());
         state.in_app = Some(session);
         state.in_app_volume = 0.6;
         state.in_app_speed = 1.25;
         let snapshot = state.mpris_snapshot();
         assert_eq!(snapshot.status, crate::mpris::PlaybackStatus::Playing);
-        assert_eq!(snapshot.title, "Goodbye, Mrs. Selvig");
-        assert_eq!(snapshot.artist, "Severance");
+        assert_eq!(snapshot.title, "Exit Interview");
+        assert_eq!(snapshot.artist, "The Quiet Floor");
         assert_eq!(snapshot.album, "S2E02");
         assert!((snapshot.volume - 0.6).abs() < 0.001);
         assert!((snapshot.rate - 1.25).abs() < 0.001);

@@ -230,7 +230,7 @@ pub fn remaining(item: &Item) -> Option<i64> {
     (left > 0).then(|| (left + 59_999) / 60_000)
 }
 
-/// The line under a card's title: `S2E04 · The After Hours`, or the year for a film.
+/// The line under a card's title: `S2E04 · Overtime`, or the year for a film.
 pub fn subtitle(item: &Item) -> String {
     if let Some(episode) = item.episode_label() {
         return format!("{episode} · {}", item.name);

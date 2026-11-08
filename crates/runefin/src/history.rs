@@ -131,8 +131,8 @@ mod tests {
     #[test]
     fn an_entry_round_trips_as_one_line() {
         let entry = HistoryEntry {
-            item_id: "dune-2".into(),
-            name: "Dune: Part Two".into(),
+            item_id: "metropolis".into(),
+            name: "Metropolis".into(),
             kind: "Movie".into(),
             series_name: None,
             year: Some(2024),
@@ -142,7 +142,7 @@ mod tests {
         let line = serde_json::to_string(&entry).expect("serialises");
         assert!(!line.contains('\n'));
         let back: HistoryEntry = serde_json::from_str(&line).expect("parses");
-        assert_eq!(back.item_id, "dune-2");
+        assert_eq!(back.item_id, "metropolis");
         assert_eq!(back.played_ms, 7_200_000);
     }
 }

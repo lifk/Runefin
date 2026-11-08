@@ -715,7 +715,7 @@ mod tests {
         let mut c = Config {
             server_url: "http://198.51.100.2:8096".into(),
             user_id: "u1".into(),
-            user_name: "luis".into(),
+            user_name: "example-user".into(),
             server_name: "example".into(),
             token: "secret".into(),
             device_id: "dev".into(),
@@ -733,7 +733,7 @@ mod tests {
         let c = Config {
             server_url: "http://198.51.100.2:8096".into(),
             user_id: "u1".into(),
-            user_name: "luis".into(),
+            user_name: "example-user".into(),
             server_name: "example".into(),
             token: "secret".into(),
             device_id: "dev".into(),
@@ -830,12 +830,12 @@ mod tests {
         let mut c = Config {
             server_url: "http://198.51.100.2:8096".into(),
             user_id: "u1".into(),
-            user_name: "luis".into(),
+            user_name: "example-user".into(),
             token: "secret".into(),
             seerr_url: "https://jellyseerr.example".into(),
             seerr_api_key: Some("seerr-key".into()),
             seerr_user_id: Some(1),
-            seerr_user_name: Some("luis".into()),
+            seerr_user_name: Some("example-user".into()),
             ..Config::default()
         };
         let text = toml::to_string(&c).expect("serialises");
@@ -844,7 +844,7 @@ mod tests {
         assert_eq!(back.seerr_url, "https://jellyseerr.example");
         assert_eq!(back.seerr_api_key.as_deref(), Some("seerr-key"));
         assert_eq!(back.seerr_user_id, Some(1));
-        assert_eq!(back.seerr_user_name.as_deref(), Some("luis"));
+        assert_eq!(back.seerr_user_name.as_deref(), Some("example-user"));
 
         c.sign_out();
         assert_eq!(c.seerr_api_key.as_deref(), Some("seerr-key"));

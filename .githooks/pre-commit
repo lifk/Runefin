@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# Refuse a commit that looks like it carries a credential, a private host or the old
+# development identity. Installed by scripts/install-hooks.sh; CI runs the same checks.
+set -euo pipefail
+
+fail() {
+    echo "pre-commit: $1" >&2
+    echo "pre-commit: fix or remove the staged content, then commit again." >&2
+    exit 1
+}
+
+# These two files contain the patterns themselves, so scanning them always matches.
+self_patterns=".githooks/pre-commit .github/workflows/ci.yml"
+
+for path in $(git diff --cached --name-only --diff-filter=ACM); do
+    case " $self_patterns " in
+        *" $path "*) continue ;;
+    esac
+    case "$path" in
+        .env|.env.*|*.pem|*.key|.cargo/config.toml|id_rsa|id_ed25519)
+            fail "$path holds local secrets or machine settings" ;;
+    esac
+done
+
+check() {
+    local path="$1" pattern="$2" what="$3" hits
+    hits=$(git diff --cached -U0 --diff-filter=ACM -- "$path" | grep -E '^\+' | grep -v '^+++' \
+        | grep -nE -- "$pattern" || true)
+    if [ -n "$hits" ]; then
+        echo "in $path:" >&2
+        printf '%s\n' "$hits" | head -5 >&2
+        fail "staged content matches $what"
+    fi
+}
+
+for path in $(git diff --cached --name-only --diff-filter=ACM); do
+    case " $self_patterns " in
+        *" $path "*) continue ;;
+    esac
+    case "$path" in
+        *.png|*.jpg|*.jpeg|*.gif|*.webp|*.ico|*.woff|*.woff2|*.ttf|*.otf) continue ;;
+    esac
+    check "$path" 'ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{20,}' "a GitHub or GitLab token"
+    check "$path" 'AKIA[0-9A-Z]{16}|xox[baprs]-[A-Za-z0-9-]{10,}' "an AWS or Slack credential"
+    check "$path" 'sk-[A-Za-z0-9]{32,}' "an API secret key"
+    check "$path" '-----BEGIN ([A-Z]+ )?PRIVATE KEY-----' "a private key"
+    check "$path" 'forgejo\.home\.luis|git\.home\.luis|jellyfin\.home\.luis|jellyseerr\.home\.luis' "a private host"
+    check "$path" 'hermes@home\.luis|/home/luis/' "the private development identity"
+    # A real Jellyfin token is 32 hex characters; fixtures use tok, token or example.
+    check "$path" 'api_key=[A-Fa-f0-9]{32}' "a token in a URL"
+done
+
+exit 0

@@ -66,27 +66,27 @@ pub fn home() -> HomeData {
         item
     }
 
-    let mut played_arrival = item("played-arrival", "Arrival", "Movie", None, 2016, 100.0);
+    let mut played_arrival = item("played-arrival", "The General", "Movie", None, 2016, 100.0);
     if let Some(user) = &mut played_arrival.user_data {
         user.played = true;
         user.playback_position_ticks = 0;
     }
-    let mut played_shogun = episode(
-        "played-shogun-s1e2",
-        "Servants of Two Masters",
-        ("Shōgun", "shogun"),
+    let mut played_harbour = episode(
+        "played-harbour-s1e2",
+        "The Harbour Master",
+        ("Harbour", "harbour"),
         1,
         2,
         100.0,
     );
-    if let Some(user) = &mut played_shogun.user_data {
+    if let Some(user) = &mut played_harbour.user_data {
         user.played = true;
         user.playback_position_ticks = 0;
     }
     let mut played_last = episode(
-        "played-last-s1e3",
-        "Long, Long Time",
-        ("The Last of Us", "last-of-us"),
+        "played-after-thaw-s1e3",
+        "The Long Winter",
+        ("After the Thaw", "after-thaw"),
         1,
         3,
         100.0,
@@ -116,53 +116,60 @@ pub fn home() -> HomeData {
         ],
         resume: vec![
             episode(
-                "severance-s2e4",
-                "The After Hours",
-                ("Severance", "severance"),
+                "quiet-floor-s2e4",
+                "Overtime",
+                ("The Quiet Floor", "quiet-floor"),
                 2,
                 4,
                 65.0,
             ),
             episode(
-                "the-bear-s3e2",
-                "Next",
-                ("The Bear", "the-bear"),
+                "service-s3e2",
+                "Double Shift",
+                ("Service", "service"),
                 3,
                 2,
                 18.0,
             ),
-            item("dune-2", "Dune: Part Two", "Movie", None, 2024, 42.0),
-            episode("andor-s2e8", "Who Are You?", ("Andor", "andor"), 2, 8, 80.0),
+            item("metropolis", "Metropolis", "Movie", None, 1927, 42.0),
+            episode(
+                "long-orbit-s2e8",
+                "Call Sign",
+                ("The Long Orbit", "long-orbit"),
+                2,
+                8,
+                80.0,
+            ),
         ],
         next_up: vec![
             episode(
-                "severance-s2e5",
-                "Trojan's Horse",
-                ("Severance", "severance"),
+                "quiet-floor-s2e5",
+                "The Long Corridor",
+                ("The Quiet Floor", "quiet-floor"),
                 2,
                 5,
                 0.0,
             ),
             episode(
-                "the-bear-s3e3",
-                "Doors",
-                ("The Bear", "the-bear"),
+                "service-s3e3",
+                "Last Orders",
+                ("Service", "service"),
                 3,
                 3,
                 0.0,
             ),
             episode(
-                "andor-s2e9",
-                "Welcome to the Rebellion",
-                ("Andor", "andor"),
+                "long-orbit-s2e9",
+                "The Quiet Signal",
+                ("The Long Orbit", "long-orbit"),
                 2,
                 9,
                 0.0,
             ),
             episode(
-                "shogun-s1e2",
-                "Servants of Two Masters",
-                ("Shōgun", "shogun"),
+                "harbour-s1e2",
+                "The Harbour Master",
+                ("Harbour", "harbour"),
                 1,
                 2,
                 0.0,
@@ -174,80 +181,101 @@ pub fn home() -> HomeData {
             .collect(),
         collections: vec![
             Item {
-                id: "ace-collection".into(),
-                name: "Ace Ventura Collection".into(),
+                id: "silent-horror-collection".into(),
+                name: "Silent Horror Collection".into(),
                 kind: "BoxSet".into(),
                 production_year: Some(1994),
                 ..Item::default()
             },
             Item {
                 id: "alien-collection".into(),
-                name: "Alien Collection".into(),
+                name: "Early Science Fiction Collection".into(),
                 kind: "BoxSet".into(),
-                production_year: Some(1979),
+                production_year: Some(1927),
                 ..Item::default()
             },
             Item {
                 id: "spider-collection".into(),
-                name: "The Amazing Spider-Man Collection".into(),
+                name: "Silent Comedy Collection".into(),
                 kind: "BoxSet".into(),
-                production_year: Some(2012),
+                production_year: Some(1921),
                 ..Item::default()
             },
             Item {
                 id: "matrix-collection".into(),
-                name: "The Matrix Collection".into(),
+                name: "German Expressionism Collection".into(),
                 kind: "BoxSet".into(),
-                production_year: Some(1999),
+                production_year: Some(1920),
                 ..Item::default()
             },
         ],
-        recently_played: vec![played_arrival, played_shogun, played_last],
+        recently_played: vec![played_arrival, played_harbour, played_last],
         latest: vec![
             LatestRail {
                 library: "Movies".into(),
                 library_id: "movies".into(),
                 items: vec![
-                    item("past-lives", "Past Lives", "Movie", None, 2023, 0.0),
                     item(
-                        "anatomy-fall",
-                        "Anatomy of a Fall",
+                        "his-girl-friday",
+                        "His Girl Friday",
                         "Movie",
                         None,
-                        2023,
+                        1940,
                         0.0,
                     ),
-                    item("the-substance", "The Substance", "Movie", None, 2024, 0.0),
-                    item("perfect-days", "Perfect Days", "Movie", None, 2023, 0.0),
-                    item("challengers", "Challengers", "Movie", None, 2024, 0.0),
+                    item("charade", "Charade", "Movie", None, 1963, 0.0),
+                    item("the-kid", "The Kid", "Movie", None, 1921, 0.0),
+                    item(
+                        "night-living-dead",
+                        "Night of the Living Dead",
+                        "Movie",
+                        None,
+                        1968,
+                        0.0,
+                    ),
+                    item(
+                        "plan-9",
+                        "Plan 9 from Outer Space",
+                        "Movie",
+                        None,
+                        1957,
+                        0.0,
+                    ),
                 ],
             },
             LatestRail {
                 library: "Shows".into(),
                 library_id: "shows".into(),
                 items: vec![
-                    episode("shogun-s1e1", "Anjin", ("Shōgun", "shogun"), 1, 1, 0.0),
-                    episode("fallout-s1e1", "The End", ("Fallout", "fallout"), 1, 1, 0.0),
                     episode(
-                        "ripley-s1e1",
-                        "I Am Legend",
-                        ("Ripley", "ripley"),
+                        "harbour-s1e1",
+                        "Landfall",
+                        ("Harbour", "harbour"),
+                        1,
+                        1,
+                        0.0,
+                    ),
+                    episode("ashfall-s1e1", "Day One", ("Ashfall", "ashfall"), 1, 1, 0.0),
+                    episode(
+                        "understudy-s1e1",
+                        "Paper Trail",
+                        ("The Understudy", "understudy"),
                         1,
                         1,
                         0.0,
                     ),
                     episode(
-                        "slow-horses-s4e1",
-                        "Identity",
-                        ("Slow Horses", "slow-horses"),
+                        "slow-desk-s4e1",
+                        "Papers",
+                        ("The Slow Desk", "slow-desk"),
                         4,
                         1,
                         0.0,
                     ),
                     episode(
-                        "the-bear-s3e1",
-                        "Tomorrow",
-                        ("The Bear", "the-bear-2"),
+                        "service-s3e1",
+                        "Closing Time",
+                        ("Service", "service-2"),
                         3,
                         1,
                         0.0,
@@ -261,14 +289,14 @@ pub fn home() -> HomeData {
 pub fn detail() -> DetailState {
     let seasons = vec![
         Item {
-            id: "severance-s1".into(),
+            id: "quiet-floor-s1".into(),
             name: "Season 1".into(),
             kind: "Season".into(),
             index_number: Some(1),
             ..Item::default()
         },
         Item {
-            id: "severance-s2".into(),
+            id: "quiet-floor-s2".into(),
             name: "Season 2".into(),
             kind: "Season".into(),
             index_number: Some(2),
@@ -277,25 +305,25 @@ pub fn detail() -> DetailState {
     ];
     let episodes: Vec<Item> = (1..=4)
         .map(|number| Item {
-            id: format!("severance-s2e{number}"),
+            id: format!("quiet-floor-s2e{number}"),
             name: [
-                "Hello, Ms. Cobel",
-                "Goodbye, Mrs. Selvig",
-                "Who Is Alive?",
-                "Woe's Hollow",
+                "Badge Photo",
+                "Exit Interview",
+                "Who Is Awake?",
+                "The Hollow Floor",
             ][number - 1]
                 .into(),
             kind: "Episode".into(),
-            series_id: Some("severance".into()),
-            series_name: Some("Severance".into()),
+            series_id: Some("quiet-floor".into()),
+            series_name: Some("The Quiet Floor".into()),
             parent_index_number: Some(2),
             index_number: Some(number as i32),
             production_year: Some(2025),
             premiere_date: Some(format!("2025-02-{:02}T00:00:00.0000000Z", number + 6)),
             run_time_ticks: Some(10_000 * 60_000 * 48),
             overview: Some(
-                "Mark and his team return to the office after the events of the season one \
-                 finale, with the severed floor's rules under review."
+                "The floor reopens under a new supervisor, and the team starts asking what \
+                 the last shutdown actually changed."
                     .into(),
             ),
             user_data: Some(UserData {
@@ -311,7 +339,7 @@ pub fn detail() -> DetailState {
                 },
                 ChapterInfo {
                     start_position_ticks: 10_000 * 60_000 * 5,
-                    name: "The severed floor".into(),
+                    name: "The office floor".into(),
                     image_tag: Some("demo-chapter-2".into()),
                 },
                 ChapterInfo {
@@ -339,17 +367,16 @@ pub fn detail() -> DetailState {
     let next_up = episodes.get(1).cloned();
     DetailState {
         item: Item {
-            id: "severance".into(),
-            name: "Severance".into(),
+            id: "quiet-floor".into(),
+            name: "The Quiet Floor".into(),
             kind: "Series".into(),
             production_year: Some(2025),
             official_rating: Some("TV-MA".into()),
             run_time_ticks: Some(10_000 * 60_000 * 48),
             overview: Some(
-                "Mark leads a team of office workers whose memories have been surgically \
-                 divided between their work and personal lives. When a mysterious colleague \
-                 appears outside of work, it begins a journey to discover the truth about \
-                 their jobs, their identities, and each other."
+                "A small team has its working memories kept apart from the rest of its life. \
+                 When someone from outside the building starts asking the right questions, the \
+                 arrangement that pays for everything begins to look like a cage."
                     .into(),
             ),
             genres: Some(vec![
@@ -359,52 +386,52 @@ pub fn detail() -> DetailState {
             ]),
             community_rating: Some(8.7),
             critic_rating: Some(96.0),
-            provider_ids: [("Imdb".to_string(), "tt11280740".to_string())].into(),
+            provider_ids: [("Imdb".to_string(), "tt0017136".to_string())].into(),
             remote_trailers: vec![jellyfin_api::RemoteTrailer {
-                url: Some("https://www.youtube.com/watch?v=xEQP4VVuyrY".into()),
+                url: Some("https://example.invalid/trailer".into()),
                 name: Some("Official Trailer".into()),
             }],
             image_tags: Some([("Primary".to_string(), "demo-poster".to_string())].into()),
             backdrop_image_tags: Some(vec!["demo-backdrop".into()]),
             people: vec![
                 Person {
-                    id: "adam-scott".into(),
-                    name: "Adam Scott".into(),
-                    role: Some("Mark Scout".into()),
+                    id: "mara-ellison".into(),
+                    name: "Mara Ellison".into(),
+                    role: Some("Avery Cole".into()),
                     kind: Some("Actor".into()),
                     ..Person::default()
                 },
                 Person {
                     id: "britt-lower".into(),
-                    name: "Britt Lower".into(),
-                    role: Some("Helly R.".into()),
+                    name: "Iris Vane".into(),
+                    role: Some("June Halden".into()),
                     kind: Some("Actor".into()),
                     ..Person::default()
                 },
                 Person {
                     id: "patricia-arquette".into(),
-                    name: "Patricia Arquette".into(),
-                    role: Some("Harmony Cobel".into()),
+                    name: "Dana Reyes".into(),
+                    role: Some("Marta Voss".into()),
                     kind: Some("Actor".into()),
                     ..Person::default()
                 },
                 Person {
                     id: "john-turturro".into(),
-                    name: "John Turturro".into(),
-                    role: Some("Irving Bailiff".into()),
+                    name: "Owen Kestrel".into(),
+                    role: Some("Elias Rook".into()),
                     kind: Some("Actor".into()),
                     ..Person::default()
                 },
                 Person {
                     id: "zach-cherry".into(),
-                    name: "Zach Cherry".into(),
-                    role: Some("Dylan George".into()),
+                    name: "Piotr Sable".into(),
+                    role: Some("Tomas Vey".into()),
                     kind: Some("Actor".into()),
                     ..Person::default()
                 },
                 Person {
                     id: "dan-erickson".into(),
-                    name: "Dan Erickson".into(),
+                    name: "Nadia Frost".into(),
                     role: Some("Creator".into()),
                     kind: Some("Writer".into()),
                     ..Person::default()
@@ -418,7 +445,7 @@ pub fn detail() -> DetailState {
             ..Item::default()
         },
         seasons,
-        active_season: Some("severance-s2".into()),
+        active_season: Some("quiet-floor-s2".into()),
         episodes,
         next_up,
         collection: Vec::new(),
@@ -465,7 +492,7 @@ pub fn trickplay_manifest()
 {
     use jellyfin_api::TrickplayInfo;
     std::collections::HashMap::from([(
-        "severance-s2e2".to_string(),
+        "quiet-floor-s2e2".to_string(),
         std::collections::HashMap::from([(
             "640".to_string(),
             TrickplayInfo {
@@ -547,11 +574,11 @@ fn hue(t: f32) -> (u8, u8, u8) {
 #[cfg(any(test, debug_assertions))]
 pub fn next_episode() -> Item {
     Item {
-        id: "severance-s2e3".into(),
-        name: "Who Is Alive?".into(),
+        id: "quiet-floor-s2e3".into(),
+        name: "Who Is Awake?".into(),
         kind: "Episode".into(),
-        series_id: Some("severance".into()),
-        series_name: Some("Severance".into()),
+        series_id: Some("quiet-floor".into()),
+        series_name: Some("The Quiet Floor".into()),
         parent_index_number: Some(2),
         index_number: Some(3),
         production_year: Some(2025),
@@ -567,11 +594,11 @@ pub fn next_episode() -> Item {
 #[cfg(any(test, debug_assertions))]
 pub fn previous_episode() -> Item {
     Item {
-        id: "severance-s2e1".into(),
-        name: "Hello, Ms. Cobel".into(),
+        id: "quiet-floor-s2e1".into(),
+        name: "Badge Photo".into(),
         kind: "Episode".into(),
-        series_id: Some("severance".into()),
-        series_name: Some("Severance".into()),
+        series_id: Some("quiet-floor".into()),
+        series_name: Some("The Quiet Floor".into()),
         parent_index_number: Some(2),
         index_number: Some(1),
         production_year: Some(2025),
@@ -679,12 +706,12 @@ pub fn contrast_backdrop(cache: &rune::ImageCache) -> rune::Image {
 pub fn shows_library() -> LibraryState {
     let mut library = LibraryState::new("shows".into(), "Shows".into(), Some("tvshows".into()));
     library.items = [
-        "Severance",
-        "The Bear",
-        "Andor",
-        "Shōgun",
-        "Slow Horses",
-        "Foundation",
+        "The Quiet Floor",
+        "Service",
+        "The Long Orbit",
+        "Harbour",
+        "The Slow Desk",
+        "Drift",
     ]
     .into_iter()
     .enumerate()
@@ -703,12 +730,12 @@ pub fn shows_library() -> LibraryState {
 /// Six recommendations for the movie detail page's "More like this" rail.
 pub fn similar() -> Vec<Item> {
     [
-        ("Dune: Part One", 2021),
-        ("Blade Runner 2049", 2017),
-        ("Arrival", 2016),
-        ("Interstellar", 2014),
-        ("Children of Men", 2006),
-        ("The Creator", 2023),
+        ("Nosferatu", 1922),
+        ("The Cabinet of Dr. Caligari", 1920),
+        ("The General", 1926),
+        ("Sherlock Jr.", 1924),
+        ("Carnival of Souls", 1962),
+        ("Detour", 1945),
     ]
     .into_iter()
     .map(|(name, year)| Item {
@@ -726,30 +753,30 @@ pub fn similar() -> Vec<Item> {
 pub fn movie_detail() -> DetailState {
     DetailState {
         item: Item {
-            id: "dune-2".into(),
-            name: "Dune: Part Two".into(),
+            id: "metropolis".into(),
+            name: "Metropolis".into(),
             kind: "Movie".into(),
-            production_year: Some(2024),
-            official_rating: Some("PG-13".into()),
-            run_time_ticks: Some(10_000 * 60_000 * 166),
+            production_year: Some(1927),
+            official_rating: Some("NR".into()),
+            run_time_ticks: Some(10_000 * 60_000 * 148),
             overview: Some(
-                "Paul Atreides unites with the Fremen to wage war against the House Harkonnen, \
-                 while trying to prevent a terrible future only he can foresee."
+                "In a city split between the towers above and the machine halls below, a young \
+                 man discovers what keeps both halves running, and what it costs."
                     .into(),
             ),
-            genres: Some(vec!["Science Fiction".into(), "Adventure".into()]),
-            original_title: Some("Dune: Part Two".into()),
-            premiere_date: Some("2024-02-27T00:00:00.0000000Z".into()),
-            tags: vec!["IMAX".into(), "Epic".into()],
+            genres: Some(vec!["Science Fiction".into(), "Drama".into()]),
+            original_title: Some("Metropolis".into()),
+            premiere_date: Some("1927-01-10T00:00:00.0000000Z".into()),
+            tags: vec!["Restored".into(), "Silent".into()],
             studios: vec![jellyfin_api::NameGuid {
                 id: "legendary".into(),
-                name: "Legendary Pictures".into(),
+                name: "Runefin Demo Library".into(),
             }],
-            community_rating: Some(8.5),
-            critic_rating: Some(92.0),
-            provider_ids: [("Imdb".to_string(), "tt15239678".to_string())].into(),
+            community_rating: Some(8.3),
+            critic_rating: Some(98.0),
+            provider_ids: [("Imdb".to_string(), "tt0017136".to_string())].into(),
             remote_trailers: vec![jellyfin_api::RemoteTrailer {
-                url: Some("https://www.youtube.com/watch?v=Way9Dexny3w".into()),
+                url: Some("https://example.invalid/trailer".into()),
                 name: Some("Official Trailer".into()),
             }],
             // Twelve minutes in: the snapshot shows both Resume and Start over.
@@ -760,7 +787,7 @@ pub fn movie_detail() -> DetailState {
             }),
             media_sources: vec![
                 MediaSource {
-                    id: "dune-source".into(),
+                    id: "metropolis-source".into(),
                     name: Some("4K HDR10".into()),
                     container: Some("mkv".into()),
                     size: Some(42_100_000_000),
@@ -788,7 +815,7 @@ pub fn movie_detail() -> DetailState {
                     ],
                 },
                 MediaSource {
-                    id: "dune-1080".into(),
+                    id: "metropolis-1080".into(),
                     name: Some("1080p".into()),
                     container: Some("mkv".into()),
                     size: Some(12_400_000_000),
@@ -816,9 +843,9 @@ pub fn movie_detail() -> DetailState {
 #[cfg(any(test, debug_assertions))]
 pub fn extras() -> Vec<Item> {
     [
-        ("extra-behind", "Building Arrakis", "BehindTheScenes", 8),
-        ("extra-deleted", "The Spice Harvester", "DeletedScene", 4),
-        ("extra-interview", "Denis Villeneuve", "Interview", 12),
+        ("extra-behind", "Restoring Metropolis", "BehindTheScenes", 8),
+        ("extra-deleted", "The Machine Hall", "DeletedScene", 4),
+        ("extra-interview", "The Restorer", "Interview", 12),
     ]
     .into_iter()
     .map(|(id, name, kind, minutes)| Item {
@@ -837,9 +864,9 @@ pub fn extras() -> Vec<Item> {
 #[cfg(any(test, debug_assertions))]
 pub fn playlists() -> Vec<Item> {
     [
-        ("playlist-marvel", "Marvel Marathon"),
-        ("playlist-halloween", "Halloween 2025"),
-        ("playlist-openings", "Anime Openings"),
+        ("playlist-silent", "Silent Horror Night"),
+        ("playlist-horror", "Public Domain Horror"),
+        ("playlist-titles", "Title Sequences"),
     ]
     .into_iter()
     .map(|(id, name)| Item {
@@ -855,8 +882,8 @@ pub fn playlists() -> Vec<Item> {
 #[cfg(any(test, debug_assertions))]
 pub fn playlist_library() -> LibraryState {
     let mut library = LibraryState::new(
-        "playlist-marvel".into(),
-        "Marvel Marathon".into(),
+        "playlist-silent".into(),
+        "Silent Horror Night".into(),
         Some("playlists".into()),
     );
     library.items = library_items(6)
@@ -873,12 +900,12 @@ pub fn playlist_library() -> LibraryState {
 /// A BoxSet detail page: six members, no stream of its own, and a hero that omits Play.
 pub fn collection() -> DetailState {
     let members: Vec<Item> = [
-        ("Ace Ventura: Pet Detective", 1994),
-        ("Ace Ventura: When Nature Calls", 1995),
-        ("The Cable Guy", 1996),
-        ("Liar Liar", 1997),
-        ("The Truman Show", 1998),
-        ("Man on the Moon", 1999),
+        ("The Golem", 1920),
+        ("Faust", 1926),
+        ("Häxan", 1922),
+        ("The Phantom Carriage", 1921),
+        ("Warning Shadows", 1923),
+        ("The Student of Prague", 1913),
     ]
     .into_iter()
     .enumerate()
@@ -893,11 +920,13 @@ pub fn collection() -> DetailState {
     .collect();
     DetailState {
         item: Item {
-            id: "ace-collection".into(),
-            name: "Ace Ventura Collection".into(),
+            id: "silent-horror-collection".into(),
+            name: "Silent Horror Collection".into(),
             kind: "BoxSet".into(),
             overview: Some(
-                "Two pet detectives, one alarming haircut, and a run of 1990s comedies.".into(),
+                "Six silent horror films from the public domain, gathered with their restored \
+                 scores."
+                    .into(),
             ),
             ..Item::default()
         },
@@ -922,10 +951,10 @@ pub fn live_channels() -> Vec<Item> {
         .map(|duration| duration.as_secs() as i64)
         .unwrap_or(0);
     [
-        ("formula-1", "Formula 1", "1", Some("British Grand Prix")),
-        ("cinemax", "Cinemax", "2", Some("Dune: Part Two")),
-        ("hbo-hd", "HBO HD", "3", Some("The Last of Us")),
-        ("showtime", "Showtime", "4", None),
+        ("aurora-one", "Aurora One", "1", Some("Harbour Watch")),
+        ("meridian", "Meridian TV", "2", Some("Metropolis")),
+        ("northlight", "Northlight", "3", Some("After the Thaw")),
+        ("access-seven", "Access Seven", "4", None),
     ]
     .into_iter()
     .map(|(id, name, number, program)| Item {
@@ -944,7 +973,7 @@ pub fn live_channels() -> Vec<Item> {
     .collect()
 }
 
-/// The guide's lookahead for the demo channels. Showtime has none, like a channel without EPG.
+/// The guide's lookahead for the demo channels. Access Seven has none, like a channel without EPG.
 #[cfg(any(test, debug_assertions))]
 pub fn live_next() -> std::collections::HashMap<String, Item> {
     let now = std::time::SystemTime::now()
@@ -952,9 +981,9 @@ pub fn live_next() -> std::collections::HashMap<String, Item> {
         .map(|duration| duration.as_secs() as i64)
         .unwrap_or(0);
     [
-        ("formula-1", "Qualifying"),
-        ("cinemax", "Scream"),
-        ("hbo-hd", "House of the Dragon"),
+        ("aurora-one", "Late Bulletin"),
+        ("meridian", "Silent Night"),
+        ("northlight", "The Golem"),
     ]
     .into_iter()
     .map(|(id, name)| {
@@ -994,25 +1023,25 @@ pub fn live_guide() -> std::collections::HashMap<String, Vec<Item>> {
     }
     std::collections::HashMap::from([
         (
-            "formula-1".to_string(),
+            "aurora-one".to_string(),
             vec![
-                program("formula-1", "British Grand Prix", now, -600, 3_000),
-                program("formula-1", "Qualifying", now, 3_000, 4_800),
-                program("formula-1", "Practice", now, 4_800, 8_400),
+                program("aurora-one", "Harbour Watch", now, -600, 3_000),
+                program("aurora-one", "Late Bulletin", now, 3_000, 4_800),
+                program("aurora-one", "Practice", now, 4_800, 8_400),
             ],
         ),
         (
-            "cinemax".to_string(),
+            "meridian".to_string(),
             vec![
-                program("cinemax", "Dune: Part Two", now, -1_800, 3_600),
-                program("cinemax", "Scream", now, 3_600, 7_800),
+                program("meridian", "Metropolis", now, -1_800, 3_600),
+                program("meridian", "Silent Night", now, 3_600, 7_800),
             ],
         ),
         (
-            "hbo-hd".to_string(),
+            "northlight".to_string(),
             vec![
-                program("hbo-hd", "The Last of Us", now, -900, 1_800),
-                program("hbo-hd", "House of the Dragon", now, 1_800, 5_400),
+                program("northlight", "After the Thaw", now, -900, 1_800),
+                program("northlight", "The Golem", now, 1_800, 5_400),
             ],
         ),
     ])
@@ -1021,12 +1050,12 @@ pub fn live_guide() -> std::collections::HashMap<String, Vec<Item>> {
 /// The Seerr half of a person page: a few credits, one already in the library.
 pub fn seerr_person_credits() -> Vec<seerr_api::Credit> {
     [
-        (945961, "movie", "Alien: Romulus", "2024", "Rain"),
-        (1020006, "movie", "Priscilla", "2023", "Priscilla"),
-        (81349, "tv", "Devs", "2020", "Lyndon"),
-        (429197, "movie", "Vice", "2018", "Lynne Vincent"),
-        (929590, "movie", "Civil War", "2024", "Jessie"),
-        (1019671, "movie", "Unlimited World", "2022", "Lars"),
+        (945961, "movie", "Night Ferry", "2024", "Rain"),
+        (1020006, "movie", "The Glass Hour", "2023", "Priscilla"),
+        (81349, "tv", "Field Notes", "2020", "Lyndon"),
+        (429197, "movie", "The Long Orbit", "2018", "Lynne Vincent"),
+        (929590, "movie", "Ashfall", "2024", "Jessie"),
+        (1019671, "movie", "Harbour", "2022", "Lars"),
     ]
     .into_iter()
     .map(|(id, media, title, year, character)| seerr_api::Credit {
@@ -1047,8 +1076,8 @@ pub fn seerr_person_credits() -> Vec<seerr_api::Credit> {
 /// A person page with the demo movie credits, for the filmography snapshot.
 pub fn person() -> crate::state::PersonPage {
     crate::state::PersonPage {
-        id: "adam-scott".into(),
-        name: "Adam Scott".into(),
+        id: "mara-ellison".into(),
+        name: "Mara Ellison".into(),
         image_tag: None,
         profile_path: None,
         tmdb_id: None,
@@ -1158,7 +1187,7 @@ pub fn remote_subtitles() -> Vec<jellyfin_api::RemoteSubtitle> {
     vec![
         jellyfin_api::RemoteSubtitle {
             id: "demo-sub-1".into(),
-            name: "Severance.S02E04.1080p.WEB-DL.DDP5.1.H.264".into(),
+            name: "The.Quiet.Floor.S02E04.1080p.WEB-DL.DDP5.1.H.264".into(),
             provider_name: Some("Open Subtitles".into()),
             format: Some("srt".into()),
             author: Some("tedi".into()),
@@ -1175,7 +1204,7 @@ pub fn remote_subtitles() -> Vec<jellyfin_api::RemoteSubtitle> {
         },
         jellyfin_api::RemoteSubtitle {
             id: "demo-sub-2".into(),
-            name: "Severance S02E04 720p HDTV x264".into(),
+            name: "The.Quiet.Floor.S02E04.720p.HDTV.x264".into(),
             provider_name: Some("Open Subtitles".into()),
             format: Some("srt".into()),
             author: Some("obnoxiousowl".into()),
@@ -1192,7 +1221,7 @@ pub fn remote_subtitles() -> Vec<jellyfin_api::RemoteSubtitle> {
         },
         jellyfin_api::RemoteSubtitle {
             id: "demo-sub-3".into(),
-            name: "severance.s02e04.hdtv".into(),
+            name: "quiet-floor.s02e04.hdtv".into(),
             provider_name: Some("Open Subtitles".into()),
             format: Some("srt".into()),
             author: Some("os-auto".into()),
@@ -1218,7 +1247,7 @@ pub fn subtitle_cues() -> Vec<crate::subtitles::Cue> {
         crate::subtitles::Cue {
             start_ms: 41 * 60_000,
             end_ms: 41 * 60_000 + 58_000,
-            text: "Previously on Severance…".into(),
+            text: "Previously on The Quiet Floor…".into(),
             align: crate::subtitles::Align::BottomCenter,
             ..Default::default()
         },
@@ -1338,14 +1367,14 @@ pub fn playback(paused: bool) -> PlaybackSession {
 pub fn search_results() -> SearchResults {
     let detail = detail();
     let movies = [
-        ("past-lives", "Past Lives", 2023),
-        ("anatomy-fall", "Anatomy of a Fall", 2023),
-        ("the-substance", "The Substance", 2024),
-        ("perfect-days", "Perfect Days", 2023),
-        ("challengers", "Challengers", 2024),
-        ("dune-2", "Dune: Part Two", 2024),
-        ("zone-interest", "The Zone of Interest", 2023),
-        ("poor-things", "Poor Things", 2023),
+        ("his-girl-friday", "His Girl Friday", 1940),
+        ("charade", "Charade", 1963),
+        ("the-kid", "The Kid", 1921),
+        ("night-living-dead", "Night of the Living Dead", 1968),
+        ("plan-9", "Plan 9 from Outer Space", 1957),
+        ("metropolis", "Metropolis", 1927),
+        ("phantom-carriage", "The Phantom Carriage", 1921),
+        ("haxan", "Häxan", 1922),
     ]
     .into_iter()
     .map(|(id, name, year)| Item {
@@ -1361,8 +1390,8 @@ pub fn search_results() -> SearchResults {
         shows: vec![detail.item],
         episodes: detail.episodes,
         people: vec![Item {
-            id: "adam-scott".into(),
-            name: "Adam Scott".into(),
+            id: "mara-ellison".into(),
+            name: "Mara Ellison".into(),
             kind: "Person".into(),
             ..Item::default()
         }],
@@ -1375,7 +1404,7 @@ pub fn sessions() -> Vec<SessionInfo> {
         SessionInfo {
             id: "living-room".into(),
             user_id: "demo-user".into(),
-            user_name: "luis".into(),
+            user_name: "example-user".into(),
             client: "Jellyfin Web".into(),
             device_name: "living-room".into(),
             device_id: "device-living-room".into(),
@@ -1391,7 +1420,7 @@ pub fn sessions() -> Vec<SessionInfo> {
         SessionInfo {
             id: "bedroom".into(),
             user_id: "demo-user".into(),
-            user_name: "luis".into(),
+            user_name: "example-user".into(),
             client: "Android TV".into(),
             device_name: "bedroom".into(),
             device_id: "device-bedroom".into(),
@@ -1410,7 +1439,7 @@ pub fn signed_in(s: &mut State) {
     s.config.sign_out();
     s.config.server_url = "https://jellyfin.example".into();
     s.config.user_id = "demo-user".into();
-    s.config.user_name = "luis".into();
+    s.config.user_name = "example-user".into();
     s.config.device_id = "demo-device".into();
     s.home_data = home();
     s.home_loaded = true;
@@ -1447,7 +1476,7 @@ pub fn library(count: usize) -> LibraryState {
 fn library_items(count: usize) -> Vec<Item> {
     const TITLES: [&str; 10] = [
         "Aurora", "Burning", "Caché", "Drive", "Everest", "Fallen", "Gravity", "Hana", "Iris",
-        "Joker",
+        "Juniper",
     ];
     (0..count)
         .map(|index| Item {
@@ -1650,7 +1679,7 @@ pub fn seerr_requests() -> Vec<MediaRequest> {
             335984,
             3,
             vec![seerr_download(
-                "Blade.Runner.2049.2160p",
+                "Nosferatu.2160p",
                 "movie-2",
                 10_000_000_000,
                 4_000_000_000,
@@ -1712,10 +1741,10 @@ pub fn seerr_summaries() -> HashMap<(String, u64), MediaSummary> {
     summaries.insert(
         ("movie".into(), 438631),
         seerr_summary(
-            "Dune",
+            "Nosferatu",
             "2021",
-            "/dune.jpg",
-            "/dune-backdrop.jpg",
+            "/nosferatu.jpg",
+            "/nosferatu-backdrop.jpg",
             Vec::new(),
         ),
     );
@@ -1732,30 +1761,30 @@ pub fn seerr_summaries() -> HashMap<(String, u64), MediaSummary> {
     summaries.insert(
         ("movie".into(), 693134),
         seerr_summary(
-            "Dune: Part Two",
+            "Metropolis",
             "2024",
-            "/dune-two.jpg",
-            "/dune-two-backdrop.jpg",
+            "/metropolis.jpg",
+            "/metropolis-backdrop.jpg",
             Vec::new(),
         ),
     );
     summaries.insert(
         ("movie".into(), 335984),
         seerr_summary(
-            "Blade Runner 2049",
+            "The Cabinet of Dr. Caligari",
             "2017",
-            "/blade.jpg",
-            "/blade-backdrop.jpg",
+            "/caligari.jpg",
+            "/caligari-backdrop.jpg",
             Vec::new(),
         ),
     );
     summaries.insert(
         ("tv".into(), 2316),
         seerr_summary(
-            "The Office",
-            "2005",
-            "/office.jpg",
-            "/office-backdrop.jpg",
+            "The Slow Desk",
+            "2022",
+            "/slow-desk.jpg",
+            "/slow-desk-backdrop.jpg",
             vec![seerr_season(1, 6), seerr_season(2, 22)],
         ),
     );
@@ -1795,37 +1824,44 @@ pub fn seerr_discover() -> crate::state::SeerrDiscover {
             seerr_discover_item(
                 "movie",
                 1423191,
-                "Resident Evil",
-                "2026",
-                "/resident.jpg",
+                "Carnival of Souls",
+                "1962",
+                "/carnival.jpg",
                 None,
             ),
+            seerr_discover_item("tv", 90228, "The Golem", "2024", "/golem.jpg", Some(3)),
             seerr_discover_item(
-                "tv",
-                90228,
-                "Dune: Prophecy",
-                "2024",
-                "/prophecy.jpg",
-                Some(3),
+                "movie",
+                438631,
+                "Nosferatu",
+                "2021",
+                "/nosferatu.jpg",
+                Some(5),
             ),
-            seerr_discover_item("movie", 438631, "Dune", "2021", "/dune.jpg", Some(5)),
         ],
         movies: vec![
             seerr_discover_item(
                 "movie",
                 693134,
-                "Dune: Part Two",
+                "Metropolis",
                 "2024",
-                "/dune-two.jpg",
+                "/metropolis.jpg",
                 Some(5),
             ),
-            seerr_discover_item("movie", 438631, "Dune", "2021", "/dune.jpg", Some(5)),
+            seerr_discover_item(
+                "movie",
+                438631,
+                "Nosferatu",
+                "2021",
+                "/nosferatu.jpg",
+                Some(5),
+            ),
             seerr_discover_item(
                 "movie",
                 335984,
-                "Blade Runner 2049",
+                "The Cabinet of Dr. Caligari",
                 "2017",
-                "/blade.jpg",
+                "/caligari.jpg",
                 None,
             ),
         ],
@@ -1838,15 +1874,15 @@ pub fn seerr_discover() -> crate::state::SeerrDiscover {
                 "/example-show.jpg",
                 Some(4),
             ),
+            seerr_discover_item("tv", 90228, "The Golem", "2024", "/golem.jpg", Some(3)),
             seerr_discover_item(
                 "tv",
-                90228,
-                "Dune: Prophecy",
-                "2024",
-                "/prophecy.jpg",
-                Some(3),
+                2316,
+                "The Slow Desk",
+                "2022",
+                "/slow-desk.jpg",
+                Some(2),
             ),
-            seerr_discover_item("tv", 2316, "The Office", "2005", "/office.jpg", Some(2)),
         ],
         ..Default::default()
     }
@@ -1858,7 +1894,14 @@ pub fn seerr_search() -> SeerrSearchResults {
         total_pages: 1,
         total_results: 3,
         results: vec![
-            seerr_discover_item("movie", 438631, "Dune", "2021", "/dune.jpg", Some(5)),
+            seerr_discover_item(
+                "movie",
+                438631,
+                "Nosferatu",
+                "2021",
+                "/nosferatu.jpg",
+                Some(5),
+            ),
             seerr_discover_item(
                 "tv",
                 196950,
@@ -1919,53 +1962,55 @@ pub fn seerr_tv_detail() -> Details {
 pub fn seerr_movie_detail() -> Details {
     Details::Movie(MovieDetails {
         id: 438631,
-        title: Some("Dune".into()),
-        release_date: Some("2021-09-15".into()),
-        runtime: Some(155),
-        poster_path: Some("/dune.jpg".into()),
-        backdrop_path: Some("/dune-backdrop.jpg".into()),
+        title: Some("Nosferatu".into()),
+        release_date: Some("1922-03-04".into()),
+        runtime: Some(94),
+        poster_path: Some("/nosferatu.jpg".into()),
+        backdrop_path: Some("/nosferatu-backdrop.jpg".into()),
         overview: Some(
-            "Paul Atreides, a brilliant and gifted young man born into a great destiny.".into(),
+            "An estate agent travels to a remote castle to close a sale, and brings something \
+             back to the town with him."
+                .into(),
         ),
-        vote_average: Some(7.8),
-        tagline: Some("Beyond fear, destiny awaits.".into()),
+        vote_average: Some(7.9),
+        tagline: Some("The first vampire film.".into()),
         genres: vec![
             seerr_api::Genre {
-                id: 878,
-                name: Some("Science Fiction".into()),
+                id: 27,
+                name: Some("Horror".into()),
             },
             seerr_api::Genre {
-                id: 12,
-                name: Some("Adventure".into()),
+                id: 14,
+                name: Some("Fantasy".into()),
             },
         ],
         credits: seerr_api::Credits {
             cast: vec![
                 seerr_api::CastMember {
                     id: 1190668,
-                    name: Some("Timothée Chalamet".into()),
-                    character: Some("Paul Atreides".into()),
+                    name: Some("Owen Kestrel".into()),
+                    character: Some("Thomas Hutter".into()),
                     job: None,
                     profile_path: None,
                 },
                 seerr_api::CastMember {
                     id: 933238,
-                    name: Some("Rebecca Ferguson".into()),
-                    character: Some("Lady Jessica".into()),
+                    name: Some("Iris Vane".into()),
+                    character: Some("Ellen Hutter".into()),
                     job: None,
                     profile_path: None,
                 },
                 seerr_api::CastMember {
                     id: 1683343,
-                    name: Some("Cailee Spaeny".into()),
-                    character: Some("Princess Irulan".into()),
+                    name: Some("Dana Reyes".into()),
+                    character: Some("The Innkeeper".into()),
                     job: None,
                     profile_path: None,
                 },
             ],
             crew: vec![seerr_api::CastMember {
                 id: 137427,
-                name: Some("Denis Villeneuve".into()),
+                name: Some("The Restorer".into()),
                 character: None,
                 job: Some("Director".into()),
                 profile_path: None,

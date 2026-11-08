@@ -591,7 +591,7 @@ fn in_app_intro_scene(s: &mut State) {
     }
     s.in_app_segments = vec![jellyfin_api::MediaSegment {
         id: "intro".into(),
-        item_id: "severance-s2e2".into(),
+        item_id: "quiet-floor-s2e2".into(),
         kind: "Intro".into(),
         start_ticks: 0,
         end_ticks: 90_000 * jellyfin_api::TICKS_PER_MS,
@@ -619,7 +619,7 @@ fn in_app_skip_credits_scene(s: &mut State) {
     s.in_app = Some(session);
     s.in_app_segments = vec![jellyfin_api::MediaSegment {
         id: "credits".into(),
-        item_id: "severance-s2e2".into(),
+        item_id: "quiet-floor-s2e2".into(),
         kind: "Outro".into(),
         start_ticks: 42 * 60_000 * jellyfin_api::TICKS_PER_MS,
         end_ticks: 44 * 60_000 * jellyfin_api::TICKS_PER_MS,
@@ -784,15 +784,15 @@ fn in_app_chapters_scene(_s: &mut State) {}
 fn in_app_queue_scene(s: &mut State) {
     in_app_osd_scene(s);
     let names = [
-        "Who Is Alive?",
-        "Woe's Hollow",
+        "Who Is Awake?",
+        "The Hollow Floor",
         "Cold Harbor",
-        "The After Hours",
+        "Overtime",
     ];
     s.queue = (1..=4)
         .map(|number| {
             let mut item = demo::next_episode();
-            item.id = format!("severance-s2e{}", number + 1);
+            item.id = format!("quiet-floor-s2e{}", number + 1);
             item.name = names[(number - 1) as usize].into();
             item.index_number = Some(number + 1);
             item
@@ -838,7 +838,7 @@ fn in_app_narrow_scene(s: &mut State) {
     s.in_app_next = Some(demo::next_episode());
     s.in_app_segments = vec![jellyfin_api::MediaSegment {
         id: "seg-intro".into(),
-        item_id: "severance-s2e2".into(),
+        item_id: "quiet-floor-s2e2".into(),
         kind: "Intro".into(),
         start_ticks: 10_000 * 60_000 * 41,
         end_ticks: 10_000 * 60_000 * 43,
@@ -846,7 +846,7 @@ fn in_app_narrow_scene(s: &mut State) {
     s.queue = (1..=3)
         .map(|number| {
             let mut item = demo::next_episode();
-            item.id = format!("severance-s2e{}", number + 1);
+            item.id = format!("quiet-floor-s2e{}", number + 1);
             item.index_number = Some(number + 1);
             item
         })
@@ -1040,7 +1040,7 @@ fn main() {
                 s.step = Step::Ready {
                     server_name: "example".into(),
                 };
-                s.config.user_name = "luis".into();
+                s.config.user_name = "example-user".into();
                 s.home_data = demo::home();
                 s.home_loaded = true;
             }),
@@ -1054,7 +1054,7 @@ fn main() {
                 s.step = Step::Ready {
                     server_name: "example".into(),
                 };
-                s.config.user_name = "luis".into();
+                s.config.user_name = "example-user".into();
                 s.home_data = demo::home();
                 s.home_loaded = true;
                 s.high_contrast = true;
@@ -1064,7 +1064,7 @@ fn main() {
                 s.step = Step::Ready {
                     server_name: "example".into(),
                 };
-                s.config.user_name = "luis".into();
+                s.config.user_name = "example-user".into();
                 s.home_data = demo::home();
                 s.home_loaded = true;
                 s.light_theme = true;
@@ -1074,7 +1074,7 @@ fn main() {
                 s.step = Step::Ready {
                     server_name: "example".into(),
                 };
-                s.config.user_name = "luis".into();
+                s.config.user_name = "example-user".into();
                 s.home_data = demo::home();
                 s.home_loaded = true;
                 s.home_hero = true;
@@ -1083,7 +1083,7 @@ fn main() {
                 s.step = Step::Ready {
                     server_name: "example".into(),
                 };
-                s.config.user_name = "luis".into();
+                s.config.user_name = "example-user".into();
                 s.home_data = demo::home();
                 s.home_loaded = true;
             }),
@@ -1092,7 +1092,7 @@ fn main() {
                 s.show_undo_toast(
                     "Removed from Continue Watching.",
                     crate::state::UndoAction::Favorite {
-                        item_id: "severance-s2e4".into(),
+                        item_id: "quiet-floor-s2e4".into(),
                         value: false,
                     },
                 );
@@ -1101,7 +1101,7 @@ fn main() {
             ("detail-theme", |s| {
                 demo::signed_in(s);
                 s.route = Route::Detail {
-                    id: "dune-2".into(),
+                    id: "metropolis".into(),
                 };
                 s.detail = Some(demo::movie_detail());
                 s.detail_theme_songs = demo::extras();
@@ -1112,7 +1112,7 @@ fn main() {
                 s.step = Step::Ready {
                     server_name: "example".into(),
                 };
-                s.config.user_name = "luis".into();
+                s.config.user_name = "example-user".into();
                 s.home_data = demo::home();
                 s.home_loaded = true;
                 s.sidebar_collapsed = true;
@@ -1121,21 +1121,21 @@ fn main() {
                 s.step = Step::Ready {
                     server_name: "example".into(),
                 };
-                s.config.user_name = "luis".into();
+                s.config.user_name = "example-user".into();
                 s.home_loaded = false;
             }),
             ("home-empty", |s| {
                 s.step = Step::Ready {
                     server_name: "example".into(),
                 };
-                s.config.user_name = "luis".into();
+                s.config.user_name = "example-user".into();
                 s.home_loaded = true;
             }),
             ("home-error", |s| {
                 s.step = Step::Ready {
                     server_name: "example".into(),
                 };
-                s.config.user_name = "luis".into();
+                s.config.user_name = "example-user".into();
                 s.home_loaded = true;
                 s.home_error = Some("Can't reach the server.".into());
             }),
@@ -1152,18 +1152,18 @@ fn main() {
                 demo::signed_in(s);
                 s.playlists = demo::playlists();
                 s.route = Route::Detail {
-                    id: "dune-2".into(),
+                    id: "metropolis".into(),
                 };
                 s.detail = Some(demo::movie_detail());
                 s.playlist_create_open = true;
-                let mut name = rune::TextEdit::new("Dune weekend");
+                let mut name = rune::TextEdit::new("Silent film weekend");
                 name.focused = true;
                 s.playlist_new_name = name;
             }),
             #[cfg(debug_assertions)]
             ("toast", |s| {
                 demo::signed_in(s);
-                s.show_toast("Added to the Marvel Marathon.");
+                s.show_toast("Added to the Silent Horror Night.");
             }),
             #[cfg(debug_assertions)]
             ("cast-picker", |s| {
@@ -1214,7 +1214,7 @@ fn main() {
             ("detail-versions", |s| {
                 demo::signed_in(s);
                 s.route = Route::Detail {
-                    id: "dune-2".into(),
+                    id: "metropolis".into(),
                 };
                 s.detail = Some(demo::movie_detail());
                 s.detail_return = Route::Home;
@@ -1223,13 +1223,13 @@ fn main() {
             ("detail-collections", |s| {
                 demo::signed_in(s);
                 s.route = Route::Detail {
-                    id: "dune-2".into(),
+                    id: "metropolis".into(),
                 };
                 s.detail = Some(demo::movie_detail());
                 s.detail_collections = vec![
                     jellyfin_api::Item {
                         id: "dune-collection".into(),
-                        name: "Dune Collection".into(),
+                        name: "Silent Horror Collection".into(),
                         kind: "BoxSet".into(),
                         ..jellyfin_api::Item::default()
                     },
@@ -1246,7 +1246,7 @@ fn main() {
             ("detail-extras", |s| {
                 demo::signed_in(s);
                 s.route = Route::Detail {
-                    id: "dune-2".into(),
+                    id: "metropolis".into(),
                 };
                 s.detail = Some(demo::movie_detail());
                 s.detail_extras = demo::extras();
@@ -1256,7 +1256,7 @@ fn main() {
             ("detail-similar", |s| {
                 demo::signed_in(s);
                 s.route = Route::Detail {
-                    id: "dune-2".into(),
+                    id: "metropolis".into(),
                 };
                 let mut detail = demo::movie_detail();
                 // A one-line overview keeps the rail inside the 800-point snapshot.
@@ -1268,7 +1268,7 @@ fn main() {
                 demo::signed_in(s);
                 s.playlists = demo::playlists();
                 s.route = Route::Detail {
-                    id: "dune-2".into(),
+                    id: "metropolis".into(),
                 };
                 s.detail = Some(demo::movie_detail());
                 s.playlist_picker_open = true;
@@ -1438,7 +1438,7 @@ fn main() {
             ("person", |s| {
                 demo::signed_in(s);
                 s.route = Route::Person {
-                    id: "adam-scott".into(),
+                    id: "mara-ellison".into(),
                 };
                 s.person = Some(demo::person());
             }),
@@ -1483,7 +1483,7 @@ fn main() {
             ("detail-tech", |s| {
                 demo::signed_in(s);
                 s.route = Route::Detail {
-                    id: "dune-2".into(),
+                    id: "metropolis".into(),
                 };
                 s.detail = Some(demo::movie_detail());
                 s.detail_tech_open = true;
@@ -1491,14 +1491,14 @@ fn main() {
             ("collection", |s| {
                 demo::signed_in(s);
                 s.route = Route::Detail {
-                    id: "ace-collection".into(),
+                    id: "silent-horror-collection".into(),
                 };
                 s.detail = Some(demo::collection());
             }),
             ("detail", |s| {
                 demo::signed_in(s);
                 s.route = Route::Detail {
-                    id: "severance".into(),
+                    id: "quiet-floor".into(),
                 };
                 s.detail_return = Route::Library {
                     id: "movies".into(),
@@ -1509,16 +1509,16 @@ fn main() {
             ("detail-loading", |s| {
                 demo::signed_in(s);
                 s.route = Route::Detail {
-                    id: "severance".into(),
+                    id: "quiet-floor".into(),
                 };
-                s.detail = Some(DetailState::loading("severance"));
+                s.detail = Some(DetailState::loading("quiet-floor"));
             }),
             ("detail-error", |s| {
                 demo::signed_in(s);
                 s.route = Route::Detail {
-                    id: "severance".into(),
+                    id: "quiet-floor".into(),
                 };
-                let mut detail = DetailState::loading("severance");
+                let mut detail = DetailState::loading("quiet-floor");
                 detail.loading = false;
                 detail.error = Some("Can't reach the server.".into());
                 s.detail = Some(detail);
@@ -1551,14 +1551,14 @@ fn main() {
             ("search", |s| {
                 demo::signed_in(s);
                 s.route = Route::Search { scope: None };
-                s.search.query = TextEdit::new("severance");
+                s.search.query = TextEdit::new("quiet-floor");
                 s.search.query.focused = true;
                 s.search.results = demo::search_results();
             }),
             ("search-expanded", |s| {
                 demo::signed_in(s);
                 s.route = Route::Search { scope: None };
-                s.search.query = TextEdit::new("severance");
+                s.search.query = TextEdit::new("quiet-floor");
                 s.search.query.focused = true;
                 s.search.results = demo::search_results();
                 s.search.expanded.insert("search-movies".into());
@@ -1571,7 +1571,7 @@ fn main() {
                 s.search.hints = vec![
                     jellyfin_api::SearchHint {
                         id: "person-1".into(),
-                        name: "Severance".into(),
+                        name: "The Quiet Floor".into(),
                         kind: "Series".into(),
                     },
                     jellyfin_api::SearchHint {
@@ -1719,7 +1719,7 @@ fn main() {
                     .insert("Tmdb".into(), "196950".into());
                 s.detail = Some(detail);
                 s.route = Route::Detail {
-                    id: "severance".into(),
+                    id: "quiet-floor".into(),
                 };
                 s.seerr.series = Some((196950, demo::seerr_tv_series()));
             }),
@@ -1742,7 +1742,7 @@ fn main() {
             ("detail-preplay", |s| {
                 demo::signed_in(s);
                 s.route = Route::Detail {
-                    id: "dune-2".into(),
+                    id: "metropolis".into(),
                 };
                 s.detail = Some(demo::movie_detail());
                 s.detail_return = Route::Home;
@@ -1752,7 +1752,7 @@ fn main() {
             ("in-app-preplay", |s| {
                 demo::signed_in(s);
                 s.route = Route::Detail {
-                    id: "dune-2".into(),
+                    id: "metropolis".into(),
                 };
                 s.detail = Some(demo::movie_detail());
                 s.detail_return = Route::Home;
@@ -1845,8 +1845,8 @@ fn main() {
             #[cfg(debug_assertions)]
             ("live-tv-favorites", |s| {
                 live_tv_scene(s);
-                s.live.favorites.insert("formula-1".into());
-                s.live.favorites.insert("hbo-hd".into());
+                s.live.favorites.insert("aurora-one".into());
+                s.live.favorites.insert("northlight".into());
                 s.live.favorites_only = true;
             }),
             ("live-guide", live_guide_scene),
@@ -2032,7 +2032,7 @@ mod tests {
         };
         let mut state = home_state();
         state.route = Route::Detail {
-            id: "severance".into(),
+            id: "quiet-floor".into(),
         };
         let mut detail = demo::detail();
         // The series itself has no aggregate position; only the Next Up episode is in flight.
@@ -2154,7 +2154,7 @@ mod tests {
     fn a_card_without_art_uses_the_first_meaningful_letter() {
         assert_eq!(screens::initial("[Anipakku] Tengen Toppa"), "A");
         assert_eq!(screens::initial("86: Eighty-Six"), "8");
-        assert_eq!(screens::initial("  ...The Bear"), "T");
+        assert_eq!(screens::initial("  ...Service"), "S");
         assert_eq!(screens::initial("!!!"), "?");
     }
 
@@ -2175,13 +2175,13 @@ mod tests {
             "rail-continue-watching",
             "rail-next-up",
             "rail-collections",
-            "rail-collections-ace-collection",
+            "rail-collections-silent-horror-collection",
             "rail-recent-0",
             "rail-recently-played",
             "rail-recently-played-played-arrival",
-            "rail-continue-watching-severance",
-            "rail-continue-watching-dune-2",
-            "resume-remove-severance-s2e4",
+            "rail-continue-watching-quiet-floor",
+            "rail-continue-watching-metropolis",
+            "resume-remove-quiet-floor-s2e4",
         ] {
             assert!(rt.find(key).is_some(), "{key} is on screen and addressable");
         }
@@ -2297,13 +2297,13 @@ mod tests {
             scale: 2.0,
         };
         let mut state = home_state();
-        state.remove_from_resume("severance-s2e4");
+        state.remove_from_resume("quiet-floor-s2e4");
         assert!(
             !state
                 .home_data
                 .resume
                 .iter()
-                .any(|item| item.id == "severance-s2e4")
+                .any(|item| item.id == "quiet-floor-s2e4")
         );
         assert!(state.toast_undo.is_some());
         let mut rt = Runtime::new(state, view, (1280.0, 800.0), env);
@@ -2318,7 +2318,7 @@ mod tests {
                 .home_data
                 .resume
                 .iter()
-                .any(|item| item.id == "severance-s2e4"),
+                .any(|item| item.id == "quiet-floor-s2e4"),
             "the card is back after Undo"
         );
         assert!(rt.state.toast.is_none());
@@ -2338,7 +2338,7 @@ mod tests {
             "shelf-screen",
             "shelf-title",
             "shelf-back",
-            "shelf-severance",
+            "shelf-quiet-floor",
         ] {
             assert!(rt.find(key).is_some(), "{key} is on screen");
         }
@@ -2357,7 +2357,7 @@ mod tests {
         let mut state = home_state();
         state.playlists = demo::playlists();
         state.route = Route::Detail {
-            id: "dune-2".into(),
+            id: "metropolis".into(),
         };
         state.detail = Some(demo::movie_detail());
         let mut rt = Runtime::new(state, view, (1280.0, 800.0), env);
@@ -2371,8 +2371,8 @@ mod tests {
         for key in [
             "playlist-picker",
             "playlist-picker-close",
-            "playlist-pick-playlist-marvel",
-            "playlist-pick-playlist-openings",
+            "playlist-pick-playlist-silent",
+            "playlist-pick-playlist-titles",
         ] {
             assert!(rt.find(key).is_some(), "{key} is in the picker");
         }
@@ -2392,7 +2392,7 @@ mod tests {
         let mut state = home_state();
         state.playlists = demo::playlists();
         state.route = Route::Library {
-            id: "playlist-marvel".into(),
+            id: "playlist-silent".into(),
         };
         state.library = Some(demo::playlist_library());
         let mut rt = Runtime::new(state, view, (1280.0, 800.0), env);
@@ -2435,7 +2435,7 @@ mod tests {
         let mut state = home_state();
         state.playlists = demo::playlists();
         state.route = Route::Library {
-            id: "playlist-marvel".into(),
+            id: "playlist-silent".into(),
         };
         state.library = Some(demo::playlist_library());
         state.playlist_editing = true;
@@ -2470,7 +2470,7 @@ mod tests {
         let mut state = home_state();
         state.playlists = demo::playlists();
         state.route = Route::Detail {
-            id: "dune-2".into(),
+            id: "metropolis".into(),
         };
         state.detail = Some(demo::movie_detail());
         let mut rt = Runtime::new(state, view, (1280.0, 800.0), env);
@@ -2493,7 +2493,7 @@ mod tests {
             assert!(rt.find(key).is_some(), "{key} is in the prompt");
         }
         // Without a session the create path refuses instead of pretending.
-        rt.state.playlist_new_name = rune::TextEdit::new("Dune weekend");
+        rt.state.playlist_new_name = rune::TextEdit::new("Silent film weekend");
         let (x, y) = rt.find("playlist-create-submit").expect("create");
         rt.pointer_down(x, y);
         rt.pointer_up(x, y);
@@ -2519,21 +2519,21 @@ mod tests {
         rt.frame(0.0);
         for key in [
             "playlists-label",
-            "playlist-playlist-marvel",
-            "playlist-playlist-halloween",
-            "playlist-playlist-openings",
+            "playlist-playlist-silent",
+            "playlist-playlist-horror",
+            "playlist-playlist-titles",
         ] {
             assert!(rt.find(key).is_some(), "{key} is in the sidebar");
         }
         let (x, y) = rt
-            .find("playlist-playlist-marvel")
+            .find("playlist-playlist-silent")
             .expect("the playlist row");
         rt.pointer_down(x, y);
         rt.pointer_up(x, y);
         rt.frame(0.02);
         assert_eq!(
             rt.state.library.as_ref().map(|library| library.id.as_str()),
-            Some("playlist-marvel")
+            Some("playlist-silent")
         );
         assert_eq!(
             rt.state
@@ -2674,9 +2674,9 @@ mod tests {
         assert_eq!(state.take_focus_key().as_deref(), Some("remote-refresh"));
 
         state.route = Route::Detail {
-            id: "dune-2".into(),
+            id: "metropolis".into(),
         };
-        state.detail = Some(DetailState::loading("dune-2"));
+        state.detail = Some(DetailState::loading("metropolis"));
         assert!(
             state.take_focus_key().is_none(),
             "a loading detail has no play button yet"
@@ -3057,7 +3057,7 @@ mod tests {
     fn detail_state() -> State {
         let mut state = home_state();
         state.route = Route::Detail {
-            id: "severance".into(),
+            id: "quiet-floor".into(),
         };
         state.detail_return = Route::Library {
             id: "movies".into(),
@@ -3075,7 +3075,7 @@ mod tests {
         };
         let mut state = home_state();
         state.route = Route::Detail {
-            id: "dune-2".into(),
+            id: "metropolis".into(),
         };
         state.detail = Some(demo::movie_detail());
         let mut rt = Runtime::new(state, view, (1280.0, 800.0), env);
@@ -3094,7 +3094,7 @@ mod tests {
         let mut state = home_state();
         state.detail_tech_open = true;
         state.route = Route::Detail {
-            id: "dune-2".into(),
+            id: "metropolis".into(),
         };
         state.detail = Some(demo::movie_detail());
         let env = Env {
@@ -3336,7 +3336,7 @@ mod tests {
         };
         let mut state = home_state();
         state.route = Route::Person {
-            id: "adam-scott".into(),
+            id: "mara-ellison".into(),
         };
         state.person = Some(demo::person());
         let mut rt = Runtime::new(state, view, (1280.0, 800.0), env);
@@ -3346,19 +3346,19 @@ mod tests {
             "person-name",
             "person-back",
             "person-credits",
-            "person-past-lives",
+            "person-his-girl-friday",
         ] {
             assert!(rt.find(key).is_some(), "{key} is on screen and addressable");
         }
 
         let mut state = home_state();
         state.route = Route::Detail {
-            id: "ace-collection".into(),
+            id: "silent-horror-collection".into(),
         };
         state.detail = Some(demo::collection());
         state.open_person(&jellyfin_api::Person {
-            id: "adam-scott".into(),
-            name: "Adam Scott".into(),
+            id: "mara-ellison".into(),
+            name: "Mara Ellison".into(),
             ..jellyfin_api::Person::default()
         });
         assert!(matches!(state.route, Route::Person { .. }));
@@ -3366,7 +3366,7 @@ mod tests {
         assert_eq!(
             state.route,
             Route::Detail {
-                id: "ace-collection".into()
+                id: "silent-horror-collection".into()
             }
         );
         assert_eq!(
@@ -3374,7 +3374,7 @@ mod tests {
                 .detail
                 .as_ref()
                 .map(|detail| detail.item.name.as_str()),
-            Some("Ace Ventura Collection")
+            Some("Silent Horror Collection")
         );
     }
 
@@ -3382,7 +3382,7 @@ mod tests {
     fn back_from_a_collection_member_returns_to_the_collection() {
         let mut state = home_state();
         state.route = Route::Detail {
-            id: "ace-collection".into(),
+            id: "silent-horror-collection".into(),
         };
         state.detail = Some(demo::collection());
         state.open_detail("ace-0".into());
@@ -3391,7 +3391,7 @@ mod tests {
         assert_eq!(
             state.route,
             Route::Detail {
-                id: "ace-collection".into()
+                id: "silent-horror-collection".into()
             }
         );
         assert_eq!(
@@ -3399,7 +3399,7 @@ mod tests {
                 .detail
                 .as_ref()
                 .map(|detail| detail.item.name.as_str()),
-            Some("Ace Ventura Collection")
+            Some("Silent Horror Collection")
         );
     }
 
@@ -3507,7 +3507,7 @@ mod tests {
             Some(item.id.as_str())
         );
         assert!(rt.find("playlist-picker").is_some());
-        assert!(rt.find("playlist-pick-playlist-marvel").is_some());
+        assert!(rt.find("playlist-pick-playlist-silent").is_some());
 
         // A toast is a short-lived confirmation drawn over whatever page is open.
         rt.state.playlist_picker_open = false;
@@ -3655,7 +3655,7 @@ mod tests {
         };
         let mut state = home_state();
         state.route = Route::Detail {
-            id: "dune-2".into(),
+            id: "metropolis".into(),
         };
         state.detail = Some(demo::movie_detail());
         let mut rt = Runtime::new(state, view, (1280.0, 1000.0), env);
@@ -3663,14 +3663,14 @@ mod tests {
         for key in [
             "detail-similar",
             "detail-similar-title",
-            "similar-similar-dune:-part-one",
-            "similar-similar-arrival",
+            "similar-similar-nosferatu",
+            "similar-similar-the-general",
         ] {
             assert!(rt.find(key).is_some(), "{key} is on screen and addressable");
         }
         // The rail opens the recommended item's own page.
         let (x, y) = rt
-            .find("similar-similar-arrival")
+            .find("similar-similar-the-general")
             .expect("a recommendation");
         rt.pointer_down(x, y);
         rt.pointer_up(x, y);
@@ -3680,7 +3680,7 @@ mod tests {
                 .detail
                 .as_ref()
                 .map(|detail| detail.item.id.as_str()),
-            Some("similar-arrival")
+            Some("similar-the-general")
         );
     }
 
@@ -3722,7 +3722,7 @@ mod tests {
         };
         let mut state = home_state();
         state.route = Route::Detail {
-            id: "severance".into(),
+            id: "quiet-floor".into(),
         };
         let mut detail = demo::detail();
         detail.episodes[0].user_data = Some(jellyfin_api::UserData {
@@ -3732,9 +3732,9 @@ mod tests {
         state.detail = Some(detail);
         let mut rt = Runtime::new(state, view, (1280.0, 800.0), env);
         rt.frame(0.0);
-        assert!(rt.find("detail-episode-severance-s2e1").is_some());
+        assert!(rt.find("detail-episode-quiet-floor-s2e1").is_some());
         assert!(
-            rt.find("played-severance-s2e1").is_some(),
+            rt.find("played-quiet-floor-s2e1").is_some(),
             "a finished episode is marked in the list"
         );
     }
@@ -3747,7 +3747,7 @@ mod tests {
         };
         let mut state = home_state();
         state.route = Route::Detail {
-            id: "severance".into(),
+            id: "quiet-floor".into(),
         };
         state.detail = Some(demo::detail());
         let mut rt = Runtime::new(state, view, (1280.0, 800.0), env);
@@ -3775,7 +3775,7 @@ mod tests {
         };
         let mut state = home_state();
         state.route = Route::Detail {
-            id: "ace-collection".into(),
+            id: "silent-horror-collection".into(),
         };
         state.detail = Some(demo::collection());
         let mut rt = Runtime::new(state, view, (1280.0, 800.0), env);
@@ -3824,16 +3824,16 @@ mod tests {
             "detail-favorite",
             "detail-played",
             "detail-overview",
-            "season-severance-s1",
-            "season-severance-s2",
+            "season-quiet-floor-s1",
+            "season-quiet-floor-s2",
             "detail-next-up",
             "detail-next-up-card",
-            "detail-episode-severance-s2e1",
+            "detail-episode-quiet-floor-s2e1",
             "detail-season-watched",
             "detail-next-up-guard",
             "detail-cast",
             "detail-cast-title",
-            "detail-cast-adam-scott",
+            "detail-cast-mara-ellison",
         ] {
             assert!(rt.find(key).is_some(), "{key} is on screen and addressable");
         }
@@ -3924,9 +3924,9 @@ mod tests {
     #[test]
     fn selecting_a_season_moves_the_pill_and_clears_the_old_rows() {
         let mut state = detail_state();
-        state.select_season("severance-s1".into());
+        state.select_season("quiet-floor-s1".into());
         let detail = state.detail.as_ref().expect("detail is open");
-        assert_eq!(detail.active_season.as_deref(), Some("severance-s1"));
+        assert_eq!(detail.active_season.as_deref(), Some("quiet-floor-s1"));
         assert!(detail.episodes.is_empty());
         assert!(detail.loading_episodes);
     }
@@ -4075,7 +4075,7 @@ mod tests {
         };
         let mut state = home_state();
         state.route = Route::Search { scope: None };
-        state.search.query = TextEdit::new("severance");
+        state.search.query = TextEdit::new("quiet-floor");
         state.search.query.focused = true;
         state.search.results = demo::search_results();
         let mut rt = Runtime::new(state, view, (1280.0, 800.0), env);
@@ -4086,9 +4086,9 @@ mod tests {
             "search-shows",
             "search-episodes",
             "search-people",
-            "search-shows-severance",
-            "search-episodes-severance-s2e1",
-            "search-person-adam-scott",
+            "search-shows-quiet-floor",
+            "search-episodes-quiet-floor-s2e1",
+            "search-person-mara-ellison",
             "search-movies-all",
             "search-movies-count",
         ] {
@@ -4138,7 +4138,7 @@ mod tests {
         };
         let mut state = home_state();
         state.route = Route::Search { scope: None };
-        state.search.query = TextEdit::new("severance");
+        state.search.query = TextEdit::new("quiet-floor");
         state.search.query.focused = true;
         state.search.results = demo::search_results();
         state.toggle_search_expanded("search-movies");
@@ -4146,8 +4146,8 @@ mod tests {
         rt.frame(0.0);
         for key in [
             "search-movies-grid",
-            "search-movies-past-lives",
-            "search-movies-poor-things",
+            "search-movies-his-girl-friday",
+            "search-movies-haxan",
         ] {
             assert!(rt.find(key).is_some(), "{key} is in the expanded grid");
         }
@@ -4223,11 +4223,11 @@ mod tests {
         };
         let mut state = home_state();
         state.route = Route::Search { scope: None };
-        state.search.recents = vec!["Dune".into(), "Severance".into()];
+        state.search.recents = vec!["Nosferatu".into(), "The Quiet Floor".into()];
         let mut rt = Runtime::new(state, view, (1280.0, 800.0), env);
         rt.frame(0.0);
-        assert!(rt.find("search-recent-Dune").is_some());
-        assert!(rt.find("search-recent-Severance").is_some());
+        assert!(rt.find("search-recent-Nosferatu").is_some());
+        assert!(rt.find("search-recent-The Quiet Floor").is_some());
     }
 
     #[test]
@@ -4597,7 +4597,7 @@ mod tests {
             .insert("Tmdb".into(), "196950".into());
         state.detail = Some(detail);
         state.route = Route::Detail {
-            id: "severance".into(),
+            id: "quiet-floor".into(),
         };
         state.seerr.series = Some((196950, demo::seerr_tv_series()));
         let mut rt = Runtime::new(state, view, (1280.0, 800.0), env);
@@ -5161,10 +5161,10 @@ mod tests {
             "live-tv-screen",
             "live-title",
             "live-channels",
-            "live-channel-formula-1",
-            "live-program-formula-1",
-            "live-channel-showtime",
-            "live-next-formula-1",
+            "live-channel-aurora-one",
+            "live-program-aurora-one",
+            "live-channel-access-seven",
+            "live-next-aurora-one",
         ] {
             assert!(rt.find(key).is_some(), "{key} is on screen and addressable");
         }
@@ -5187,13 +5187,13 @@ mod tests {
         for key in [
             "live-guide",
             "live-guide-times",
-            "live-guide-row-formula-1",
-            "live-guide-row-cinemax",
+            "live-guide-row-aurora-one",
+            "live-guide-row-meridian",
             "live-guide-toggle",
         ] {
             assert!(rt.find(key).is_some(), "{key} is on screen and addressable");
         }
-        assert!(rt.find("live-channel-formula-1").is_none());
+        assert!(rt.find("live-channel-aurora-one").is_none());
     }
 
     #[test]
@@ -5247,7 +5247,7 @@ mod tests {
         state.queue = (1..=4)
             .map(|number| {
                 let mut item = demo::next_episode();
-                item.id = format!("severance-s2e{}", number + 1);
+                item.id = format!("quiet-floor-s2e{}", number + 1);
                 item.index_number = Some(number + 1);
                 item
             })
@@ -5315,7 +5315,7 @@ mod tests {
         };
         let mut state = home_state();
         state.route = Route::Detail {
-            id: "dune-2".into(),
+            id: "metropolis".into(),
         };
         state.detail = Some(demo::movie_detail());
         state.preplay_open = true;
@@ -5323,19 +5323,19 @@ mod tests {
         rt.frame(0.0);
         for key in [
             "preplay-sheet",
-            "preplay-version-dune-source",
+            "preplay-version-metropolis-source",
             "preplay-cancel",
             "preplay-play",
         ] {
             assert!(rt.find(key).is_some(), "{key} is on screen");
         }
         let (x, y) = rt
-            .find("preplay-version-dune-1080")
+            .find("preplay-version-metropolis-1080")
             .expect("the 1080p source");
         rt.pointer_down(x, y);
         rt.pointer_up(x, y);
         rt.frame(1.0 / 60.0);
-        assert_eq!(rt.state.in_app_source.as_deref(), Some("dune-1080"));
+        assert_eq!(rt.state.in_app_source.as_deref(), Some("metropolis-1080"));
     }
 
     #[test]
@@ -5385,7 +5385,7 @@ mod tests {
         };
         let mut state = home_state();
         state.route = Route::Detail {
-            id: "dune-2".into(),
+            id: "metropolis".into(),
         };
         state.detail = Some(demo::movie_detail());
         state.detail_theme_songs = demo::extras();
@@ -5535,7 +5535,7 @@ mod tests {
         state.library = Some(library);
         state.playlist_editing = true;
         state.route = Route::Library {
-            id: "playlist-marvel".into(),
+            id: "playlist-silent".into(),
         };
         state.remove_playlist_entry(entry);
         assert!(
@@ -5606,13 +5606,13 @@ mod tests {
     fn a_chosen_version_is_remembered_per_item() {
         let mut state = home_state();
         state.route = Route::Detail {
-            id: "dune-2".into(),
+            id: "metropolis".into(),
         };
         state.detail = Some(demo::movie_detail());
-        state.play_detail_source("dune-1080".into());
+        state.play_detail_source("metropolis-1080".into());
         assert_eq!(
-            state.version_choices.get("dune-2").map(String::as_str),
-            Some("dune-1080")
+            state.version_choices.get("metropolis").map(String::as_str),
+            Some("metropolis-1080")
         );
     }
 
@@ -5700,7 +5700,7 @@ mod tests {
         state.in_app = Some(session);
         state.in_app_segments = vec![jellyfin_api::MediaSegment {
             id: "intro".into(),
-            item_id: "severance-s2e2".into(),
+            item_id: "quiet-floor-s2e2".into(),
             kind: "Intro".into(),
             start_ticks: 60_000 * jellyfin_api::TICKS_PER_MS,
             end_ticks: 90_000 * jellyfin_api::TICKS_PER_MS,
@@ -5713,9 +5713,9 @@ mod tests {
     fn adding_to_a_playlist_offers_undo() {
         let mut state = home_state();
         state.playlist_add_pending = Some((
-            "playlist-marvel".into(),
-            "dune-2".into(),
-            "Marvel Marathon".into(),
+            "playlist-silent".into(),
+            "metropolis".into(),
+            "Silent Horror Night".into(),
         ));
         state.apply_playlist_add(Ok(()));
         assert!(state.toast_undo.is_some());
@@ -5723,7 +5723,7 @@ mod tests {
             state
                 .toast
                 .as_deref()
-                .is_some_and(|text| text.contains("Marvel"))
+                .is_some_and(|text| text.contains("Silent Horror Night"))
         );
         state.undo_toast();
         assert!(state.toast.is_some());
@@ -5739,7 +5739,7 @@ mod tests {
         state.in_app = Some(demo::in_app());
         state.in_app_segments = vec![jellyfin_api::MediaSegment {
             id: "intro".into(),
-            item_id: "severance-s2e2".into(),
+            item_id: "quiet-floor-s2e2".into(),
             kind: "Intro".into(),
             start_ticks: 0,
             end_ticks: 90_000 * jellyfin_api::TICKS_PER_MS,
@@ -5773,10 +5773,10 @@ mod tests {
         let mut state = home_state();
         let parent = demo::movie_detail();
         state.route = Route::Detail {
-            id: "dune-2".into(),
+            id: "metropolis".into(),
         };
         state.detail = Some(parent);
-        state.open_detail("dune-1080".into());
+        state.open_detail("metropolis-1080".into());
         state.detail_extras = demo::extras();
         state.detail_theme_songs = demo::extras();
         state.detail_theme_videos = demo::extras();
@@ -5790,11 +5790,11 @@ mod tests {
     fn a_preplay_source_is_tied_to_its_item() {
         let mut state = home_state();
         state.route = Route::Detail {
-            id: "dune-2".into(),
+            id: "metropolis".into(),
         };
         state.detail = Some(demo::movie_detail());
-        state.set_preplay_source("dune-1080".into());
-        assert_eq!(state.in_app_source_for.as_deref(), Some("dune-2"));
+        state.set_preplay_source("metropolis-1080".into());
+        assert_eq!(state.in_app_source_for.as_deref(), Some("metropolis"));
         state.close_preplay();
         assert!(state.in_app_source.is_none());
         assert!(state.in_app_source_for.is_none());
@@ -5804,10 +5804,10 @@ mod tests {
     fn choosing_the_server_clears_the_local_checkpoint() {
         let mut state = home_state();
         state.in_app = Some(demo::in_app());
-        state.remember_checkpoint("severance-s2e2", 48 * 60_000);
+        state.remember_checkpoint("quiet-floor-s2e2", 48 * 60_000);
         state.resume_conflict = Some((48 * 60_000, 42 * 60_000));
         state.resume_from_server();
-        assert_eq!(state.local_checkpoint("severance-s2e2"), None);
+        assert_eq!(state.local_checkpoint("quiet-floor-s2e2"), None);
     }
 
     #[test]
@@ -5819,12 +5819,12 @@ mod tests {
             audio_mode: Some(crate::config::AudioMode::Night),
             reduce_motion: Some(true),
             version_choices: Some(std::collections::HashMap::from([(
-                "dune-2".to_string(),
-                "dune-1080".to_string(),
+                "metropolis".to_string(),
+                "metropolis-1080".to_string(),
             )])),
             playback_quality: Some(crate::config::PlaybackQuality::Mbps4),
             quality_choices: Some(std::collections::HashMap::from([(
-                "dune-2".to_string(),
+                "metropolis".to_string(),
                 crate::config::PlaybackQuality::Mbps2,
             )])),
             ..crate::config::Config::fresh()
@@ -5836,15 +5836,15 @@ mod tests {
         assert_eq!(state.audio_mode, crate::config::AudioMode::Night);
         assert!(state.reduce_motion);
         assert_eq!(
-            state.version_choices.get("dune-2").map(String::as_str),
-            Some("dune-1080")
+            state.version_choices.get("metropolis").map(String::as_str),
+            Some("metropolis-1080")
         );
         assert_eq!(
             state.playback_quality,
             crate::config::PlaybackQuality::Mbps4
         );
         assert_eq!(
-            state.quality_choices.get("dune-2"),
+            state.quality_choices.get("metropolis"),
             Some(&crate::config::PlaybackQuality::Mbps2)
         );
     }
@@ -5854,16 +5854,16 @@ mod tests {
         let mut state = home_state();
         state
             .version_choices
-            .insert("dune-2".into(), "dune-1080".into());
+            .insert("metropolis".into(), "metropolis-1080".into());
         state.save_preferences();
         assert_eq!(
             state
                 .config
                 .version_choices
                 .as_ref()
-                .and_then(|map| map.get("dune-2"))
+                .and_then(|map| map.get("metropolis"))
                 .map(String::as_str),
-            Some("dune-1080")
+            Some("metropolis-1080")
         );
     }
 
@@ -5918,12 +5918,12 @@ mod tests {
     fn live_favorites_filter_the_channel_list() {
         let mut state = home_state();
         state.live.channels = demo::live_channels();
-        state.toggle_live_favorite("hbo-hd");
+        state.toggle_live_favorite("northlight");
         state.toggle_live_favorites_only();
-        assert!(state.live.favorites.contains("hbo-hd"));
+        assert!(state.live.favorites.contains("northlight"));
         assert!(state.live.favorites_only);
-        state.toggle_live_favorite("hbo-hd");
-        assert!(!state.live.favorites.contains("hbo-hd"));
+        state.toggle_live_favorite("northlight");
+        assert!(!state.live.favorites.contains("northlight"));
     }
 
     #[test]
@@ -5945,7 +5945,7 @@ mod tests {
     fn a_collection_member_can_be_removed_locally() {
         let mut state = home_state();
         state.route = Route::Detail {
-            id: "ace-collection".into(),
+            id: "silent-horror-collection".into(),
         };
         state.detail = Some(demo::collection());
         let member = state.detail.as_ref().expect("detail").collection[0]
@@ -5987,7 +5987,7 @@ mod tests {
         let config = crate::config::Config {
             last_place: Some(crate::config::LastPlace {
                 kind: "detail".into(),
-                id: Some("dune-2".into()),
+                id: Some("metropolis".into()),
                 name: None,
                 collection_type: None,
             }),
@@ -5996,7 +5996,7 @@ mod tests {
         let mut state = State::from_config(config);
         state.home_loaded = true;
         state.poll();
-        assert!(matches!(&state.route, Route::Detail { id } if id == "dune-2"));
+        assert!(matches!(&state.route, Route::Detail { id } if id == "metropolis"));
     }
 
     #[test]
@@ -6048,12 +6048,12 @@ mod tests {
         };
         let mut state = home_state();
         state.route = Route::Detail {
-            id: "dune-2".into(),
+            id: "metropolis".into(),
         };
         state.detail = Some(demo::movie_detail());
         state.detail_collections = vec![jellyfin_api::Item {
             id: "dune-collection".into(),
-            name: "Dune Collection".into(),
+            name: "Silent Horror Collection".into(),
             kind: "BoxSet".into(),
             ..jellyfin_api::Item::default()
         }];
@@ -6070,25 +6070,25 @@ mod tests {
             scale: 2.0,
         };
         let mut state = home_state();
-        state.hide_from_home("severance-s2e4".into());
-        assert!(state.is_home_hidden("severance-s2e4"));
+        state.hide_from_home("quiet-floor-s2e4".into());
+        assert!(state.is_home_hidden("quiet-floor-s2e4"));
         assert!(state.toast_undo.is_some());
         let mut rt = Runtime::new(state, view, (1280.0, 800.0), env);
         rt.frame(0.0);
-        assert!(rt.find("rail-continue-watching-severance").is_none());
+        assert!(rt.find("rail-continue-watching-quiet-floor").is_none());
         rt.state.undo_toast();
         rt.frame(1.0 / 60.0);
-        assert!(rt.find("rail-continue-watching-severance").is_some());
+        assert!(rt.find("rail-continue-watching-quiet-floor").is_some());
     }
 
     #[test]
     fn hidden_home_ids_survive_a_restart() {
         let config = crate::config::Config {
-            hidden_home: Some(vec!["dune-2".into()]),
+            hidden_home: Some(vec!["metropolis".into()]),
             ..crate::config::Config::fresh()
         };
         let state = State::from_config(config);
-        assert!(state.is_home_hidden("dune-2"));
+        assert!(state.is_home_hidden("metropolis"));
     }
 
     #[test]
@@ -6167,7 +6167,7 @@ mod tests {
         let mut detail = demo::movie_detail();
         detail.item.media_sources.truncate(1);
         state.route = Route::Detail {
-            id: "dune-2".into(),
+            id: "metropolis".into(),
         };
         state.detail = Some(detail);
         let mut rt = Runtime::new(state, view, (1280.0, 800.0), env);
@@ -6230,27 +6230,27 @@ mod tests {
         };
         let mut state = home_state();
         state.route = Route::Detail {
-            id: "dune-2".into(),
+            id: "metropolis".into(),
         };
         state.detail = Some(demo::movie_detail());
         state.detail_extras = demo::extras();
         let mut rt = Runtime::new(state, view, (1280.0, 800.0), env);
         rt.frame(0.0);
         for key in [
-            "detail-version-dune-source",
-            "detail-version-dune-1080",
+            "detail-version-metropolis-source",
+            "detail-version-metropolis-1080",
             "detail-extras",
             "detail-extra-extra-behind",
         ] {
             assert!(rt.find(key).is_some(), "{key} is on screen");
         }
         let (x, y) = rt
-            .find("detail-version-dune-1080")
+            .find("detail-version-metropolis-1080")
             .expect("the 1080p source");
         rt.pointer_down(x, y);
         rt.pointer_up(x, y);
         rt.frame(1.0 / 60.0);
-        assert_eq!(rt.state.in_app_source.as_deref(), Some("dune-1080"));
+        assert_eq!(rt.state.in_app_source.as_deref(), Some("metropolis-1080"));
     }
 
     #[test]
@@ -6264,14 +6264,14 @@ mod tests {
             y: 0.0,
         });
         state.card_menu_toggle_played();
-        assert_eq!(state.local_checkpoint("severance-s2e4"), None);
+        assert_eq!(state.local_checkpoint("quiet-floor-s2e4"), None);
     }
 
     #[test]
     fn local_checkpoints_are_remembered_and_newer_than_the_server() {
         let mut state = home_state();
-        state.remember_checkpoint("dune-2", 42_000);
-        assert_eq!(state.local_checkpoint("dune-2"), Some(42_000));
+        state.remember_checkpoint("metropolis", 42_000);
+        assert_eq!(state.local_checkpoint("metropolis"), Some(42_000));
     }
 
     #[test]
@@ -6330,7 +6330,7 @@ mod tests {
         state.skip_mode = crate::config::SkipMode::Always;
         state.in_app_segments = vec![jellyfin_api::MediaSegment {
             id: "intro".into(),
-            item_id: "severance-s2e2".into(),
+            item_id: "quiet-floor-s2e2".into(),
             kind: "Intro".into(),
             start_ticks: (41 * 60_000 + 50_000) * jellyfin_api::TICKS_PER_MS,
             end_ticks: (42 * 60_000 + 10_000) * jellyfin_api::TICKS_PER_MS,
@@ -6367,7 +6367,7 @@ mod tests {
         state.in_app = Some(session);
         state.in_app_segments = vec![jellyfin_api::MediaSegment {
             id: "seg-1".into(),
-            item_id: "severance-s2e2".into(),
+            item_id: "quiet-floor-s2e2".into(),
             kind: "Intro".into(),
             start_ticks: 0,
             end_ticks: 10_000 * 90_000,
@@ -6405,7 +6405,7 @@ mod tests {
         state.skip_mode = crate::config::SkipMode::Ask;
         state.in_app_segments = vec![jellyfin_api::MediaSegment {
             id: "seg-lead".into(),
-            item_id: "severance-s2e2".into(),
+            item_id: "quiet-floor-s2e2".into(),
             kind: "Intro".into(),
             start_ticks: 90_000 * jellyfin_api::TICKS_PER_MS,
             end_ticks: 120_000 * jellyfin_api::TICKS_PER_MS,
@@ -6439,7 +6439,7 @@ mod tests {
         state.skip_mode = crate::config::SkipMode::Never;
         state.in_app_segments = vec![jellyfin_api::MediaSegment {
             id: "seg-never".into(),
-            item_id: "severance-s2e2".into(),
+            item_id: "quiet-floor-s2e2".into(),
             kind: "Intro".into(),
             start_ticks: 0,
             end_ticks: 90_000 * jellyfin_api::TICKS_PER_MS,

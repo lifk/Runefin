@@ -44,7 +44,7 @@ fn search_and_discover_use_the_page_total_fields() {
     let search: SearchResults = parse(include_str!("../../tests/fixtures/search.json"));
     assert_eq!(search.total_results, 3);
     assert_eq!(search.results.len(), 3);
-    assert_eq!(search.results[0].title(), "Dune");
+    assert_eq!(search.results[0].title(), "Example Film");
     assert_eq!(search.results[0].year(), Some("2021"));
     assert!(search.results[0].is_movie());
     assert!(search.results[1].is_tv());
@@ -63,7 +63,7 @@ fn search_and_discover_use_the_page_total_fields() {
 #[test]
 fn detail_pages_expose_the_title_poster_and_media_state() {
     let movie: MovieDetails = parse(include_str!("../../tests/fixtures/movie-detail.json"));
-    assert_eq!(movie.title.as_deref(), Some("Dune"));
+    assert_eq!(movie.title.as_deref(), Some("Example Film"));
     assert_eq!(movie.year(), Some("2021"));
     assert_eq!(movie.runtime, Some(155));
     assert_eq!(

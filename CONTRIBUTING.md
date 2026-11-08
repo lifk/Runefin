@@ -13,6 +13,7 @@ Thanks for looking. Runefin is a small, opinionated codebase; these rules keep i
 ## Build
 
 ```sh
+scripts/install-hooks.sh   # once: the pre-commit hook refuses tokens and private hosts
 cargo build -p runefin
 cargo test -p jellyfin-api
 cargo test -p seerr-api

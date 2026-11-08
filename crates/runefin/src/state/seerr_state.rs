@@ -135,7 +135,7 @@ pub const NETWORKS: &[(&str, i64)] = &[
     ("BBC One", 4),
     ("AMC", 174),
     ("FX", 88),
-    ("Showtime", 67),
+    ("Access Seven", 67),
     ("CBS", 16),
     ("NBC", 6),
     ("ABC", 2),

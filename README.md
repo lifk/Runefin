@@ -113,6 +113,7 @@ cargo test -p seerr-api       # the Seerr client, no network
 cargo test -p runefin         # headless UI tests through the real layout and springs
 scripts/check.sh              # fmt, clippy, both suites, release build
 scripts/snapshots.sh          # regenerate the committed captures
+scripts/install-hooks.sh      # once per clone: refuse tokens and private hosts in a commit
 ```
 
 The UI tests drive real input through Rune's `Runtime` and assert on state and presented geometry,
@@ -143,6 +144,20 @@ SEERR_URL=https://jellyseerr.example SEERR_API_KEY=... \
 See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the build, the conventions and the review rules, and
 [`SECURITY.md`](SECURITY.md) for how to report a vulnerability privately. Please do not open a
 public issue containing a server token, a private hostname or personal library data.
+
+## How it is built
+
+Runefin is developed with AI assistance. Most of the code, tests, documentation and snapshots in
+this repository were written by an AI coding agent working from human direction and review. Every
+change is expected to pass `scripts/check.sh` (formatting, clippy, three test suites, a release
+build) and, when it can move pixels, to ship with regenerated snapshots.
+
+That is a statement about how the code was produced, not a promise about its quality. Read what
+you run, keep your server patched, and report what breaks.
+
+The fixtures behind the screenshots use public-domain films (for example *Metropolis* and *Night
+of the Living Dead*) and invented series, episodes, channels and people. No third-party artwork
+is included; see [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
 ## Licence and disclaimer
 

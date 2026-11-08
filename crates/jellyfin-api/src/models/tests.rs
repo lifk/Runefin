@@ -7,11 +7,11 @@ const ITEMS: &str = r#"{
   "Items": [
     {
       "Id": "a1b2c3",
-      "Name": "Blade Runner 2049",
+      "Name": "Example Film",
       "Type": "Movie",
       "ProductionYear": 2017,
       "RunTimeTicks": 97800000000,
-      "Overview": "A young blade runner's discovery…",
+      "Overview": "A young courier's discovery…",
       "CommunityRating": 8.0,
       "OfficialRating": "R",
       "Genres": ["Science Fiction", "Drama"],
@@ -49,7 +49,7 @@ fn a_real_items_body_parses_and_keeps_total_count() {
     let page: ItemsResult = serde_json::from_str(ITEMS).expect("the captured body parses");
     assert_eq!(page.total_record_count, 2);
     assert_eq!(page.items.len(), 2);
-    assert_eq!(page.items[0].name, "Blade Runner 2049");
+    assert_eq!(page.items[0].name, "Example Film");
     assert_eq!(page.items[0].kind, "Movie");
 }
 
@@ -94,7 +94,7 @@ fn a_session_carries_its_device_and_now_playing_item() {
       "DeviceName": "living-room",
       "DeviceId": "dev-2",
       "IsActive": true,
-      "NowPlayingItem": { "Id": "item-1", "Name": "Dune", "Type": "Movie" },
+      "NowPlayingItem": { "Id": "item-1", "Name": "Example Film", "Type": "Movie" },
       "PlayState": { "PositionTicks": 450000000, "IsPaused": true, "CanSeek": true }
     }"#;
     let session: SessionInfo = serde_json::from_str(body).expect("the session parses");
@@ -104,7 +104,7 @@ fn a_session_carries_its_device_and_now_playing_item() {
             .now_playing_item
             .as_ref()
             .map(|item| item.name.as_str()),
-        Some("Dune")
+        Some("Example Film")
     );
     assert_eq!(
         session.play_state.as_ref().map(|state| state.is_paused),
@@ -137,16 +137,16 @@ fn image_tags_are_read_per_kind_and_absent_kinds_stay_absent() {
 #[test]
 fn people_arrive_with_their_role_and_portrait_tag() {
     let body = r#"{
-      "Id":"show-1","Name":"Severance","Type":"Series",
+      "Id":"show-1","Name":"Example Series","Type":"Series",
       "People":[
-        {"Id":"p1","Name":"Adam Scott","Role":"Mark Scout","Type":"Actor","PrimaryImageTag":"face-1"},
+        {"Id":"p1","Name":"Alex Doe","Role":"Avery Cole","Type":"Actor","PrimaryImageTag":"face-1"},
         {"Id":"p2","Name":"Dan Erickson","Role":"Creator","Type":"Writer"}
       ]
     }"#;
     let item: Item = serde_json::from_str(body).expect("the detail body parses");
     assert_eq!(item.people.len(), 2);
-    assert_eq!(item.people[0].name, "Adam Scott");
-    assert_eq!(item.people[0].role.as_deref(), Some("Mark Scout"));
+    assert_eq!(item.people[0].name, "Alex Doe");
+    assert_eq!(item.people[0].role.as_deref(), Some("Avery Cole"));
     assert_eq!(item.people[0].primary_image_tag.as_deref(), Some("face-1"));
     assert_eq!(item.people[1].role.as_deref(), Some("Creator"));
     assert!(item.people[1].primary_image_tag.is_none());
@@ -292,7 +292,7 @@ fn the_chapter_under_the_playhead_is_the_last_one_that_started() {
 #[test]
 fn a_remote_subtitle_parses_its_provider_facts() {
     let body = r#"[{"ThreeLetterISOLanguageName":"eng","Id":"abc_srt-eng-1",
-        "ProviderName":"Open Subtitles","Name":"Severance.S02E04.1080p.WEB-DL",
+        "ProviderName":"Open Subtitles","Name":"Example Series.S02E04.1080p.WEB-DL",
         "Format":"srt","Author":"tedi","Comment":"Retail NF",
         "DateCreated":"2023-09-29T17:01:03.0000000Z","CommunityRating":3.0,
         "FrameRate":23.976,"DownloadCount":64498,"IsHashMatch":true,

@@ -2773,7 +2773,7 @@ mod tests {
         let mut session = crate::demo::in_app();
         // The live shape: 640×360 thumbnails, 10×10 per sprite, 156 thumbnails.
         session.item.trickplay = Some(std::collections::HashMap::from([(
-            "severance-s2e2".to_string(),
+            "quiet-floor-s2e2".to_string(),
             std::collections::HashMap::from([(
                 "640".to_string(),
                 jellyfin_api::TrickplayInfo {
@@ -2864,7 +2864,7 @@ mod tests {
         state.adjust_in_app_subtitle_delay(5_000);
         assert_eq!(
             state.current_in_app_subtitle().map(|cue| cue.text.as_str()),
-            Some("Previously on Severance…")
+            Some("Previously on The Quiet Floor…")
         );
         state.adjust_in_app_subtitle_size(0.1);
         assert!((state.in_app_subtitles.size - 1.1).abs() < 0.001);

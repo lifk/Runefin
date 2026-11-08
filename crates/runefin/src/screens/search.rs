@@ -136,7 +136,7 @@ pub(super) fn search_screen(s: &State) -> El {
         let terms: Vec<String> = if has_recents {
             s.search.recents.clone()
         } else {
-            ["Severance", "Dune", "The Bear", "Shōgun"]
+            ["The Quiet Floor", "Nosferatu", "Service", "Harbour"]
                 .into_iter()
                 .map(str::to_string)
                 .collect()

@@ -68,8 +68,8 @@ mod tests {
         std::fs::create_dir_all(&directory).expect("the temp directory");
         let path = directory.join("positions.json");
         let mut map = HashMap::new();
-        map.insert("severance-s2e4".to_string(), 1_234_000);
-        map.insert("dune-2".to_string(), 42_000);
+        map.insert("quiet-floor-s2e4".to_string(), 1_234_000);
+        map.insert("metropolis".to_string(), 42_000);
         save_to(map.clone(), path.clone());
         assert_eq!(load_from(path), map);
         let _ = std::fs::remove_dir_all(directory);
