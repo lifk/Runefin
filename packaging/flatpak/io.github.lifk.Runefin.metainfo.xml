@@ -42,6 +42,14 @@
   </screenshots>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.1.1" date="2026-11-09">
+      <description>
+        <p>
+          Playback keeps its pacing: a late frame is dropped instead of replayed, and the
+          player clock is read ten times a second rather than every frame.
+        </p>
+      </description>
+    </release>
     <release version="0.1.0" date="2026-11-07"/>
   </releases>
 </component>
