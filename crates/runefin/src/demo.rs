@@ -1475,7 +1475,7 @@ pub fn library(count: usize) -> LibraryState {
 
 fn library_items(count: usize) -> Vec<Item> {
     const TITLES: [&str; 10] = [
-        "Aurora", "Burning", "Caché", "Drive", "Everest", "Fallen", "Gravity", "Hana", "Iris",
+        "Aurora", "Beacon", "Cascade", "Drift", "Ember", "Fathom", "Glacier", "Harbour", "Ivory",
         "Juniper",
     ];
     (0..count)

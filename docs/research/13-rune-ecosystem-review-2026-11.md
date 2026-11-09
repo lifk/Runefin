@@ -4,6 +4,50 @@ Method: `git fetch upstream` in the fork, comparison of `runefin/player` with `u
 unreleased changelog, and a trial rebase. The public listing was read from `neiii/awesome-rune`
 (`projects.json`, schema, PR template).
 
+## Applied 2026-11-10
+
+Branch `rune-bump` (this change), fork branch `runefin/bump-2026-11` at `489750e5`, based on
+`upstream/dev` `2bc3179d` (176 commits since the previous base).
+
+What the rebase needed:
+
+- `render.rs`: upstream's shader machine added a `classic` argument to `Renderer::create`; the
+  DMA-BUF adapter became one more argument, so `new_with_adapter` keeps working.
+- `window/create.rs`: the window renderer moved out of `window.rs`; the adapter is passed there.
+- `window/create.rs` and `lifecycle.rs`: `set_fullscreen` re-applied on the rewritten window
+  creation/resume paths.
+- `window.rs` / `window/events.rs`: `set_design_height` and its `ScaleFactorChanged` guard
+  re-applied around the new scale handling.
+- `runtime/input/focus.rs`: upstream's `web_focus` clause and our `return_activates` clause now
+  sit side by side in `takes_return`.
+
+Adopted automatically by the bump: Blink-compatible line breaking, TextEdit IME composition and
+undo grouping, the tooltip state machine, the scroll mode machine and the virtual-list motion
+gate.
+
+Verified:
+
+- Rune's own lib suite fails the same 13 tests on `upstream/dev` and on the rebased branch
+  (macOS precompiled metallib, two macOS smoothing tests, GPU/lavapipe-sensitive render and
+  video tests), so the rebase adds no failures.
+- App: `scripts/check.sh` green, 315 tests.
+- Player: the DMA-BUF probe renders 24.0 frames/s with zero stalls and a 41 ms longest gap on
+  the rebased renderer.
+- Snapshots: all 150 regenerated; the diff is text rendering (Windfoil) plus the fixture titles.
+
+Deferred, with the reason:
+
+- **`El::focus_fill`**: `focus_highlight` still gives both the big-screen fill and Return
+  activation; switching would split one decision across two attributes for no visible gain.
+- **RTL layout**: the UI copy is English, so mirroring the sidebar and rails would be a product
+  decision, not an upgrade. RTL *text* is shaped by Rune's bidi pass either way; revisit when
+  the interface itself is localized.
+- **Sticky headers (`El::stuck_reveal`)**: optional design change, not a defect; the library
+  toolbar is already reachable by scrolling to the top.
+
+The fixture library also gained its neutral titles here (`Aurora 000`, `Beacon 001`, …): the
+earlier public-domain pass had missed the ten-word list behind the paged library scenes.
+
 ## Where the fork stands
 
 - Merge base: `ddf14140` (2026-11-06). Since then upstream has **168 commits**; the fork adds
