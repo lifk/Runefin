@@ -91,6 +91,8 @@ git push origin main     # after scripts/check.sh is green
 
 - Tag `v0.1.0` on `ee9ae08` and a GitHub release with notes and
   `Runefin-0.1.0-x86_64.flatpak` (10.7 MB) built from the repinned tree.
+- Tag `v0.1.1` on `41ee306` with the playback pacing fix: `Runefin-0.1.1-x86_64.flatpak`
+  (10.7 MB), checksum-verified against the local build, installed over 0.1.0 under the same ID.
 
 ### Still required
 
