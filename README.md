@@ -102,8 +102,10 @@ A gamepad works in either mode: D-pad/left stick moves, **A** selects, **B** goe
 change section, and **Start** opens a card menu or the player gear. `RUNEFIN_GAMEPAD=0` turns the
 listener off.
 
-On SteamOS, `cecd` maps an HDMI-CEC remote's OK button to Enter; a sample mapping that makes every
-control reachable is in [`packaging/flatpak/cecd.toml`](packaging/flatpak/cecd.toml).
+On SteamOS, `cecd` maps an HDMI-CEC remote's OK button to Enter; Runefin wants Space for a few
+controls. [`packaging/flatpak/setup-cecd.sh`](packaging/flatpak/setup-cecd.sh) merges the right
+mapping into `~/.config/cecd/config.toml` (backing it up first), and
+[`cecd.toml`](packaging/flatpak/cecd.toml) is the same mapping as a reference file.
 
 ## Development
 
