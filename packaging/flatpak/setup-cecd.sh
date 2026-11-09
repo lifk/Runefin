@@ -1,12 +1,17 @@
 #!/usr/bin/env bash
-# Install Runefin's HDMI-CEC remote mapping into ~/.config/cecd/config.toml.
+# Install the small HDMI-CEC mapping Runefin needs into ~/.config/cecd/config.toml.
 #
-# Safe to re-run: it only adds keys that are missing, keeps values you already
-# chose, and writes a timestamped backup before changing anything.
+# cecd's mapping applies to the whole SteamOS session, so this script deliberately
+# changes as little as possible: only the Menu buttons, which Runefin uses for the
+# item menu. OK, Back and the D-pad are left at cecd's defaults (Return, Escape and
+# the arrow keys) because Runefin's big-screen mode takes Return and arrows itself.
+#
+# Safe to re-run: it adds only keys that are missing and keeps values you chose.
 #
 #   bash setup-cecd.sh              # merge, then restart cecd if it is running
 #   bash setup-cecd.sh --dry-run    # show what would change, write nothing
 #   bash setup-cecd.sh --force      # also replace mappings that differ
+#   bash setup-cecd.sh --restore    # undo an older install from this script
 #
 # It can be piped from the repository:
 #   curl -fsSL https://raw.githubusercontent.com/lifk/Runefin/main/packaging/flatpak/setup-cecd.sh | bash
@@ -14,13 +19,15 @@ set -euo pipefail
 
 dry_run=false
 force=false
+restore=false
 
 for arg in "$@"; do
     case "$arg" in
         --dry-run) dry_run=true ;;
         --force) force=true ;;
+        --restore) restore=true ;;
         -h|--help)
-            sed -n '2,16p' "$0" 2>/dev/null | sed 's/^# \{0,1\}//'
+            sed -n '2,18p' "$0" 2>/dev/null | sed 's/^# \{0,1\}//'
             exit 0
             ;;
         *)
@@ -56,10 +63,9 @@ if command -v systemctl >/dev/null 2>&1; then
     systemctl --user list-unit-files cecd.service >/dev/null 2>&1 && have_user_unit=true
     systemctl list-unit-files cecd.service >/dev/null 2>&1 && have_system_unit=true
 fi
-have_unit=$have_user_unit
 have_binary=false
 command -v cecd >/dev/null 2>&1 && have_binary=true
-if ! $have_user_unit && ! $have_system_unit && ! $have_binary; then
+if ! $have_user_unit && ! $have_system_unit && ! $have_binary && ! $restore; then
     warn "cecd was not found as a service or a command"
     warn "the file is still written; it takes effect when cecd exists (SteamOS 3.8.1+)"
 fi
@@ -79,40 +85,81 @@ fi
 if [ -f "$target" ] && grep -q $'\r' "$target"; then
     warn "$target has CRLF line endings; new lines will use LF"
 fi
-if [ -f "$target" ]; then
-    if grep -qE '^[[:space:]]*mappings[[:space:]]*=' "$target"; then
-        die "$target defines mappings as an inline table; convert it to a [mappings] table first"
+
+restart_cecd() {
+    if $have_user_unit; then
+        if systemctl --user restart cecd 2>/dev/null; then
+            say "restarted cecd"
+        else
+            warn "could not restart cecd; run 'systemctl --user restart cecd' in a Desktop Mode terminal"
+        fi
+    elif $have_system_unit; then
+        if systemctl restart cecd 2>/dev/null; then
+            say "restarted cecd"
+        else
+            warn "could not restart the cecd service; run 'systemctl restart cecd' in a Desktop Mode terminal"
+        fi
+    else
+        say "restart cecd yourself when it is installed (systemctl --user restart cecd)"
     fi
-    if grep -qE '^[[:space:]]*\[\[mappings\]\]' "$target"; then
-        die "$target uses [[mappings]]; cecd expects a single [mappings] table"
+}
+
+# --- undo an older install ------------------------------------------------------------
+
+if $restore; then
+    [ -f "$target" ] || { say "nothing to restore: $target does not exist"; exit 0; }
+    latest=""
+    if [ -d "$config_dir" ]; then
+        latest=$(find "$config_dir" -maxdepth 1 -name 'config.toml.bak-*' -printf '%T@ %p\n' 2>/dev/null \
+            | sort -rn | head -1 | cut -d' ' -f2-)
     fi
+    if [ -n "$latest" ] && [ -f "$latest" ]; then
+        if $dry_run; then
+            say "would restore $latest over $target"
+            diff -u "$target" "$latest" || true
+            exit 0
+        fi
+        keep="$target.before-restore-$(date +%Y%m%d%H%M%S)"
+        cp -p "$target" "$keep"
+        cp -p "$latest" "$target"
+        say "restored $latest"
+        say "the file it replaced is $keep"
+    elif grep -q "Added by Runefin" "$target"; then
+        if $dry_run; then
+            say "would remove $target (Runefin created it)"
+            exit 0
+        fi
+        rm -f "$target"
+        say "removed $target; cecd returns to its defaults"
+    else
+        die "no backup found and $target is not one this script created; remove the [mappings] keys by hand"
+    fi
+    restart_cecd
+    exit 0
 fi
 
 mkdir -p "$config_dir" || die "could not create $config_dir"
 [ -w "$config_dir" ] || die "$config_dir is not writable"
 
-# --- the mappings ---------------------------------------------------------------------
+# --- the mapping ---------------------------------------------------------------------
 #
-# Keys are cecd's Linux key names; values are input-event codes (KEY_* in
-# /usr/include/linux/input-event-codes.h). Select/OK map to Space because a few
-# Runefin controls only take Space; the rest is what the player already binds.
+# Only the Menu buttons are remapped: cecd's own defaults already send Return, Escape and
+# the arrow keys, which Runefin's big-screen mode handles. Anything else would change what
+# the remote does inside the Steam UI while the app is closed.
 
-keys="up down left right select ok back exit contents-menu media-context-sensitive-menu help \
-play pause stop skip-forward skip-backward fast-forward rewind channel-up channel-down \
-volume-up volume-down mute power"
-
-values="103 108 105 106 57 57 1 1 438 438 59 57 57 1 106 105 106 105 104 109 115 114 113 116"
-
-tmp_merged=$(mktemp) || die "could not create a temporary file"
-tmp_report=$(mktemp) || die "could not create a temporary file"
-cleanup() { rm -f "$tmp_merged" "$tmp_report"; }
-trap cleanup EXIT
+keys="contents-menu media-context-sensitive-menu"
+values="438 438"   # KEY_CONTEXT_MENU
 
 force_flag=0
 $force && force_flag=1
 
 input=/dev/null
 [ -f "$target" ] && input="$target"
+
+tmp_merged=$(mktemp) || die "could not create a temporary file"
+tmp_report=$(mktemp) || die "could not create a temporary file"
+cleanup() { rm -f "$tmp_merged" "$tmp_report"; }
+trap cleanup EXIT
 
 set +e
 awk -v keys="$keys" -v vals="$values" -v force="$force_flag" '
@@ -182,7 +229,6 @@ if [ "$status" -ne 0 ] && [ "$status" -ne 5 ]; then
     die "could not merge the mapping (awk exit $status)"
 fi
 
-# Everything awk had to say about existing values.
 [ -s "$tmp_report" ] && cat "$tmp_report" >&2
 
 if [ -f "$target" ] && cmp -s "$tmp_merged" "$target"; then
@@ -210,28 +256,11 @@ if [ -f "$target" ]; then
     say "backup: $backup"
 fi
 
-mkdir -p "$config_dir"
 cp "$tmp_merged" "$target.tmp.$$" && mv "$target.tmp.$$" "$target"
 say "wrote: $target"
 
-# --- restart --------------------------------------------------------------------------
-
-if $have_user_unit; then
-    if systemctl --user restart cecd 2>/dev/null; then
-        say "restarted cecd"
-    else
-        warn "could not restart cecd; run 'systemctl --user restart cecd' in a Desktop Mode terminal"
-    fi
-elif $have_system_unit; then
-    if systemctl restart cecd 2>/dev/null; then
-        say "restarted cecd"
-    else
-        warn "could not restart the cecd service; run 'systemctl restart cecd' in a Desktop Mode terminal"
-    fi
-else
-    say "restart cecd yourself when it is installed (systemctl --user restart cecd)"
-fi
-
+restart_cecd
 say
-say "Check SteamOS Settings > Display / Power > HDMI CEC: remote input must be on,"
-say "and CEC enabled on the TV. The mapping applies to the TV remote, not the gamepad."
+say "SteamOS Settings > Display / Power > HDMI CEC: remote input must be on, and CEC"
+say "enabled on the TV. Runefin takes Return as OK; the D-pad, Back and the player's"
+say "transport keys keep cecd's defaults."

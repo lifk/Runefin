@@ -33,7 +33,7 @@ zeroize = "1"
 # dep means a red build nobody changed.
 zbus = { version = "6", default-features = false, features = ["tokio", "service"] }
 tokio = { version = "1", features = ["rt", "net", "time"] }
-rune = { git = "https://github.com/lifk/rune", rev = "5da4bbf6e9dea29eb51422d77a162d7f8abb97af", default-features = false, features = ["embedded-fonts", "svg", "dbus"] }
+rune = { git = "https://github.com/lifk/rune", rev = "f3eec1a5f347c1be06bc8589a14d0d56c01c1c39", default-features = false, features = ["embedded-fonts", "svg", "dbus"] }
 gilrs = "0.11.2"
 
 [lints]

@@ -1368,7 +1368,7 @@ checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 
 [[package]]
 name = "jellyfin-api"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "serde",
  "serde_json",
@@ -2651,7 +2651,7 @@ checksum = "6c20b6793b5c2fa6553b250154b78d6d0db37e72700ae35fad9387a46f487c97"
 [[package]]
 name = "rune"
 version = "0.0.1"
-source = "git+https://github.com/lifk/rune?rev=5da4bbf6e9dea29eb51422d77a162d7f8abb97af#5da4bbf6e9dea29eb51422d77a162d7f8abb97af"
+source = "git+https://github.com/lifk/rune?rev=f3eec1a5f347c1be06bc8589a14d0d56c01c1c39#f3eec1a5f347c1be06bc8589a14d0d56c01c1c39"
 dependencies = [
  "accesskit",
  "arboard",
@@ -2718,12 +2718,12 @@ dependencies = [
 [[package]]
 name = "rune-motion"
 version = "0.1.0"
-source = "git+https://github.com/lifk/rune?rev=5da4bbf6e9dea29eb51422d77a162d7f8abb97af#5da4bbf6e9dea29eb51422d77a162d7f8abb97af"
+source = "git+https://github.com/lifk/rune?rev=f3eec1a5f347c1be06bc8589a14d0d56c01c1c39#f3eec1a5f347c1be06bc8589a14d0d56c01c1c39"
 
 [[package]]
 name = "rune-staging"
 version = "0.0.1"
-source = "git+https://github.com/lifk/rune?rev=5da4bbf6e9dea29eb51422d77a162d7f8abb97af#5da4bbf6e9dea29eb51422d77a162d7f8abb97af"
+source = "git+https://github.com/lifk/rune?rev=f3eec1a5f347c1be06bc8589a14d0d56c01c1c39#f3eec1a5f347c1be06bc8589a14d0d56c01c1c39"
 dependencies = [
  "wgpu",
 ]
@@ -2731,14 +2731,14 @@ dependencies = [
 [[package]]
 name = "rune-taffy"
 version = "0.0.1"
-source = "git+https://github.com/lifk/rune?rev=5da4bbf6e9dea29eb51422d77a162d7f8abb97af#5da4bbf6e9dea29eb51422d77a162d7f8abb97af"
+source = "git+https://github.com/lifk/rune?rev=f3eec1a5f347c1be06bc8589a14d0d56c01c1c39#f3eec1a5f347c1be06bc8589a14d0d56c01c1c39"
 dependencies = [
  "taffy",
 ]
 
 [[package]]
 name = "runefin"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "flate2",
  "gilrs",
@@ -2888,7 +2888,7 @@ dependencies = [
 
 [[package]]
 name = "seerr-api"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "serde",
  "serde_json",
@@ -3940,7 +3940,7 @@ dependencies = [
 [[package]]
 name = "wgpu-external-frame"
 version = "0.4.0"
-source = "git+https://github.com/lifk/rune?rev=5da4bbf6e9dea29eb51422d77a162d7f8abb97af#5da4bbf6e9dea29eb51422d77a162d7f8abb97af"
+source = "git+https://github.com/lifk/rune?rev=f3eec1a5f347c1be06bc8589a14d0d56c01c1c39#f3eec1a5f347c1be06bc8589a14d0d56c01c1c39"
 dependencies = [
  "ash",
  "glow",

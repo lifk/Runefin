@@ -1004,6 +1004,9 @@ fn main() {
         // The window's physical height sets the scale; 720 points of design keeps the same
         // layout at 1080p (1.5x) and 4K (3x).
         rune::set_design_height(Some(720.0));
+        // A TV remote's OK button arrives as Return; make it press the focused control, not
+        // only the rows and links that already took it.
+        rune::set_return_activates(true);
         crate::theme::set_big_screen(true);
     }
     let size = if startup.window_width >= 900.0 && startup.window_height >= 600.0 {

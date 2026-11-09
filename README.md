@@ -57,8 +57,8 @@ means a build nobody changed.
 ### Flatpak (recommended on SteamOS and other immutable systems)
 
 ```sh
-curl -LO https://github.com/lifk/Runefin/releases/latest/download/Runefin-0.1.1-x86_64.flatpak
-flatpak install --user ./Runefin-0.1.1-x86_64.flatpak
+curl -LO https://github.com/lifk/Runefin/releases/latest/download/Runefin-0.1.2-x86_64.flatpak
+flatpak install --user ./Runefin-0.1.2-x86_64.flatpak
 flatpak run io.github.lifk.Runefin
 ```
 
@@ -102,10 +102,11 @@ A gamepad works in either mode: D-pad/left stick moves, **A** selects, **B** goe
 change section, and **Start** opens a card menu or the player gear. `RUNEFIN_GAMEPAD=0` turns the
 listener off.
 
-On SteamOS, `cecd` maps an HDMI-CEC remote's OK button to Enter; Runefin wants Space for a few
-controls. [`packaging/flatpak/setup-cecd.sh`](packaging/flatpak/setup-cecd.sh) merges the right
-mapping into `~/.config/cecd/config.toml` (backing it up first), and
-[`cecd.toml`](packaging/flatpak/cecd.toml) is the same mapping as a reference file.
+On SteamOS an HDMI-CEC remote arrives as keyboard input, and Runefin's big-screen mode takes
+Return as OK. Only the Menu buttons need a cecd mapping:
+[`packaging/flatpak/setup-cecd.sh`](packaging/flatpak/setup-cecd.sh) merges it into
+`~/.config/cecd/config.toml` (backing the file up first), and
+[`cecd.toml`](packaging/flatpak/cecd.toml) is the same mapping as a reference.
 
 ## Development
 

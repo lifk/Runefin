@@ -42,6 +42,15 @@
   </screenshots>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.1.2" date="2026-11-09">
+      <description>
+        <p>
+          A TV remote's OK button (Return) now presses the focused control everywhere on the
+          big screen, and the CEC helper only maps the Menu buttons so it no longer changes
+          what OK and the D-pad do in the Steam UI.
+        </p>
+      </description>
+    </release>
     <release version="0.1.1" date="2026-11-09">
       <description>
         <p>

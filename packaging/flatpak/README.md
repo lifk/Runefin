@@ -146,10 +146,10 @@ keyboard input; no `/dev/cec` permission is needed inside the Flatpak. Enable
 **Remote control input** in SteamOS Settings → Display / Power → HDMI CEC and
 turn on CEC on the TV.
 
-SteamOS's `cecd` maps Select/OK to **Enter**. Runefin's big-screen cards now
-take Return through `focus_highlight`, but a few controls (notably some detail
-actions) still only activate on **Space**. The mapping below sends Select to
-Space so every control works, and adds the transport keys.
+cecd's mapping is **global to the SteamOS session**, so Runefin changes as little of it as
+possible. OK, Back and the D-pad keep cecd's defaults — Return, Escape and the arrow keys — and
+Runefin's big-screen mode now takes Return as "press the focused control". The only keys the app
+adds are the Menu buttons, which open a poster's item menu.
 
 On the Steam Machine, with no checkout needed:
 
@@ -162,18 +162,22 @@ bash setup-cecd.sh
 
 From a checkout, `packaging/flatpak/setup-cecd.sh` is the same script. It:
 
-- adds only the keys that are missing and keeps any value you already chose;
-  `--force` replaces differing values as well;
-- writes a timestamped backup next to the file before changing it;
-- refuses a config with two `[mappings]` tables, an inline `mappings = { … }` or
-  `[[mappings]]`, since cecd cannot read those;
-- warns when `cecd` is not installed or the machine is not SteamOS, and still
-  writes the file for when it is;
-- restarts the `cecd` user service when it exists.
+- adds only the keys that are missing and keeps any value you already chose
+  (`--force` replaces differing values);
+- writes a timestamped backup before changing the file;
+- refuses a config with two `[mappings]` tables, an inline `mappings = { … }` or `[[mappings]]`;
+- warns when `cecd` is not installed or the host is not SteamOS, and still writes the file;
+- restarts the `cecd` service when one exists.
 
-It maps OK to Space, Back to Esc, the remote's Menu key to Runefin's context
-menu, and play/pause, skip and channel buttons to the keys the player already
-uses. `packaging/flatpak/cecd.toml` is the same mapping as a reference file.
+If an older version of this script (which remapped Select to Space and the transport keys)
+is installed, undo it with:
+
+```sh
+bash setup-cecd.sh --restore
+```
+
+That restores the newest backup, or removes the file when the script created it, then restarts
+`cecd`. `packaging/flatpak/cecd.toml` is the same two-key mapping as a reference file.
 
 A TV remote is reported as a keyboard, not a gamepad. Steam Input is not
 involved; the physical controller keeps working alongside it.
