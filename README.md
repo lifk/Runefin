@@ -56,10 +56,23 @@ means a build nobody changed.
 
 ### Flatpak (recommended on SteamOS and other immutable systems)
 
+Add the signed repository once, then updates arrive with `flatpak update`:
+
+```sh
+flatpak remote-add --if-not-exists --user runefin https://lifk.github.io/Runefin/runefin.flatpakrepo
+flatpak install --user runefin io.github.lifk.Runefin
+flatpak run io.github.lifk.Runefin
+flatpak update --user          # later
+```
+
+If you installed from a `.flatpak` bundle before, remove that copy once so this origin takes
+over (`flatpak uninstall --user io.github.lifk.Runefin`); your settings stay in `~/.var/app`.
+
+The offline bundle is still attached to every release:
+
 ```sh
 curl -LO https://github.com/lifk/Runefin/releases/latest/download/Runefin-0.1.5-x86_64.flatpak
 flatpak install --user ./Runefin-0.1.5-x86_64.flatpak
-flatpak run io.github.lifk.Runefin
 ```
 
 Packaging sources, the repository layout, controller notes and the CEC mapping live in

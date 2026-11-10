@@ -55,6 +55,48 @@ flatpak run io.github.lifk.Runefin --big-screen
 The package exports **Runefin** and **Runefin Big Screen** desktop entries. The user config lives
 at `~/.var/app/io.github.lifk.Runefin/config/runefin/config.toml`.
 
+## Hosted repository (GitHub Pages)
+
+The signed repository is published to the `gh-pages` branch and served at
+`https://lifk.github.io/Runefin/`. Clients add it once and then update with `flatpak update`:
+
+```sh
+flatpak remote-add --if-not-exists --user runefin https://lifk.github.io/Runefin/runefin.flatpakrepo
+flatpak install --user runefin io.github.lifk.Runefin
+```
+
+A copy installed from a `.flatpak` bundle has a different origin; remove it once
+(`flatpak uninstall --user io.github.lifk.Runefin`) and install from the remote. The settings
+under `~/.var/app/io.github.lifk.Runefin` are kept.
+
+### The release key
+
+Signing uses a dedicated key outside the repository:
+
+```sh
+export GNUPGHOME=$HOME/.local/share/runefin/release-gnupg
+gpg --list-secret-keys --with-colons | awk -F: '/^sec:/{print $5, $7}'
+```
+
+Only the public half, `runefin-releases.gpg`, is committed; the `.flatpakrepo` embeds it, so a
+client verifies the summary without a side channel. **Back that directory up.** If the key is
+lost, every client has to remove and re-add the remote with a new key; rotating means publishing
+a new `.flatpakrepo` and telling users to re-add it.
+
+### Publishing a release
+
+```sh
+scripts/publish-flatpak.sh
+```
+
+It builds a fresh repository (only the current commit, so the site stays around 18 MB instead of
+accumulating every build), signs the summary, writes `dist/Runefin.flatpakrepo`, and replaces the
+`gh-pages` branch with the result. The branch is force-pushed on purpose: clients only need the
+current commit, and keeping history would grow the site without bound.
+
+Override the defaults if needed: `RUNEFIN_GPG_HOME` for the keyring, `FLATPAK_REPO_URL` for the
+published address.
+
 ## Sending and updating
 
 ### One machine, over SSH (recommended first)
