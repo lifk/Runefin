@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Renders the UI headlessly (no window, fixed virtual clock).
 #
-#   scripts/snapshots.sh             # the eight committed views -> docs/snapshots/
+#   scripts/snapshots.sh             # the committed views -> docs/snapshots/
 #   scripts/snapshots.sh --all       # every scene -> /tmp/runefin-snapshots
 #   scripts/snapshots.sh --all DIR   # every scene -> DIR
 #

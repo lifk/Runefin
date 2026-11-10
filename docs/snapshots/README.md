@@ -1,6 +1,6 @@
 # Snapshot captures
 
-Eight views are committed here. Each is rendered by `scripts/snapshots.sh` from a named
+Ten views are committed here. Each is rendered by `scripts/snapshots.sh` from a named
 `AppSpec` scene, headlessly, at a fixed virtual time and scale — the same renderer the window
 uses, so a diff in the image is a diff in the UI. Personal live captures are never committed:
 they contain the real session's ids and artwork.
@@ -15,15 +15,18 @@ they contain the real session's ids and artwork.
 | `in-app-osd.png` | `in-app-osd` | 1280×800 at 2× | the player chrome and timeline |
 | `home-big.png` | `home` | 1920×1080 at 1.5× | the 10-foot home; linked from the README |
 | `library-big.png` | `library` | 1920×1080 at 1.5× | the 10-foot library; linked from AppStream |
+| `focus-card-big.png` | `home` | 1920×1080 at 1.5× | a card's neutral focus wash and 2 pt ring |
+| `focus-sidebar-big.png` | `home` | 1920×1080 at 1.5× | focus on the selected sidebar entry |
 
-These eight are the screens a change is most likely to touch, plus the two frames the README and
-the AppStream metadata link to. The rest of the catalogue still exists — it is rendered on your
+These ten are the screens a change is most likely to touch, plus the two frames the README and
+the AppStream metadata link to and the focus pair. Focus is runtime state, not scene state, so
+the two focus frames render past the first poll; the sidebar one walks there with a script. The rest of the catalogue still exists — it is rendered on your
 machine, not stored in the repository.
 
 ## Rendering
 
 ```sh
-scripts/snapshots.sh              # the eight above, in place; commit intended diffs
+scripts/snapshots.sh              # the ten above, in place; commit intended diffs
 scripts/snapshots.sh --all        # every scene into /tmp/runefin-snapshots
 scripts/snapshots.sh --all DIR    # every scene into DIR
 target/debug/runefin --list-scenes
@@ -35,7 +38,7 @@ player's subtitle/trickplay/up-next states, the Seerr pages, and the synthetic c
 not in the table, and look at the frames it writes.
 
 **Rule.** A change that can move pixels renders the affected scenes with `--all` and inspects
-them. If one of the eight committed views changes, commit it in the same change and say why.
+them. If one of the ten committed views changes, commit it in the same change and say why.
 
 ## Reproducibility
 

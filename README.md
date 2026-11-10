@@ -32,8 +32,8 @@ everything from a gamepad or an HDMI-CEC remote.
 - **Remote and cast**: open sessions, pause/resume/+30 s/stop, and “Play on…”.
 - **Seerr (optional)**: if you run Jellyseerr/Seerr, Discover and Requests appear for film and
   season requests, request status and download progress.
-- **Big screen**: a 64 pt safe gutter, a type ramp for couch distance, 4 pt focus rings, gamepad
-  navigation and HDMI-CEC remote support.
+- **Big screen**: a 64 pt safe gutter, a type ramp for couch distance, 2 pt neutral focus rings,
+  D-pad focus zones, gamepad navigation and HDMI-CEC remote support.
 
 The full inventory and the deliberate limits are in [`docs/features.md`](docs/features.md).
 
@@ -132,7 +132,7 @@ cargo test -p jellyfin-api    # wire types and URLs, no network
 cargo test -p seerr-api       # the Seerr client, no network
 cargo test -p runefin         # headless UI tests through the real layout and springs
 scripts/check.sh              # fmt, clippy, both suites, release build
-scripts/snapshots.sh          # the eight committed views
+scripts/snapshots.sh          # the committed views, in place
 scripts/snapshots.sh --all    # every scene, into /tmp/runefin-snapshots
 scripts/install-hooks.sh      # once per clone: refuse tokens and private hosts in a commit
 ```

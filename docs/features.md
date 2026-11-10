@@ -427,11 +427,11 @@ keys the player already uses.
 ## Verification
 
 ```sh
-cargo test -p jellyfin-api        # 44 API tests, no network
+cargo test -p jellyfin-api        # 45 API tests, no network
 cargo test -p seerr-api           # 25 Seerr API tests, no network
-cargo test -p runefin             # 312 app tests (21 ignored), headless
+cargo test -p runefin             # 336 app tests (22 ignored), headless
 scripts/check.sh                  # fmt, clippy, all three suites, release build
-scripts/snapshots.sh              # the eight committed views
+scripts/snapshots.sh              # the committed views, in place
 JELLYFIN_URL=... JELLYFIN_USER_ID=... JELLYFIN_TOKEN=... \
   cargo test -p jellyfin-api --test live -- --ignored --nocapture
 target/release/runefin            # the signed-in app

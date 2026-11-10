@@ -367,12 +367,16 @@ restart. Both modes share every screen and every focus group, so a bug fixed in 
 both.
 
 **Controller.** A gamepad is a first-class input in both modes; Big Screen is the mode where it
-is the only one. Big-screen focus is a 4 pt ring plus a 10 % accent fill (`focus_highlight`); the
-fill also makes a focused row take Return, so a CEC remote's Select/OK reaches the same control.
-The light theme uses a light text halo over artwork, and the selected nav pill uses dark text on
-the blue fill. D-pad and the left stick move focus (400 ms then 80 ms repeats), A is Space —
+is the only one. Big-screen focus is a 2 pt neutral ring (`theme::ring()`) plus the pointer's
+`t.hover` wash (`theme::tv_focus`), not an accent slab; the ring also makes a focused row take
+Return, so a CEC remote's Select/OK reaches the same control. The light theme uses a light text
+halo over artwork, and the selected nav pill uses dark text on the blue fill. D-pad and the left
+stick move focus (400 ms then 80 ms repeats), A is Space —
 activate a card, play/pause in the player — B and Back are Escape, Start is the context key (a
-card's menu; the player's gear), and LB/RB are Shift+Tab/Tab between focus groups. The mapping is
+card's menu; the player's gear), and LB/RB are Shift+Tab/Tab between focus groups. On big-screen
+screens the app owns the four directions (`tv_focus` zones with clamped edges and a sidebar
+round-trip), so Up/Down change lanes and leave a rail; a focused panel or menu keeps Rune's own
+directions. The mapping is
 the keyboard's, not a second interaction model, so every shortcut, focus ring and layer behaves
 identically with either device. A big-screen launch focuses the first item of each route, and an
 opened layer (card menu, gear, subtitle/audio list, chapters, queue) focuses its first control, so
@@ -608,7 +612,7 @@ makes it a Jellyfin client rather than a pretty browser.
   (22 today); its `tests/live.rs` is read-only and opt-in with `SEERR_URL`/`SEERR_API_KEY`.
 - `cargo test -p runefin`: `Runtime` drives real input through real layout and springs at a fixed
   step; assert on state, `rt.find(key)`, `rt.presented(key)` — never on colours.
-- `scripts/snapshots.sh`: the eight committed views to `docs/snapshots/*.png` at a fixed virtual
+- `scripts/snapshots.sh`: the committed views to `docs/snapshots/*.png` at a fixed virtual
   time; `--all` renders every `AppSpec::scene` into a local directory instead.
   A UI change is a PNG diff in the commit. `--live` opts a headless `--snap` out of the hermetic
   fixture and renders the session on disk instead, for personal screenshots of a real library;
