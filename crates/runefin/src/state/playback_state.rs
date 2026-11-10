@@ -251,8 +251,10 @@ impl State {
                     ),
                     None => failure.message.clone(),
                 };
-                self.playback_error = Some(message.clone());
-                self.detail_notice = Some(message);
+                self.playback_error = Some(message);
+                // The notice above already said the in-app player failed; repeating it here
+                // drew the same long line twice.
+                self.detail_notice = None;
             }
         }
     }

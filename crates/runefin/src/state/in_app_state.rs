@@ -777,7 +777,7 @@ impl State {
                     })
                     .map_err(|message| Failure {
                         stage: Stage::Player,
-                        message,
+                        message: format!("{method}: {message}"),
                     })
             },
         );

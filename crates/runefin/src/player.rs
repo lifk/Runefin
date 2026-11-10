@@ -192,6 +192,12 @@ impl Player {
             if let Some(error) = self.error() {
                 return Err(error);
             }
+            if self.has_ended() {
+                return Err(
+                    "the stream ended before the first frame; the file may be empty or unreadable"
+                        .into(),
+                );
+            }
             if self.buffering().is_some() {
                 limit = limit.max(Duration::from_secs(20));
             } else {

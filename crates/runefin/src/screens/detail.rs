@@ -1253,6 +1253,7 @@ fn hero(s: &State, detail: &DetailState, t: &tok::Theme) -> El {
         info = info.child(
             text(notice.clone())
                 .key("detail-notice")
+                .w_full()
                 .font(type_::mono_caption())
                 .color(tok::accent(3, true)),
         );
@@ -1261,6 +1262,8 @@ fn hero(s: &State, detail: &DetailState, t: &tok::Theme) -> El {
         info = info.child(
             text(error.clone())
                 .key("detail-playback-error")
+                .w_full()
+                .max_lines(3)
                 .font(type_::mono_caption())
                 .color(tok::accent(2, true)),
         );
