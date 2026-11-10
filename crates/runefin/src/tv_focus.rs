@@ -16,6 +16,15 @@ pub struct Zone {
     parent: Option<usize>,
 }
 
+/// Whether `key` is one of the zones' keys. A focused panel, menu or scrollbar is not, and the
+/// router must leave those to Rune instead of swallowing their directions.
+pub fn contains(s: &State, key: &str) -> bool {
+    let (zones, _) = zones(s);
+    zones
+        .iter()
+        .any(|zone| zone.keys.iter().any(|candidate| candidate == key))
+}
+
 /// Whether this router owns the current screen. A screen it does not know is left to Rune's own
 /// group handling.
 pub fn owns_screen(s: &State) -> bool {
@@ -152,6 +161,8 @@ fn zones(s: &State) -> (Vec<Zone>, bool) {
         Route::Search { .. } => (search_zones(s), false),
         Route::Person { .. } => (person_zones(s), false),
         Route::Seerr => (seerr_zones(s), false),
+        Route::LiveTv => (live_zones(s), true),
+        Route::Remote => (remote_zones(s), true),
         _ => (Vec::new(), false),
     }
 }
@@ -500,6 +511,47 @@ fn seerr_zones(s: &State) -> Vec<Zone> {
     zones
 }
 
+fn live_zones(s: &State) -> Vec<Zone> {
+    let mut zones = vec![sidebar(s)];
+    let keys: Vec<String> = s
+        .live
+        .channels
+        .iter()
+        .map(|channel| {
+            if s.live.guide_open {
+                format!("live-guide-row-{}", channel.id)
+            } else {
+                format!("live-channel-{}", channel.id)
+            }
+        })
+        .collect();
+    if !keys.is_empty() {
+        zones.push(Zone {
+            keys,
+            columns: 1,
+            parent: Some(0),
+        });
+    }
+    zones
+}
+
+fn remote_zones(s: &State) -> Vec<Zone> {
+    let mut zones = vec![sidebar(s)];
+    let keys: Vec<String> = s
+        .cast_sessions
+        .iter()
+        .map(|session| format!("remote-session-{}", session.id))
+        .collect();
+    if !keys.is_empty() {
+        zones.push(Zone {
+            keys,
+            columns: 1,
+            parent: Some(0),
+        });
+    }
+    zones
+}
+
 fn in_app_zones(s: &State) -> Vec<Zone> {
     if !s.osd_visible {
         return Vec::new();
@@ -662,6 +714,36 @@ mod tests {
             step(&state, Some("seerr-tab-discover"), TvAction::Right).as_deref(),
             Some("seerr-tab-requests")
         );
+    }
+
+    #[test]
+    fn a_panel_key_is_not_part_of_the_screen_zones() {
+        let mut state = home();
+        state.route = Route::Detail {
+            id: "quiet-floor".into(),
+        };
+        state.detail = Some(crate::demo::detail());
+        assert!(contains(&state, "detail-play"));
+        assert!(
+            !contains(&state, "detail-collection-picker"),
+            "a modal keeps its own directions"
+        );
+    }
+
+    #[test]
+    fn live_tv_and_remote_move_over_their_rows() {
+        let mut state = home();
+        state.route = Route::LiveTv;
+        state.live.channels = crate::demo::live_channels();
+        let first = "live-channel-aurora-one";
+        let down = step(&state, Some(first), TvAction::Down).expect("the next channel");
+        assert_eq!(down, "live-channel-meridian");
+
+        state.route = Route::Remote;
+        state.cast_sessions = crate::demo::sessions();
+        let down = step(&state, Some("remote-session-living-room"), TvAction::Down)
+            .expect("the next session");
+        assert_eq!(down, "remote-session-bedroom");
     }
 
     #[test]

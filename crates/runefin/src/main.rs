@@ -300,12 +300,18 @@ fn on_key(s: &mut State, key: &KeyEvent, tx: &mut Tx) -> bool {
         && action.is_direction()
     {
         let focused = tx.focused().map(str::to_owned);
-        let target = tv_focus::step(s, focused.as_deref(), action);
-        if target.is_some() || tv_focus::owns_screen(s) {
-            if let Some(target) = target {
-                tx.focus_key(target);
+        // A modal, menu or scrollbar has focus: its directions are Rune's, not the zones'.
+        let panel = focused
+            .as_deref()
+            .is_some_and(|key| !tv_focus::contains(s, key));
+        if !panel {
+            let target = tv_focus::step(s, focused.as_deref(), action);
+            if target.is_some() || tv_focus::owns_screen(s) {
+                if let Some(target) = target {
+                    tx.focus_key(target);
+                }
+                return true;
             }
-            return true;
         }
     }
     if s.shortcut_matches(crate::shortcuts::Action::Fullscreen, key) {

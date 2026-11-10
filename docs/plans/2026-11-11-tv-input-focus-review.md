@@ -159,6 +159,10 @@ Second pass (later the same day): zones for Search (the field plus each result g
 rows). Settings is a vertical form with dozens of control keys, so a direction there becomes
 Next/Previous in tab order, which already follows the page, instead of a hand-kept key list.
 
-Still open: a Settings zone that can also enter a row's control sideways, the same for Live TV
-and Remote if their groups feel wrong on hardware, scrub-and-commit on the timeline (today a
+Third pass: Live TV (channels, or the guide rows while the guide is open) and Remote (session
+rows) join the sidebar in the router. A focused panel, menu or scrollbar is left to Rune: the
+router only moves when the focused key belongs to one of its zones, so the card menu, the gear
+sheet and the subtitle panel keep their own directions.
+
+Still open: Seerr's detail page (back, seasons, cast), scrub-and-commit on the timeline (today a
 press seeks immediately), and a focus snapshot scene.
