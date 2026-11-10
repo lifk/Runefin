@@ -1,6 +1,6 @@
 # TV input and focus — review and proposed model
 
-**Status:** review, 2026-11-11. No behaviour changed by this document.
+**Status:** review and first implementation, 2026-11-11. See "Implemented" at the end.
 **Scope:** big-screen mode with an HDMI-CEC remote, a gamepad, or a keyboard. Desktop pointer
 behaviour stays as it is.
 
@@ -136,3 +136,23 @@ absorbed by S1 anyway.
 - Pointer behaviour, hover, drag and the desktop mode.
 - Rune itself; no fork change is required for this model.
 - The playback stack, subtitles and the auto-sync plan.
+
+## Implemented 2026-11-11
+
+- `tv_input`: one semantic action per key (directions, activate, back, menu, paging), shared by
+  the router and the player. CEC, keyboard and the gamepad thread all arrive here.
+- `tv_focus`: app-owned zones with explicit edges for Home (sidebar and every rail, including
+  on-now, each library rail, recently played and collections), Library (grid columns and list),
+  Detail (back, actions, seasons, episodes) and the player OSD (timeline and controls). Up/Down
+  switch lanes, Left at a zone's start returns to the sidebar, edges clamp, nothing wraps. The
+  window's `on_key` runs the router before Rune and consumes the direction when it owns the
+  screen.
+- OSD: Down from the timeline reaches the controls, the volume slider spends Left/Right on the
+  level, Return on the timeline is play/pause, and a remote seek shows the trickplay preview at
+  the new position while the chrome is up.
+- Focus visuals: neutral `t.hover` wash plus a 2 pt neutral ring; the 4 pt solid blue and the
+  accent highlight wash are gone.
+- `--windowed`: same layout, zones and keys in a normal window, for laptop iteration.
+
+Still open: zones for Search, Settings, Person and the Seerr pages (they keep Rune's behaviour),
+scrub-and-commit on the timeline (today a press seeks immediately), and a focus snapshot scene.

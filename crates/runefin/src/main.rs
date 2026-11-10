@@ -34,6 +34,8 @@ mod state;
 mod subtitles;
 mod theme;
 mod trailer;
+mod tv_focus;
+mod tv_input;
 
 use rune::{AppSpec, Cx, El, Key, KeyEvent, TextEdit, Tx};
 
@@ -90,8 +92,11 @@ fn init() -> State {
     };
     if big_screen_requested() {
         state.big_screen = true;
-        state.fullscreen = true;
-        state.pending_fullscreen = Some(true);
+        // `--windowed` keeps the TV layout in an ordinary window, for iterating on a laptop
+        // with the same zones and the same keys.
+        let windowed = std::env::args().any(|arg| arg == "--windowed");
+        state.fullscreen = !windowed;
+        state.pending_fullscreen = (!windowed).then_some(true);
     }
     state
 }
@@ -256,6 +261,36 @@ fn on_key(s: &mut State, key: &KeyEvent, tx: &mut Tx) -> bool {
         }
         return true;
     }
+    // A focused volume slider spends Left/Right on the level; the router would move focus
+    // instead. The seek bar keeps the app's existing seek handling when the router has no move.
+    if s.in_app.is_some() && s.osd_visible && tx.focused() == Some("in-app-volume-slider") {
+        match key.key {
+            Key::Left => {
+                s.adjust_in_app_volume(-0.05);
+                return true;
+            }
+            Key::Right => {
+                s.adjust_in_app_volume(0.05);
+                return true;
+            }
+            _ => {}
+        }
+    }
+    // The living-room router owns the four directions: it steps between zones, clamps at the
+    // edges and asks Rune to focus the key it chose. A screen with no zones is left to Rune.
+    if s.big_screen
+        && let Some(action) = tv_input::action(key)
+        && action.is_direction()
+    {
+        let focused = tx.focused().map(str::to_owned);
+        let target = tv_focus::step(s, focused.as_deref(), action);
+        if target.is_some() || tv_focus::owns_screen(s) {
+            if let Some(target) = target {
+                tx.focus_key(target);
+            }
+            return true;
+        }
+    }
     if s.shortcut_matches(crate::shortcuts::Action::Fullscreen, key) {
         s.toggle_fullscreen();
         return true;
@@ -283,7 +318,8 @@ fn on_key(s: &mut State, key: &KeyEvent, tx: &mut Tx) -> bool {
             // A CEC remote's OK arrives as Return. With nothing focused it is the play/pause
             // key; a focused OSD control sees it first and activates itself instead.
             _ if s.shortcut_matches(crate::shortcuts::Action::PlayPause, key)
-                || (key.key == Key::Enter && tx.focused().is_none()) =>
+                || (key.key == Key::Enter
+                    && matches!(tx.focused(), None | Some("in-app-seek"))) =>
             {
                 s.toggle_in_app_pause();
                 return true;

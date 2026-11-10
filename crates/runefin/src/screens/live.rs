@@ -226,7 +226,7 @@ fn channel_row(s: &State, channel: &jellyfin_api::Item, t: &tok::Theme) -> El {
         .hover(t.hover)
         .motion(motion::SNAPPY)
         .focusable(true)
-        .focus_ring(theme::focus_width(), 2.0, theme::FOCUS)
+        .focus_ring(theme::focus_width(), 2.0, theme::ring())
         .press_scale(0.99)
         .cursor(rune::Cursor::Pointer)
         .on_press(move |s: &mut State| {
@@ -335,7 +335,7 @@ fn channel_row(s: &State, channel: &jellyfin_api::Item, t: &tok::Theme) -> El {
                 .hover(t.hover)
                 .motion(motion::SNAPPY)
                 .focusable(true)
-                .focus_ring(theme::focus_width(), 2.0, theme::FOCUS)
+                .focus_ring(theme::focus_width(), 2.0, theme::ring())
                 .press_scale(0.94)
                 .label(if reminder_set {
                     "Remove reminder"
@@ -369,7 +369,7 @@ fn channel_row(s: &State, channel: &jellyfin_api::Item, t: &tok::Theme) -> El {
                 })
                 .hover(t.hover)
                 .focusable(true)
-                .focus_ring(theme::focus_width(), 2.0, theme::FOCUS)
+                .focus_ring(theme::focus_width(), 2.0, theme::ring())
                 .cursor(rune::Cursor::Pointer)
                 .child(
                     text(if s.live.favorites.contains(&channel.id) {
@@ -450,7 +450,7 @@ fn button(
         .hover(t.hover)
         .motion(motion::SNAPPY)
         .focusable(true)
-        .focus_ring(theme::focus_width(), 2.0, theme::FOCUS)
+        .focus_ring(theme::focus_width(), 2.0, theme::ring())
         .press_scale(0.97)
         .child(text(label).font(type_::label()).color(t.text))
         .cursor(rune::Cursor::Pointer)
@@ -642,7 +642,7 @@ fn guide_row(s: &State, channel: &Item, now: i64, slice_seconds: i64, t: &tok::T
         .hover(t.hover)
         .motion(motion::SNAPPY)
         .focusable(true)
-        .focus_ring(theme::focus_width(), 2.0, theme::FOCUS)
+        .focus_ring(theme::focus_width(), 2.0, theme::ring())
         .press_scale(0.995)
         .cursor(rune::Cursor::Pointer)
         .on_press(move |s: &mut State| {

@@ -222,7 +222,7 @@ fn control(
         .hover(t.hover)
         .motion(motion::SNAPPY)
         .focusable(true)
-        .focus_ring(crate::theme::focus_width(), 2.0, crate::theme::FOCUS)
+        .focus_ring(crate::theme::focus_width(), 2.0, crate::theme::ring())
         .press_scale(0.97)
         .child(
             text(label)

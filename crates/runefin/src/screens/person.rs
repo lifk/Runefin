@@ -94,7 +94,7 @@ pub(super) fn person_screen(s: &State, person: &PersonPage) -> El {
                         .hover(t.hover)
                         .motion(motion::SNAPPY)
                         .focusable(true)
-                        .focus_ring(theme::focus_width(), 2.0, theme::FOCUS)
+                        .focus_ring(theme::focus_width(), 2.0, theme::ring())
                         .press_scale(0.97)
                         .child(text("← Back").font(type_::label()).color(t.text))
                         .cursor(rune::Cursor::Pointer)
@@ -253,7 +253,7 @@ fn credit_card(s: &State, credit: &seerr_api::Credit, t: &tok::Theme) -> El {
         .press_scale(0.98)
         .hover(t.hover)
         .focusable(true)
-        .focus_ring(theme::focus_width(), 2.0, theme::FOCUS)
+        .focus_ring(theme::focus_width(), 2.0, theme::ring())
         .cursor(rune::Cursor::Pointer)
         .on_press(move |s: &mut State| s.open_seerr_detail(media.clone(), tmdb_id))
         .child(

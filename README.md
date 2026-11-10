@@ -71,8 +71,8 @@ over (`flatpak uninstall --user io.github.lifk.Runefin`); your settings stay in 
 The offline bundle is still attached to every release:
 
 ```sh
-curl -LO https://github.com/lifk/Runefin/releases/latest/download/Runefin-0.1.9-x86_64.flatpak
-flatpak install --user ./Runefin-0.1.9-x86_64.flatpak
+curl -LO https://github.com/lifk/Runefin/releases/latest/download/Runefin-0.1.10-x86_64.flatpak
+flatpak install --user ./Runefin-0.1.10-x86_64.flatpak
 ```
 
 Packaging sources, the repository layout, controller notes and the CEC mapping live in
@@ -108,8 +108,12 @@ Settings → Interface, or for one launch:
 
 ```sh
 target/release/runefin --big-screen
+target/release/runefin --big-screen --windowed   # same layout and keys in a window
 RUNEFIN_UI=big target/release/runefin
 ```
+
+`--windowed` keeps the TV layout, focus zones and key map but skips fullscreen, so the same
+navigation can be driven from a laptop keyboard while iterating.
 
 A gamepad works in either mode: D-pad/left stick moves, **A** selects, **B** goes back, **LB/RB**
 change section, and **Start** opens a card menu or the player gear. `RUNEFIN_GAMEPAD=0` turns the

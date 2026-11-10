@@ -148,16 +148,29 @@ pub const FOCUS: Color = Color {
     a: 1.0,
 };
 
-/// A 2 pt ring is 3 px at 1080p; a couch needs the 4 pt ring that becomes 6 px.
+/// A 2 pt ring is 3 px at 1080p. The neutral colour carries the visibility; a 4 pt solid blue
+/// read as a selection box over artwork.
 pub fn focus_width() -> f32 {
-    if is_big_screen() { 4.0 } else { 2.0 }
+    2.0
 }
 
-/// Give a big-screen control both a ring and a focused fill. Rune also treats a highlighted
-/// row as taking Return, so this is what makes a CEC remote's OK/Enter activate a card.
+/// The focus ring colour. A TV shows a thin neutral ring; the solid blue reads as a selection
+/// box over artwork. Desktop keeps the accent.
+pub fn ring() -> Color {
+    if is_big_screen() {
+        colors().text.alpha(0.85)
+    } else {
+        FOCUS
+    }
+}
+
+/// Give a big-screen control the pointer's neutral wash while it holds keyboard focus. Return
+/// activation comes from `rune::set_return_activates`, not from a highlight colour.
 pub fn tv_focus(el: El) -> El {
     if is_big_screen() {
-        el.focus_highlight(tok::accent(0, true).alpha(0.10))
+        // The same neutral wash the pointer gets on the desktop, not an accent slab: focus and
+        // selection must not look alike.
+        el.focus_fill(colors().hover)
     } else {
         el
     }

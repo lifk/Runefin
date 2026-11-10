@@ -1621,6 +1621,10 @@ impl State {
             self.osd_hide_at = None;
             changed = true;
         }
+        if !self.osd_visible {
+            // The precomputed preview is only meaningful with the chrome it belongs to.
+            self.in_app_hover = None;
+        }
         if self.in_app.is_some()
             && self.osd_visible
             && !self.next_up_eligible()
@@ -2091,6 +2095,14 @@ impl State {
     pub fn seek_in_app_step(&mut self, forward: bool) {
         let step = self.seek_step_ms;
         self.seek_in_app(if forward { step } else { -step });
+        // A remote has no pointer to rest on the bar, so show the frame at the new position
+        // while the chrome is up: the same trickplay preview a mouse drag gets.
+        if let Some(session) = &self.in_app {
+            let duration = session.duration_ms.unwrap_or(0).max(1) as f32;
+            let x =
+                (session.position_ms as f32 / duration).clamp(0.0, 1.0) * self.in_app_seek_width;
+            self.hover_in_app_seek(x);
+        }
     }
 
     pub fn skip_in_app_segment(&mut self, end_ms: i64) {
