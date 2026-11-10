@@ -430,7 +430,15 @@ impl Client {
                     "Type": "Video",
                     "Codec": "hevc",
                     "Conditions": [
-                        { "Condition": "LessThanEqual", "Property": "VideoBitDepth", "Value": "10", "IsRequired": false }
+                        { "Condition": "LessThanEqual", "Property": "VideoBitDepth", "Value": "10", "IsRequired": false },
+                        // GStreamer can decode the HDR10 base layer of a Dolby Vision profile but
+                        // not the DV metadata, and a DV mp4 stalls qtdemux before any frame. Say
+                        // so, so the server tone-maps a transcoded copy instead of direct-playing
+                        // a file that never reaches the sink.
+                        { "Condition": "NotEquals", "Property": "VideoRangeType", "Value": "DOVI", "IsRequired": false },
+                        { "Condition": "NotEquals", "Property": "VideoRangeType", "Value": "DOVIWithHDR10", "IsRequired": false },
+                        { "Condition": "NotEquals", "Property": "VideoRangeType", "Value": "DOVIWithSDR", "IsRequired": false },
+                        { "Condition": "NotEquals", "Property": "VideoRangeType", "Value": "DOVIWithHLG", "IsRequired": false }
                     ]
                 }
             ],

@@ -759,8 +759,9 @@ impl State {
                 waker,
             ),
             |(client, item_id, source, request, cap, fallback, surface, waker)| {
-                let negotiated =
-                    request.and_then(|request| client.playback_info(&item_id, &request).ok());
+                let negotiated = request
+                    .as_ref()
+                    .and_then(|request| client.playback_info(&item_id, request).ok());
                 let (url, method, play_session_id, notice) = choose_playback(
                     &client,
                     negotiated.as_ref(),
@@ -768,17 +769,65 @@ impl State {
                     cap,
                     &fallback,
                 );
-                Player::start(&url, surface, waker)
-                    .map(|player| InAppStart {
+                match Player::start(&url, surface.clone(), waker.clone()) {
+                    Ok(player) => Ok(InAppStart {
                         player,
                         method,
                         play_session_id,
                         notice,
-                    })
-                    .map_err(|message| Failure {
-                        stage: Stage::Player,
-                        message: format!("{method}: {message}"),
-                    })
+                    }),
+                    Err(first) => {
+                        // A direct play that produced no frame is worth one more try through the
+                        // server's transcoder: it can tone-map or re-encode whatever the local
+                        // pipeline could not open (a Dolby Vision mp4, for example) instead of
+                        // sending the item to the mpv fallback.
+                        let direct = method == "DirectPlay" || method == "DirectStream";
+                        let Some(retry) = request.as_ref().filter(|_| direct).map(|request| {
+                            let mut retry = request.clone();
+                            retry.enable_direct_play = false;
+                            retry.enable_direct_stream = false;
+                            retry.enable_transcoding = true;
+                            retry.max_streaming_bitrate = Some(8_000_000);
+                            retry
+                        }) else {
+                            return Err(Failure {
+                                stage: Stage::Player,
+                                message: format!("{method}: {first}"),
+                            });
+                        };
+                        let Some(response) = client.playback_info(&item_id, &retry).ok() else {
+                            return Err(Failure {
+                                stage: Stage::Player,
+                                message: format!(
+                                    "{method}: {first}; the server offered no transcoded copy"
+                                ),
+                            });
+                        };
+                        let (url, method, play_session_id, _) = choose_playback(
+                            &client,
+                            Some(&response),
+                            source.as_deref(),
+                            None,
+                            &fallback,
+                        );
+                        match Player::start(&url, surface, waker) {
+                            Ok(player) => Ok(InAppStart {
+                                player,
+                                method,
+                                play_session_id,
+                                notice: Some(
+                                    "Direct play produced no frames; the server is transcoding \
+                                     this item."
+                                        .into(),
+                                ),
+                            }),
+                            Err(second) => Err(Failure {
+                                stage: Stage::Player,
+                                message: format!("{method}: {first}; transcode retry: {second}"),
+                            }),
+                        }
+                    }
+                }
             },
         );
     }

@@ -320,3 +320,22 @@ fn redaction_leaves_ordinary_text_alone() {
     assert_eq!(redact("?userId=1&limit=2"), "?userId=1&limit=2");
     assert_eq!(redact("?ApiKey=abc"), "?ApiKey=<redacted>");
 }
+
+#[test]
+fn the_device_profile_declines_dolby_vision_and_still_allows_hdr10() {
+    let profile = Client::device_profile();
+    let hevc = profile["CodecProfiles"]
+        .as_array()
+        .expect("codec profiles")
+        .iter()
+        .find(|entry| entry["Codec"] == "hevc")
+        .expect("an hevc profile");
+    let conditions = hevc["Conditions"].as_array().expect("conditions");
+    let declined: Vec<&str> = conditions
+        .iter()
+        .filter(|condition| condition["Condition"] == "NotEquals")
+        .filter_map(|condition| condition["Value"].as_str())
+        .collect();
+    assert!(declined.contains(&"DOVIWithHDR10"), "{declined:?}");
+    assert!(declined.contains(&"DOVI"), "{declined:?}");
+}
