@@ -42,12 +42,12 @@
   </screenshots>
   <content_rating type="oars-1.1"/>
   <releases>
-    <release version="0.1.7" date="2026-11-10">
+    <release version="0.1.8" date="2026-11-10">
       <description>
         <p>
-          Dolby Vision files are no longer direct-played: the server tone-maps them, and a
-          direct play that produces no frame retries once through the server's transcoder
-          instead of falling back to mpv.
+          Subtitle timing follows a transcoded stream that starts at the resume point, and
+          seeks stay in file time. Dolby Vision files are tone-mapped by the server, and a
+          direct play with no frame retries transcoded.
         </p>
       </description>
     </release>

@@ -481,6 +481,8 @@ pub fn in_app() -> crate::state::InAppSession {
         play_method: "DirectPlay",
         play_session_id: None,
         history_start_ms: 0,
+        position_base_ms: 0,
+        position_calibrated: true,
     }
 }
 
@@ -1133,6 +1135,8 @@ pub fn live_session() -> crate::state::InAppSession {
         play_method: "DirectPlay",
         play_session_id: None,
         history_start_ms: 0,
+        position_base_ms: 0,
+        position_calibrated: true,
     }
 }
 

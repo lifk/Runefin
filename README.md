@@ -71,8 +71,8 @@ over (`flatpak uninstall --user io.github.lifk.Runefin`); your settings stay in 
 The offline bundle is still attached to every release:
 
 ```sh
-curl -LO https://github.com/lifk/Runefin/releases/latest/download/Runefin-0.1.7-x86_64.flatpak
-flatpak install --user ./Runefin-0.1.7-x86_64.flatpak
+curl -LO https://github.com/lifk/Runefin/releases/latest/download/Runefin-0.1.8-x86_64.flatpak
+flatpak install --user ./Runefin-0.1.8-x86_64.flatpak
 ```
 
 Packaging sources, the repository layout, controller notes and the CEC mapping live in

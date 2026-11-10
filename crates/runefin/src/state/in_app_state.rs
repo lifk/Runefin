@@ -83,6 +83,30 @@ pub struct InAppSession {
     pub play_session_id: Option<String>,
     /// Position the play started at, so history records watched time rather than the resume point.
     pub history_start_ms: i64,
+    /// Added to the pipeline's position when the server's transcoded stream starts at zero
+    /// rather than carrying the file's timestamps. Subtitle cues are always in file time.
+    pub position_base_ms: i64,
+    /// Whether `position_base_ms` has been decided for this session.
+    pub position_calibrated: bool,
+}
+
+/// The offset to add to a transcoded stream's clock so it reads in file time. A stream that
+/// starts at the resume point but reports zero needs the resume point added; one that carries
+/// the file's own timestamps needs nothing.
+fn transcode_position_base(raw_ms: i64, expected_ms: i64) -> i64 {
+    if raw_ms > 0 && raw_ms + 2_000 < expected_ms {
+        expected_ms
+    } else {
+        0
+    }
+}
+
+impl InAppSession {
+    /// Seek in file time. A stream whose timeline starts at the resume point needs the base
+    /// removed before the pipeline sees it.
+    pub(super) fn seek_to(&self, target_ms: i64) {
+        self.player.seek_ms(target_ms - self.position_base_ms);
+    }
 }
 
 /// Pick the URL and the method the server offered. Direct play wins unless the reader capped
@@ -305,7 +329,7 @@ impl State {
             return;
         };
         if let Some(session) = &mut self.in_app {
-            session.player.seek_ms(local);
+            session.seek_to(local);
             session.position_ms = local;
             session.seek_hold = Some((local, Instant::now()));
         }
@@ -1345,7 +1369,7 @@ impl State {
         };
         if let Some(session) = &mut self.in_app {
             let target = start.clamp(0, session.duration_ms.unwrap_or(start));
-            session.player.seek_ms(target);
+            session.seek_to(target);
             session.position_ms = target;
             session.seek_hold = Some((target, Instant::now()));
             session.scrub_ms = None;
@@ -1474,7 +1498,9 @@ impl State {
                 let Some(pending) = self.pending_in_app.take() else {
                     return;
                 };
-                if pending.start_ms > 0 {
+                // A transcode URL already starts at `start_time_ticks`; seeking again would
+                // land at twice the resume point and leave the subtitles behind.
+                if pending.start_ms > 0 && method != "Transcode" {
                     player.seek_ms(pending.start_ms);
                 }
                 if pending.paused {
@@ -1515,6 +1541,8 @@ impl State {
                     play_method: method,
                     play_session_id: play_session_id.clone(),
                     history_start_ms: pending.start_ms,
+                    position_base_ms: 0,
+                    position_calibrated: method != "Transcode" || pending.start_ms == 0,
                 });
                 // The preference may have arrived before the player did; apply it now that
                 // there is a pipeline to switch.
@@ -1604,10 +1632,31 @@ impl State {
         if query_due {
             self.in_app_query_at = Instant::now();
         }
-        let reported = if query_due {
+        let raw = if query_due {
             session.player.position_ms()
         } else {
-            session.position_ms
+            0
+        };
+        let mut base = session.position_base_ms;
+        let expected = session.history_start_ms;
+        let calibrate = query_due
+            && !session.position_calibrated
+            && session.play_method == "Transcode"
+            && raw > 0;
+        let stored = session.position_ms;
+        if calibrate {
+            // A transcoded stream may carry its own timeline or start at zero. If the clock is
+            // nowhere near the resume point the server was asked for, the stream is zero-based;
+            // subtitle cues are always in file time, so the base puts the two back together.
+            base = transcode_position_base(raw, expected);
+            if let Some(session) = &mut self.in_app {
+                session.position_base_ms = base;
+                session.position_calibrated = true;
+            }
+        }
+        let reported = if query_due { raw + base } else { stored };
+        let Some(session) = self.in_app.as_ref() else {
+            return changed;
         };
         let (position, seek_settled) = match session.seek_hold {
             Some((target, at)) => {
@@ -1710,7 +1759,7 @@ impl State {
             && position >= b
         {
             if let Some(session) = &mut self.in_app {
-                session.player.seek_ms(a);
+                session.seek_to(a);
                 session.position_ms = a;
                 session.seek_hold = Some((a, Instant::now()));
                 session.scrub_ms = None;
@@ -1982,7 +2031,7 @@ impl State {
         self.show_in_app_osd();
         if let Some(session) = &mut self.in_app {
             let target = position_ms.clamp(0, session.duration_ms.unwrap_or(position_ms));
-            session.player.seek_ms(target);
+            session.seek_to(target);
             session.position_ms = target;
             session.seek_hold = Some((target, Instant::now()));
             session.scrub_ms = None;
@@ -1995,7 +2044,7 @@ impl State {
         self.show_in_app_osd();
         if let Some(session) = &mut self.in_app {
             let target = (session.position_ms + delta_ms).max(0);
-            session.player.seek_ms(target);
+            session.seek_to(target);
             session.position_ms = target;
             session.seek_hold = Some((target, Instant::now()));
             session.scrub_ms = None;
@@ -2012,7 +2061,7 @@ impl State {
         if let Some(session) = &mut self.in_app {
             let target = (session.position_ms + if forward { 42 } else { -42 }).max(0);
             session.player.set_paused(true);
-            session.player.seek_ms(target);
+            session.seek_to(target);
             session.position_ms = target;
             session.paused = true;
             session.seek_hold = Some((target, Instant::now()));
@@ -2033,7 +2082,7 @@ impl State {
             .as_ref()
             .map_or(0, |session| session.position_ms);
         if let Some(session) = &mut self.in_app {
-            session.player.seek_ms(end_ms);
+            session.seek_to(end_ms);
             session.position_ms = end_ms;
             session.seek_hold = Some((end_ms, Instant::now()));
             session.scrub_ms = None;
@@ -2111,7 +2160,7 @@ impl State {
             if !cancelled {
                 let duration = session.duration_ms.unwrap_or(0).max(1) as f32;
                 let target = (duration * fraction.clamp(0.0, 1.0)) as i64;
-                session.player.seek_ms(target);
+                session.seek_to(target);
                 session.position_ms = target;
                 session.seek_hold = Some((target, Instant::now()));
             }
@@ -2916,6 +2965,14 @@ mod tests {
         }));
         assert_eq!(state.in_app_subtitles.selected, Some(0));
         assert_eq!(state.in_app_subtitles.tracks.len(), 2);
+    }
+
+    #[test]
+    fn a_zero_based_transcode_clock_gets_the_resume_point_added() {
+        assert_eq!(transcode_position_base(1_000, 705_000), 705_000);
+        assert_eq!(transcode_position_base(706_000, 705_000), 0);
+        assert_eq!(transcode_position_base(0, 705_000), 0, "no sample yet");
+        assert_eq!(transcode_position_base(1_000, 0), 0, "nothing to add");
     }
 
     #[test]
