@@ -164,5 +164,13 @@ rows) join the sidebar in the router. A focused panel, menu or scrollbar is left
 router only moves when the focused key belongs to one of its zones, so the card menu, the gear
 sheet and the subtitle panel keep their own directions.
 
-Still open: Seerr's detail page (back, seasons, cast), scrub-and-commit on the timeline (today a
-press seeks immediately), and a focus snapshot scene.
+Still open: scrub-and-commit on the timeline (today a press seeks immediately), and a focus
+snapshot scene.
+
+Fourth pass: Seerr's detail page (Back, the action row, the season picker, the cast rail). The
+zones mirror what the page actually draws: only rendered actions take focus (no request button
+while a season is still unchosen, or once Seerr owns the title), seasons skip specials and empty
+ones, and only the first twelve named cast members are reachable. Moving down from a vertical
+list into a rail now starts at the rail's first item instead of carrying the row number across as
+a column. The router also claims Search, Person, Seerr, Live TV, Remote and the Seerr detail page
+at their edges, not only when a move succeeded, so Rune's group rules cannot take over there.

@@ -30,7 +30,16 @@ pub fn contains(s: &State, key: &str) -> bool {
 pub fn owns_screen(s: &State) -> bool {
     matches!(
         s.route,
-        Route::Home | Route::Library { .. } | Route::Detail { .. }
+        Route::Home
+            | Route::Library { .. }
+            | Route::Detail { .. }
+            | Route::Search { .. }
+            | Route::Person { .. }
+            | Route::Seerr
+            | Route::SeerrDetail { .. }
+            | Route::LiveTv
+            | Route::Remote
+            | Route::Settings
     ) || (s.in_app.is_some() && s.osd_visible)
 }
 
@@ -119,7 +128,13 @@ fn adjacent(
         return nav_key(s);
     }
     let zone = &zones[target];
-    let at = idx.min(zone.keys.len().saturating_sub(1));
+    // Entering a rail from a vertical list starts at its first item: the list's row number is
+    // not a column position. Rail-to-rail moves still keep the column.
+    let at = if zones[zi].columns == 1 && zone.columns == 0 {
+        0
+    } else {
+        idx.min(zone.keys.len().saturating_sub(1))
+    };
     zone.keys.get(at).cloned()
 }
 
@@ -163,6 +178,7 @@ fn zones(s: &State) -> (Vec<Zone>, bool) {
         Route::Seerr => (seerr_zones(s), false),
         Route::LiveTv => (live_zones(s), true),
         Route::Remote => (remote_zones(s), true),
+        Route::SeerrDetail { .. } => (seerr_detail_zones(s), false),
         _ => (Vec::new(), false),
     }
 }
@@ -552,6 +568,88 @@ fn remote_zones(s: &State) -> Vec<Zone> {
     zones
 }
 
+fn seerr_detail_zones(s: &State) -> Vec<Zone> {
+    let Some(detail) = &s.seerr.detail else {
+        return Vec::new();
+    };
+    let mut zones = vec![Zone {
+        keys: vec!["seerr-detail-back".into()],
+        columns: 1,
+        parent: None,
+    }];
+    let Some(details) = &detail.details else {
+        return zones;
+    };
+    // Mirror `detail_action`: a key the page does not render must never take focus.
+    let media_status = details
+        .media_info()
+        .map(|info| info.media_status())
+        .unwrap_or(seerr_api::MediaStatus::Unknown);
+    let library_id = details
+        .media_info()
+        .and_then(|info| info.jellyfin_media_id.clone())
+        .or_else(|| s.seerr.library_id(&detail.media_type, detail.tmdb_id));
+    let mut actions = Vec::new();
+    if library_id.is_some() {
+        actions.push("seerr-detail-open".to_string());
+    }
+    let settled = matches!(
+        media_status,
+        seerr_api::MediaStatus::Available
+            | seerr_api::MediaStatus::Processing
+            | seerr_api::MediaStatus::Pending
+            | seerr_api::MediaStatus::Blocklisted
+    );
+    let seasons_chosen =
+        !matches!(details, seerr_api::Details::Tv(_)) || !detail.selected_seasons.is_empty();
+    if !settled && seasons_chosen && !detail.requesting {
+        actions.push("seerr-detail-request".to_string());
+    }
+    if !actions.is_empty() {
+        let parent = zones.len() - 1;
+        zones.push(Zone {
+            keys: actions,
+            columns: 0,
+            parent: Some(parent),
+        });
+    }
+    if let seerr_api::Details::Tv(tv) = details
+        && !tv.seasons.is_empty()
+    {
+        // The picker shows All in its header and one row per season below it, skipping
+        // specials and seasons without episodes.
+        let mut seasons = vec!["seerr-season-all".to_string()];
+        seasons.extend(
+            tv.seasons
+                .iter()
+                .filter(|season| season.season_number > 0 && season.episode_count > 0)
+                .map(|season| format!("seerr-season-{}", season.season_number)),
+        );
+        zones.push(Zone {
+            keys: seasons,
+            columns: 1,
+            parent: Some(0),
+        });
+    }
+    // The rail is drawn only from named cast, and only the first twelve.
+    let cast: Vec<String> = details
+        .credits()
+        .cast
+        .iter()
+        .filter(|member| member.name.is_some())
+        .take(12)
+        .map(|member| format!("seerr-cast-{}", member.id))
+        .collect();
+    if !cast.is_empty() {
+        zones.push(Zone {
+            keys: cast,
+            columns: 0,
+            parent: Some(0),
+        });
+    }
+    zones
+}
+
 fn in_app_zones(s: &State) -> Vec<Zone> {
     if !s.osd_visible {
         return Vec::new();
@@ -744,6 +842,65 @@ mod tests {
         let down = step(&state, Some("remote-session-living-room"), TvAction::Down)
             .expect("the next session");
         assert_eq!(down, "remote-session-bedroom");
+    }
+
+    #[test]
+    fn a_seerr_detail_reaches_actions_seasons_and_cast() {
+        let mut state = home();
+        state.route = Route::SeerrDetail {
+            media_type: "tv".into(),
+            tmdb_id: 196_950,
+        };
+        let mut tv = crate::demo::seerr_tv_series();
+        tv.credits.cast = vec![
+            seerr_api::CastMember {
+                id: 7,
+                name: Some("Owen Kestrel".into()),
+                character: Some("Thomas Hutter".into()),
+                job: None,
+                profile_path: None,
+            },
+            seerr_api::CastMember {
+                id: 8,
+                name: Some("Iris Vane".into()),
+                character: Some("Ellen Hutter".into()),
+                job: None,
+                profile_path: None,
+            },
+        ];
+        state.seerr.detail = Some(crate::state::SeerrDetailState {
+            media_type: "tv".into(),
+            tmdb_id: 196_950,
+            details: Some(seerr_api::Details::Tv(tv)),
+            selected_seasons: Default::default(),
+            loading: false,
+            error: None,
+            requesting: false,
+        });
+        assert_eq!(
+            step(&state, Some("seerr-detail-back"), TvAction::Down).as_deref(),
+            Some("seerr-detail-open")
+        );
+        assert_eq!(
+            step(&state, Some("seerr-detail-open"), TvAction::Down).as_deref(),
+            Some("seerr-season-all")
+        );
+        assert_eq!(
+            step(&state, Some("seerr-season-all"), TvAction::Down).as_deref(),
+            Some("seerr-season-1")
+        );
+        assert_eq!(
+            step(&state, Some("seerr-season-3"), TvAction::Down).as_deref(),
+            Some("seerr-cast-7")
+        );
+        // With a season chosen the request button joins the actions row, after the open button.
+        if let Some(detail) = &mut state.seerr.detail {
+            detail.selected_seasons.insert(1);
+        }
+        assert_eq!(
+            step(&state, Some("seerr-detail-open"), TvAction::Right).as_deref(),
+            Some("seerr-detail-request")
+        );
     }
 
     #[test]

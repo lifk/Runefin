@@ -3,7 +3,7 @@ resolver = "3"
 members = ["crates/jellyfin-api", "crates/seerr-api", "crates/runefin"]
 
 [workspace.package]
-version = "0.1.12"
+version = "0.1.13"
 edition = "2024"
 license = "MIT"
 repository = "https://github.com/lifk/Runefin"
