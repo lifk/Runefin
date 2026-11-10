@@ -33,7 +33,9 @@ Verified:
 - App: `scripts/check.sh` green, 315 tests.
 - Player: the DMA-BUF probe renders 24.0 frames/s with zero stalls and a 41 ms longest gap on
   the rebased renderer.
-- Snapshots: all 150 regenerated; the diff is text rendering (Windfoil) plus the fixture titles.
+- Snapshots: every scene was regenerated during the bump; the diff was text rendering
+  (Windfoil) plus the fixture titles. The branch then cut the committed set to eight core views
+  (`scripts/snapshots.sh --all` renders the rest locally); see the snapshot README.
 
 Deferred, with the reason:
 
