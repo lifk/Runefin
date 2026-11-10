@@ -243,8 +243,16 @@ impl State {
             }
             Err(failure) => {
                 self.pending_play = None;
-                self.playback_error = Some(failure.message.clone());
-                self.detail_notice = Some(failure.message);
+                // The mpv fallback only runs after the integrated player failed; say both.
+                let message = match self.last_in_app_error.take() {
+                    Some(reason) => format!(
+                        "In-app player failed: {reason}. The mpv fallback failed: {}",
+                        failure.message
+                    ),
+                    None => failure.message.clone(),
+                };
+                self.playback_error = Some(message.clone());
+                self.detail_notice = Some(message);
             }
         }
     }

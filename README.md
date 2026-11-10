@@ -57,8 +57,8 @@ means a build nobody changed.
 ### Flatpak (recommended on SteamOS and other immutable systems)
 
 ```sh
-curl -LO https://github.com/lifk/Runefin/releases/latest/download/Runefin-0.1.4-x86_64.flatpak
-flatpak install --user ./Runefin-0.1.4-x86_64.flatpak
+curl -LO https://github.com/lifk/Runefin/releases/latest/download/Runefin-0.1.5-x86_64.flatpak
+flatpak install --user ./Runefin-0.1.5-x86_64.flatpak
 flatpak run io.github.lifk.Runefin
 ```
 

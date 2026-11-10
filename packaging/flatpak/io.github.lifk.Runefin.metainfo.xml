@@ -42,6 +42,15 @@
   </screenshots>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.1.5" date="2026-11-10">
+      <description>
+        <p>
+          The integrated player keeps waiting while a stream is still starting instead of
+          falling back to mpv after a couple of seconds, and a failed fallback now names both
+          the GStreamer reason and the mpv one.
+        </p>
+      </description>
+    </release>
     <release version="0.1.4" date="2026-11-10">
       <description>
         <p>

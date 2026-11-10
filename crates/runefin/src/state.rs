@@ -560,6 +560,9 @@ pub struct State {
     /// pipeline lock, which the streaming thread holds during a flush or renegotiation; asking
     /// every frame turns that into UI stalls. Ten times a second is plenty for the bar.
     pub in_app_query_at: Instant,
+    /// Why the integrated player refused the last item. Kept so a failed mpv fallback can say
+    /// both reasons instead of only "mpv isn't installed".
+    pub last_in_app_error: Option<String>,
     pub still_watching_open: bool,
     pub still_watching_next: Option<Item>,
     /// When the card opened, so its 60 s countdown can stop the run quietly.
@@ -930,6 +933,7 @@ impl State {
             in_app_last_input: Instant::now(),
             in_app_play_since: Instant::now(),
             in_app_query_at: Instant::now(),
+            last_in_app_error: None,
             still_watching_open: false,
             still_watching_next: None,
             still_watching_since: None,
@@ -4208,6 +4212,7 @@ mod tests {
             in_app_last_input: Instant::now(),
             in_app_play_since: Instant::now(),
             in_app_query_at: Instant::now(),
+            last_in_app_error: None,
             still_watching_open: false,
             still_watching_next: None,
             still_watching_since: None,

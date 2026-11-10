@@ -106,7 +106,7 @@ impl Player {
         // PLAYING and then produces no frames. Waiting the CPU path's full timeout there costs
         // six seconds on every such file; two seconds is enough for a healthy first frame.
         let dmabuf = match start_pipeline(url, surface.clone(), true) {
-            Ok(player) => match player.wait_for_first_frame(Duration::from_secs(2)) {
+            Ok(player) => match player.wait_for_first_frame(Duration::from_secs(8)) {
                 Ok(()) => {
                     player.begin_trace();
                     return Ok(player);
@@ -117,7 +117,7 @@ impl Player {
         };
         eprintln!("in-app: DMA-BUF path unavailable ({dmabuf}); using CPU");
         match start_pipeline(url, surface, false) {
-            Ok(player) => match player.wait_for_first_frame(Duration::from_secs(6)) {
+            Ok(player) => match player.wait_for_first_frame(Duration::from_secs(12)) {
                 Ok(()) => Ok(player),
                 Err(cpu) => Err(format!(
                     "GStreamer produced no frames: {cpu} (DMA-BUF path: {dmabuf})"
@@ -176,14 +176,32 @@ impl Player {
     /// The pipeline can reach PLAYING and still never produce a buffer (a 4K HDR
     /// VA-API postproc that refuses the caps, for example). Fail the start so the
     /// caller can fall back instead of showing a black player with a frozen clock.
+    ///
+    /// A source that is still starting is not a failure: a server-side transcode can take
+    /// several seconds before the first buffer, and treating that as "unplayable" sent a
+    /// perfectly playable episode to the mpv fallback. While the pipeline is moving toward
+    /// PLAYING, or the bus reports buffering, the budget grows to 20 s; a real bus error still
+    /// fails at once.
     fn wait_for_first_frame(&self, timeout: Duration) -> Result<(), String> {
         let started = Instant::now();
-        while started.elapsed() < timeout {
+        let mut limit = timeout;
+        loop {
             if self.position_ms() > 0 {
                 return Ok(());
             }
             if let Some(error) = self.error() {
                 return Err(error);
+            }
+            if self.buffering().is_some() {
+                limit = limit.max(Duration::from_secs(20));
+            } else {
+                let (_, current, pending) = self.pipeline.state(gst::ClockTime::ZERO);
+                if current != gst::State::Playing && pending != gst::State::VoidPending {
+                    limit = limit.max(Duration::from_secs(20));
+                }
+            }
+            if started.elapsed() >= limit {
+                break;
             }
             std::thread::sleep(Duration::from_millis(50));
         }

@@ -1501,6 +1501,8 @@ impl State {
                     if pending.local {
                         self.detail_notice = Some(format!("Trailer failed: {}", failure.message));
                     } else {
+                        eprintln!("in-app: {}", failure.message);
+                        self.last_in_app_error = Some(failure.message.clone());
                         self.detail_notice = Some(format!(
                             "In-app player failed: {}. Trying mpv.",
                             failure.message
