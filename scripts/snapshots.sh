@@ -1,10 +1,31 @@
 #!/usr/bin/env bash
-# Renders every AppSpec scene to docs/snapshots/ with the headless renderer (no window, fixed
-# virtual clock). Commit the PNGs: a diff in the image is a diff in the UI.
+# Renders the UI headlessly (no window, fixed virtual clock).
+#
+#   scripts/snapshots.sh             # the eight committed views -> docs/snapshots/
+#   scripts/snapshots.sh --all       # every scene -> /tmp/runefin-snapshots
+#   scripts/snapshots.sh --all DIR   # every scene -> DIR
+#
+# Only the core set is committed: it is the contract a reviewer reads in the pull request.
+# Everything else stays a local tool, so the repository does not carry 29 MB of PNGs that
+# nobody diffs. When a change touches a screen, render it with --all and look at it.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+all=false
 out=docs/snapshots
+case "${1:-}" in
+    --all)
+        all=true
+        out="${2:-${TMPDIR:-/tmp}/runefin-snapshots}"
+        ;;
+    "") ;;
+    *)
+        echo "usage: $0 [--all [DIR]]" >&2
+        exit 2
+        ;;
+esac
+
+echo "writing to $out"
 mkdir -p "$out"
 
 cargo build -p runefin
@@ -32,6 +53,21 @@ render_big_4k() {
     echo "wrote $out/$name-big-4k.png"
 }
 
+# The committed set: one frame per main view, plus the two big-screen frames the README and the
+# AppStream metadata link to.
+core() {
+    render home home 1280 800
+    render detail detail 1280 800
+    render search search 1280 800
+    render live-tv live-tv 1280 800
+    render settings settings 1280 800
+    render in-app-osd in-app-osd 1280 800
+    render_big home home
+    render_big library library
+}
+
+# Every scene, for local review only.
+all() {
 # The connect screen is a small window; the home shell needs room for three rails.
 render idle connect-idle 560 520
 render connect-discovery connect-discovery 1280 800
@@ -187,3 +223,10 @@ render_big_4k settings settings
 render_big_4k live-tv live-tv
 render_big_4k idle connect-idle
 render_big_4k in-app-osd in-app-osd
+}
+
+if $all; then
+    all
+else
+    core
+fi

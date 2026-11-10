@@ -608,7 +608,8 @@ makes it a Jellyfin client rather than a pretty browser.
   (22 today); its `tests/live.rs` is read-only and opt-in with `SEERR_URL`/`SEERR_API_KEY`.
 - `cargo test -p runefin`: `Runtime` drives real input through real layout and springs at a fixed
   step; assert on state, `rt.find(key)`, `rt.presented(key)` — never on colours.
-- `scripts/snapshots.sh`: every `AppSpec::scene` to `docs/snapshots/*.png` at a fixed virtual time.
+- `scripts/snapshots.sh`: the eight committed views to `docs/snapshots/*.png` at a fixed virtual
+  time; `--all` renders every `AppSpec::scene` into a local directory instead.
   A UI change is a PNG diff in the commit. `--live` opts a headless `--snap` out of the hermetic
   fixture and renders the session on disk instead, for personal screenshots of a real library;
   committed snapshots never use it.

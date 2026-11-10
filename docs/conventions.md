@@ -18,7 +18,7 @@ exist because Rune's author enforces the same ones upstream.
 2. **Every interactive element has a stable `.key(..)`.** Keys are how tests, scripted input and
    the `--tree` dump address elements. Renaming one is a breaking change for the snapshot suite:
    rename it in the same commit and re-render.
-3. **A change that can move pixels ships with a snapshot.** Run `scripts/snapshots.sh` before and
+3. **A change that can move pixels renders a snapshot.** Run `scripts/snapshots.sh` before and
    after; commit the PNGs. An intended diff says why in the commit message.
 4. **No `todo!()`, `unimplemented!()`, `dbg!()`, or `unwrap()` outside `#[cfg(test)]`.** Denied by
    the workspace lints. Do not silence with `#[allow]` — finish the branch or delete the call.

@@ -18,8 +18,9 @@ wins until it is amended in the same change. The full rationale for each rule li
    `poll` returns `true` only when something visible changed.
 2. **Every interactive element has a stable `.key(..)`.** Keys are how tests, scripted input and
    `--tree` address elements. Renaming one re-renders the snapshots in the same commit.
-3. **A change that can move pixels ships with a snapshot.** `scripts/snapshots.sh` before and
-   after; commit the PNGs; an intended diff says why.
+3. **A change that can move pixels renders a snapshot.** `scripts/snapshots.sh` for the eight
+   committed views, and `scripts/snapshots.sh --all` for any other screen the change touches.
+   Commit the core views when they change; an intended diff says why.
 4. **No `todo!()`, `unimplemented!()`, `dbg!()`, or `unwrap()` outside `#[cfg(test)]`.** Denied by
    the workspace lints. Do not silence them with `#[allow]`.
 5. **No new dependency without a line in `docs/design.md`.** Nothing that pulls an async runtime,
@@ -27,7 +28,7 @@ wins until it is amended in the same change. The full rationale for each rule li
 6. **The Rune rev is pinned** in `crates/runefin/Cargo.toml` — a commit of our fork's
    `runefin/player` branch, never a branch name. Bump it as a standalone commit: run
    `scripts/upstream-sync.sh`, update the rev, run `scripts/check.sh`, render
-   `scripts/snapshots.sh`, include the PNG diffs.
+   `scripts/snapshots.sh`, include the core-view PNG diffs.
 
 ## API truth
 
