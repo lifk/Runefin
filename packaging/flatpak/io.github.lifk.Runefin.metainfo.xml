@@ -42,6 +42,15 @@
   </screenshots>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.1.3" date="2026-11-10">
+      <description>
+        <p>
+          Updated to the latest Rune revision: text wraps as Chromium wraps it, text fields
+          take IME composition, tooltips follow a new timing model, and long libraries scroll
+          without rows jumping as content passes.
+        </p>
+      </description>
+    </release>
     <release version="0.1.2" date="2026-11-09">
       <description>
         <p>
