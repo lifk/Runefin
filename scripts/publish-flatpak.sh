@@ -62,6 +62,11 @@ git -C "$pages" \
     commit -qm "Flatpak repository: $(sed -n 's/^Version = //p' dist/flatpak-repo/config 2>/dev/null || date -Idate)"
 git -C "$pages" remote add origin https://github.com/lifk/Runefin.git
 git -C "$pages" push -q --force origin gh-pages
+# A push that GitHub accepts but does not move is worse than a failure: clients keep seeing the
+# previous build. Compare the remote ref with what was just committed.
+remote_head=$(git -C "$pages" ls-remote origin gh-pages | cut -f1)
+local_head=$(git -C "$pages" rev-parse HEAD)
+[ "$remote_head" = "$local_head" ] || die "gh-pages did not move: remote $remote_head, local $local_head"
 say "published $(du -sh "$pages" | cut -f1) to $repo_url"
 say "clients: flatpak remote-add --if-not-exists --user runefin ${repo_url}runefin.flatpakrepo"
 say "         flatpak install --user runefin io.github.lifk.Runefin"
