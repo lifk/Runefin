@@ -2385,9 +2385,12 @@ fn seek_bar(s: &State, session: &crate::state::InAppSession, progress: f32, t: &
     let knob_x = (s.in_app_seek_width * progress - knob / 2.0)
         .clamp(0.0, (s.in_app_seek_width - knob).max(0.0));
     let knob_y = 24.0 - track / 2.0 - knob / 2.0;
-    el().key("in-app-seek")
+    let bar = el()
+        .key("in-app-seek")
         .w_full()
         .h(24.0)
+        .focusable(true)
+        .focus_ring(theme::focus_width(), 12.0, theme::ring())
         .cursor(rune::Cursor::Grab)
         .on_layout_tx(|s: &mut State, rect: [f32; 4], _tx: &mut rune::Tx| {
             s.in_app_seek_width = rect[2];
@@ -2456,7 +2459,14 @@ fn seek_bar(s: &State, session: &crate::state::InAppSession, progress: f32, t: &
                 .fill(Color::WHITE)
                 .shadow(0.0, 3.0, Color::BLACK.alpha(0.55))
         }))
-        .children(seek_preview(s, session, t))
+        .children(seek_preview(s, session, t));
+    // The TV's focused timeline gets the same neutral wash as every other control; the knob
+    // stays visible anyway, so the wash is what says "the arrows scrub this".
+    if theme::is_big_screen() {
+        bar.focus_fill(t.hover)
+    } else {
+        bar
+    }
 }
 
 /// The clock, the run's position and the three controls that belong to the picture rather than

@@ -21,9 +21,21 @@ pub(super) fn search_screen(s: &State) -> El {
         .w_full()
         .on_edit(|s: &mut State| &mut s.search.query)
         .on_input_change(|s: &mut State, _| s.search_changed())
-        .on_input_key(|s: &mut State, key: &rune::KeyEvent, _tx| {
+        .on_input_key(|s: &mut State, key: &rune::KeyEvent, tx: &mut rune::Tx| {
             if key.key == rune::Key::Escape {
+                // A text field keeps its own keys, so the zone router never sees a press here:
+                // Down is the one key this field has to pass on.
                 s.close_search();
+                true
+            } else if s.big_screen && key.key == rune::Key::Down {
+                let target =
+                    crate::tv_focus::step(s, Some("search-input"), crate::tv_input::TvAction::Down);
+                if let Some(target) = target {
+                    // Rune keeps a field that still asks for focus; the text edit's own flag
+                    // has to follow the runtime focus out.
+                    s.search.query.focused = false;
+                    tx.focus_key(target);
+                }
                 true
             } else {
                 false

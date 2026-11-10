@@ -1869,6 +1869,11 @@ impl State {
     /// Reveal the player controls and restart the idle timer.
     pub fn show_in_app_osd(&mut self) {
         if self.in_app.is_some() {
+            if !self.osd_visible {
+                // The remote has no pointer to put on the bar: opening the chrome puts focus
+                // there, so Left/Right scrub at once and OK commits.
+                self.osd_focus_pending = true;
+            }
             self.in_app_last_input = Instant::now();
             self.osd_visible = true;
             self.osd_hide_at = Some(Instant::now() + Duration::from_secs(3));
@@ -2174,12 +2179,57 @@ impl State {
     /// Show the position under the pointer while the timeline is being dragged. This changes
     /// only the OSD; the player keeps its own clock until the gesture ends.
     pub fn preview_in_app_scrub(&mut self, fraction: f32) {
+        let Some(session) = &self.in_app else {
+            return;
+        };
+        let duration = session.duration_ms.unwrap_or(0).max(1) as f32;
+        self.preview_in_app_at((duration * fraction.clamp(0.0, 1.0)) as i64);
+    }
+
+    /// Show `position_ms` on the timeline with its trickplay frame, without moving the player.
+    /// A remote's scrub and a pointer drag both land here; OK or releasing the pointer commits.
+    pub fn preview_in_app_at(&mut self, position_ms: i64) {
+        let Some(session) = &self.in_app else {
+            return;
+        };
+        let duration = session.duration_ms.unwrap_or(0).max(1);
+        let target = position_ms.clamp(0, duration);
+        let width = self.in_app_seek_width.max(1.0);
+        let x = (target as f32 / duration as f32).clamp(0.0, 1.0) * width;
+        let item = session.item.clone();
         if let Some(session) = &mut self.in_app {
-            let duration = session.duration_ms.unwrap_or(0).max(1) as f32;
-            session.scrub_ms = Some((duration * fraction.clamp(0.0, 1.0)) as i64);
+            session.scrub_ms = Some(target);
         }
+        self.in_app_hover = Some((x, target));
+        self.in_app_hover_armed = true;
+        // A reader resting on the bar must not lose the preview to the idle timer.
         self.osd_visible = true;
         self.osd_hide_at = None;
+        self.ensure_trickplay_tile(&item, target);
+    }
+
+    /// A TV remote's timeline scrub: move the preview one step without seeking. OK commits it,
+    /// so the picture jumps once instead of once per press.
+    pub fn scrub_in_app_step(&mut self, forward: bool) {
+        let step = self.seek_step_ms;
+        let Some(session) = &self.in_app else {
+            return;
+        };
+        let duration = session.duration_ms.unwrap_or(0).max(1);
+        let from = session.scrub_ms.unwrap_or(session.position_ms);
+        let target = (from + if forward { step } else { -step }).clamp(0, duration);
+        self.preview_in_app_at(target);
+    }
+
+    /// Commit the timeline's preview; with no preview up, OK is play/pause.
+    pub fn commit_in_app_scrub(&mut self) {
+        let Some(target) = self.in_app.as_ref().and_then(|session| session.scrub_ms) else {
+            self.toggle_in_app_pause();
+            return;
+        };
+        self.clear_in_app_hover();
+        self.seek_in_app_to(target);
+        self.osd_hide_at = Some(Instant::now() + Duration::from_secs(3));
     }
 
     /// Commit a timeline drag. A cancelled drag only clears the preview and leaves the player
@@ -2699,6 +2749,36 @@ mod tests {
         assert_eq!(state.in_app.as_ref().expect("playing").position_ms, 30_000);
         state.seek_in_app_step(false);
         assert_eq!(state.in_app.as_ref().expect("playing").position_ms, 0);
+    }
+
+    #[test]
+    fn a_timeline_scrub_previews_without_moving_the_player() {
+        let mut state = State::from_config(Config::fresh());
+        state.in_app = Some(crate::demo::in_app());
+        state.in_app_seek_width = 1232.0;
+        state.seek_step_ms = 10_000;
+        let start = state.in_app.as_ref().expect("playing").position_ms;
+        state.scrub_in_app_step(true);
+        state.scrub_in_app_step(true);
+        let session = state.in_app.as_ref().expect("playing");
+        assert_eq!(session.scrub_ms, Some(start + 20_000));
+        assert_eq!(session.position_ms, start, "the scrub has not sought yet");
+        assert_eq!(
+            state.in_app_hover.map(|(_, ms)| ms),
+            Some(start + 20_000),
+            "the trickplay preview follows the scrub"
+        );
+
+        state.commit_in_app_scrub();
+        let session = state.in_app.as_ref().expect("playing");
+        assert_eq!(session.position_ms, start + 20_000);
+        assert_eq!(session.scrub_ms, None);
+        assert!(state.in_app_hover.is_none());
+
+        // With nothing previewed, OK is the play/pause key.
+        assert!(!session.paused);
+        state.commit_in_app_scrub();
+        assert!(state.in_app.as_ref().expect("playing").paused);
     }
 
     #[test]

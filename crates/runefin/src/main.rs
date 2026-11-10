@@ -46,12 +46,16 @@ use state::{Route, State, Step};
 fn view(s: &State, cx: &mut Cx<State>) -> El {
     // The root's own rect is the window's content size; remembering it makes the next launch
     // open at the size the reader left. The write itself happens on close, not here.
-    screens::view(s, cx).on_screen_layout(|s: &mut State, rect: [f32; 4]| {
-        if rect[2] >= 1.0 && rect[3] >= 1.0 {
-            s.window_size = (rect[2], rect[3]);
-            s.window_position = (rect[0], rect[1]);
-        }
-    })
+    // Rune calls an element's own key handler before its focus-group navigation. Without this
+    // hook a focused card never reaches the router: Rune would have already wrapped the rail.
+    screens::view(s, cx)
+        .on_key(tv_key)
+        .on_screen_layout(|s: &mut State, rect: [f32; 4]| {
+            if rect[2] >= 1.0 && rect[3] >= 1.0 {
+                s.window_size = (rect[2], rect[3]);
+                s.window_position = (rect[0], rect[1]);
+            }
+        })
 }
 
 /// Once, before the first frame: hand the worker the waker it rings when an answer lands.
@@ -247,6 +251,94 @@ fn trace_slow_poll(took: std::time::Duration) {
     eprintln!("playback: the UI frame took {} ms", took.as_millis());
 }
 
+/// The living-room keys. Rune runs an element's own `on_key` before its focus-group navigation,
+/// so the root element carries this hook too; `on_key` calls it for the unfocused case. A screen
+/// with no zones, a focused panel or a text field's Left/Right is left to Rune.
+fn tv_key(s: &mut State, key: &KeyEvent, tx: &mut Tx) -> bool {
+    let Some(action) = tv_input::action(key) else {
+        return false;
+    };
+    let focused = tx.focused().map(str::to_owned);
+    // A focused volume slider spends Left/Right on the level.
+    if s.in_app.is_some() && s.osd_visible && focused.as_deref() == Some("in-app-volume-slider") {
+        match action {
+            tv_input::TvAction::Left => {
+                s.adjust_in_app_volume(-0.05);
+                return true;
+            }
+            tv_input::TvAction::Right => {
+                s.adjust_in_app_volume(0.05);
+                return true;
+            }
+            _ => {}
+        }
+    }
+    // On the timeline, Left/Right move the preview and OK commits it.
+    if s.big_screen
+        && s.in_app.is_some()
+        && s.osd_visible
+        && focused.as_deref() == Some("in-app-seek")
+    {
+        match action {
+            tv_input::TvAction::Left => {
+                s.scrub_in_app_step(false);
+                return true;
+            }
+            tv_input::TvAction::Right => {
+                s.scrub_in_app_step(true);
+                return true;
+            }
+            tv_input::TvAction::Activate => {
+                s.commit_in_app_scrub();
+                return true;
+            }
+            _ => {}
+        }
+    }
+    if !action.is_direction() {
+        return false;
+    }
+    // A text field keeps Left/Right for its caret; Up/Down still leave it for the rows or zones.
+    if matches!(action, tv_input::TvAction::Left | tv_input::TvAction::Right)
+        && focused.as_deref().is_some_and(tv_input::is_text_field)
+    {
+        return false;
+    }
+    // Settings is a vertical form with dozens of control keys; Up/Down follow the page's tab
+    // order instead of a hand-kept key list. Left/Right stay with the focused control.
+    if s.big_screen && matches!(s.route, Route::Settings) {
+        tx.send_key(KeyEvent {
+            key: Key::Tab,
+            mods: rune::Mods {
+                shift: matches!(action, tv_input::TvAction::Up),
+                ..rune::Mods::default()
+            },
+        });
+        return true;
+    }
+    // The router steps between zones, clamps at the edges and asks Rune to focus the key it
+    // chose. A modal, menu or scrollbar has focus: its directions are Rune's, not the zones'.
+    let panel = focused
+        .as_deref()
+        .is_some_and(|key| !tv_focus::contains(s, key));
+    if !panel {
+        let target = tv_focus::step(s, focused.as_deref(), action);
+        if target.is_some() || tv_focus::owns_screen(s) {
+            if let Some(target) = &target {
+                // A text edit's focused flag keeps Rune focused on it; follow the runtime focus.
+                if target == "search-input" {
+                    s.search.query.focused = true;
+                } else if focused.as_deref() == Some("search-input") {
+                    s.search.query.focused = false;
+                }
+                tx.focus_key(target.clone());
+            }
+            return true;
+        }
+    }
+    false
+}
+
 /// Esc pops the top screen: detail goes back to its card, a library goes home.
 fn on_key(s: &mut State, key: &KeyEvent, tx: &mut Tx) -> bool {
     // A rebind captures exactly one key. Escape cancels; everything else is swallowed so the
@@ -261,58 +353,10 @@ fn on_key(s: &mut State, key: &KeyEvent, tx: &mut Tx) -> bool {
         }
         return true;
     }
-    // A focused volume slider spends Left/Right on the level; the router would move focus
-    // instead. The seek bar keeps the app's existing seek handling when the router has no move.
-    if s.in_app.is_some() && s.osd_visible && tx.focused() == Some("in-app-volume-slider") {
-        match key.key {
-            Key::Left => {
-                s.adjust_in_app_volume(-0.05);
-                return true;
-            }
-            Key::Right => {
-                s.adjust_in_app_volume(0.05);
-                return true;
-            }
-            _ => {}
-        }
-    }
-    // Settings is a vertical form with dozens of control keys; the tab order already follows
-    // the page, so a direction becomes Next/Previous there instead of a hand-kept key list.
-    if s.big_screen
-        && matches!(s.route, Route::Settings)
-        && let Some(action) = tv_input::action(key)
-        && action.is_direction()
-    {
-        let back = matches!(action, tv_input::TvAction::Up | tv_input::TvAction::Left);
-        tx.send_key(KeyEvent {
-            key: Key::Tab,
-            mods: rune::Mods {
-                shift: back,
-                ..rune::Mods::default()
-            },
-        });
+    // The TV's own keys, shared with the root element's key hook. On a focused control Rune
+    // runs that hook before its group navigation; `on_key` above only sees the unfocused case.
+    if tv_key(s, key, tx) {
         return true;
-    }
-    // The living-room router owns the four directions: it steps between zones, clamps at the
-    // edges and asks Rune to focus the key it chose. A screen with no zones is left to Rune.
-    if s.big_screen
-        && let Some(action) = tv_input::action(key)
-        && action.is_direction()
-    {
-        let focused = tx.focused().map(str::to_owned);
-        // A modal, menu or scrollbar has focus: its directions are Rune's, not the zones'.
-        let panel = focused
-            .as_deref()
-            .is_some_and(|key| !tv_focus::contains(s, key));
-        if !panel {
-            let target = tv_focus::step(s, focused.as_deref(), action);
-            if target.is_some() || tv_focus::owns_screen(s) {
-                if let Some(target) = target {
-                    tx.focus_key(target);
-                }
-                return true;
-            }
-        }
     }
     if s.shortcut_matches(crate::shortcuts::Action::Fullscreen, key) {
         s.toggle_fullscreen();
@@ -2735,6 +2779,33 @@ mod tests {
     }
 
     #[test]
+    fn opening_the_player_osd_focuses_the_timeline_once() {
+        let mut state = State::from_config(config::Config::fresh());
+        state.big_screen = true;
+        state.step = Step::Ready {
+            server_name: "example".into(),
+        };
+        state.home_data = demo::home();
+        state.route = Route::Home;
+        state.in_app = Some(demo::in_app());
+        state.osd_visible = false;
+        state.show_in_app_osd();
+        assert_eq!(state.take_focus_key().as_deref(), Some("in-app-seek"));
+        assert!(
+            state.take_focus_key().is_none(),
+            "the route behind the player does not steal focus back"
+        );
+
+        state.osd_visible = false;
+        state.show_in_app_osd();
+        assert_eq!(
+            state.take_focus_key().as_deref(),
+            Some("in-app-seek"),
+            "each reopening starts on the timeline"
+        );
+    }
+
+    #[test]
     fn big_screen_asks_for_the_first_item_on_the_route() {
         let mut state = State::from_config(config::Config::fresh());
         state.big_screen = true;
@@ -4272,6 +4343,129 @@ mod tests {
         ] {
             assert!(rt.find(key).is_some(), "{key} is in the expanded grid");
         }
+    }
+
+    #[test]
+    fn the_tv_router_owns_directions_before_runes_group_navigation() {
+        let env = Env {
+            system_dark: true,
+            scale: 1.5,
+        };
+        let mut state = home_state();
+        state.big_screen = true;
+        state.route = Route::Home;
+        let mut rt = Runtime::new(state, view, (1280.0, 720.0), env);
+        rt.on_key = Some(on_key);
+        rt.frame(0.0);
+        let first = rt
+            .state
+            .take_focus_key()
+            .expect("home asks for its first card");
+        rt.update(|_, tx| tx.focus_key(first.clone()));
+        rt.frame(0.016);
+        assert_eq!(rt.focused_key().as_deref(), Some(first.as_str()));
+
+        rt.key(KeyEvent {
+            key: Key::Down,
+            mods: Default::default(),
+        });
+        rt.frame(0.032);
+        let below = rt.focused_key().expect("the next lane");
+        assert!(
+            below.starts_with("rail-next-up-"),
+            "Down changes lanes instead of wrapping the rail: {below}"
+        );
+
+        rt.key(KeyEvent {
+            key: Key::Up,
+            mods: Default::default(),
+        });
+        rt.frame(0.048);
+        assert!(
+            rt.focused_key()
+                .is_some_and(|key| key.starts_with("rail-continue-watching-")),
+            "Up returns to the rail above"
+        );
+    }
+
+    #[test]
+    fn the_search_field_leaves_down_for_its_results() {
+        let env = Env {
+            system_dark: true,
+            scale: 1.5,
+        };
+        let mut state = home_state();
+        state.big_screen = true;
+        state.route = Route::Search { scope: None };
+        state.search.query.text = "his girl".into();
+        state.search.results = demo::search_results();
+        let mut rt = Runtime::new(state, view, (1280.0, 720.0), env);
+        rt.on_key = Some(on_key);
+        rt.frame(0.0);
+        rt.update(|_, tx| tx.focus_key("search-input"));
+        rt.frame(0.016);
+        assert_eq!(rt.focused_key().as_deref(), Some("search-input"));
+        assert!(
+            rt.find("search-movies-his-girl-friday").is_some(),
+            "the first movie card is on screen"
+        );
+
+        rt.key(KeyEvent {
+            key: Key::Down,
+            mods: Default::default(),
+        });
+        rt.frame(0.032);
+        let result = rt.focused_key().expect("the first result group");
+        assert!(result.starts_with("search-movies-"), "{result}");
+    }
+
+    #[test]
+    fn a_big_screen_timeline_scrubs_then_commits_with_ok() {
+        let env = Env {
+            system_dark: true,
+            scale: 1.5,
+        };
+        let mut state = home_state();
+        state.big_screen = true;
+        state.in_app = Some(demo::in_app());
+        state.osd_visible = true;
+        state.seek_step_ms = 10_000;
+        let mut rt = Runtime::new(state, view, (1280.0, 720.0), env);
+        rt.on_key = Some(on_key);
+        rt.frame(0.0);
+        rt.update(|_, tx| tx.focus_key("in-app-seek"));
+        rt.frame(0.016);
+        assert_eq!(rt.focused_key().as_deref(), Some("in-app-seek"));
+
+        let before = rt.state.in_app.as_ref().expect("playing").position_ms;
+        rt.key(KeyEvent {
+            key: Key::Right,
+            mods: Default::default(),
+        });
+        rt.frame(0.032);
+        {
+            let session = rt.state.in_app.as_ref().expect("playing");
+            assert_eq!(session.scrub_ms, Some(before + 10_000));
+            assert_eq!(session.position_ms, before, "the scrub has not seeked yet");
+        }
+        assert!(
+            rt.find("in-app-trickplay-time").is_some(),
+            "the preview follows the scrub"
+        );
+        assert_eq!(
+            rt.focused_key().as_deref(),
+            Some("in-app-seek"),
+            "the timeline keeps focus while scrubbing"
+        );
+
+        rt.key(KeyEvent {
+            key: Key::Enter,
+            mods: Default::default(),
+        });
+        rt.frame(0.048);
+        let session = rt.state.in_app.as_ref().expect("playing");
+        assert_eq!(session.position_ms, before + 10_000);
+        assert_eq!(session.scrub_ms, None, "OK cleared the preview");
     }
 
     #[test]

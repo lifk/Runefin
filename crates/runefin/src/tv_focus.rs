@@ -654,26 +654,32 @@ fn in_app_zones(s: &State) -> Vec<Zone> {
     if !s.osd_visible {
         return Vec::new();
     }
+    // A live stream has no timeline: the transport is the whole OSD.
+    let live = s.in_app.as_ref().is_some_and(|session| session.live);
+    let controls = Zone {
+        keys: [
+            "in-app-pause",
+            "in-app-volume-slider",
+            "in-app-mute",
+            "in-app-fullscreen",
+            "in-app-gear",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect(),
+        columns: 0,
+        parent: (!live).then_some(0),
+    };
+    if live {
+        return vec![controls];
+    }
     vec![
         Zone {
             keys: vec!["in-app-seek".into()],
             columns: 1,
             parent: None,
         },
-        Zone {
-            keys: [
-                "in-app-pause",
-                "in-app-volume-slider",
-                "in-app-mute",
-                "in-app-fullscreen",
-                "in-app-gear",
-            ]
-            .into_iter()
-            .map(String::from)
-            .collect(),
-            columns: 0,
-            parent: Some(0),
-        },
+        controls,
     ]
 }
 
@@ -900,6 +906,20 @@ mod tests {
         assert_eq!(
             step(&state, Some("seerr-detail-open"), TvAction::Right).as_deref(),
             Some("seerr-detail-request")
+        );
+    }
+
+    #[test]
+    fn a_live_osd_has_no_timeline_to_scrub() {
+        let mut state = home();
+        let mut session = crate::demo::in_app();
+        session.live = true;
+        state.in_app = Some(session);
+        state.osd_visible = true;
+        assert!(!contains(&state, "in-app-seek"));
+        assert_eq!(
+            step(&state, Some("in-app-pause"), TvAction::Right).as_deref(),
+            Some("in-app-volume-slider")
         );
     }
 

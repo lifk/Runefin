@@ -53,9 +53,25 @@ render_big_4k() {
     echo "wrote $out/$name-big-4k.png"
 }
 
-# The committed set: one frame per main view, plus the two big-screen frames the README and the
-# AppStream metadata link to.
+# Focus is runtime state, not scene state: these render past the first poll so the app's focus
+# request lands, and the optional script walks the router before the frame.
+render_focus() {
+    local scene=$1 name=$2 script=${3:-}
+    local args=(--snap "$out/$name-big.png" --scene "$scene" --size 1280x720 --scale 1.5
+        --big-screen --at 0.6)
+    if [ -n "$script" ]; then
+        args+=(--script "$script")
+    fi
+    "$bin" "${args[@]}"
+    echo "wrote $out/$name-big.png"
+}
+
+# The committed set: one frame per main view, the two big-screen frames the README and the
+# AppStream metadata link to, and the focus pair that pins the router's visual contract.
 core() {
+    local focus_script
+    focus_script=$(mktemp)
+    printf '%s\n' '{"events":[{"t":0.15,"type":"key","name":"Up"}]}' > "$focus_script"
     render home home 1280 800
     render detail detail 1280 800
     render search search 1280 800
@@ -64,6 +80,9 @@ core() {
     render in-app-osd in-app-osd 1280 800
     render_big home home
     render_big library library
+    render_focus home focus-card
+    render_focus home focus-sidebar "$focus_script"
+    rm -f "$focus_script"
 }
 
 # Every scene, for local review only.

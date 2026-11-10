@@ -49,6 +49,26 @@ pub fn action(key: &KeyEvent) -> Option<TvAction> {
     })
 }
 
+/// Text fields keep Left/Right for the caret; Up/Down still leave them for the zones.
+pub fn is_text_field(key: &str) -> bool {
+    matches!(
+        key,
+        "server"
+            | "username"
+            | "password"
+            | "playlist-name-input"
+            | "in-app-goto-input"
+            | "library-search"
+            | "search-input"
+            | "seerr-search"
+            | "settings-search"
+            | "setting-omdb-key"
+            | "setting-seerr-url"
+            | "setting-seerr-key-input"
+            | "setting-seerr-user"
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -61,8 +61,11 @@ Navigation rules:
    decides what Left/Right means (the timeline scrubs, the volume slider adjusts).
 7. Modals trap all of it; Back closes them first.
 
-The router runs in the window's `on_key` before Rune's arrow handling and returns `true` when it
-has moved focus, so Rune never applies its group rules in big-screen mode.
+The router is attached to the root element's `on_key`, which Rune runs before its focus-group
+navigation. The window's `on_key` alone is too late once a control has focus: Rune consumes arrow
+keys first. The root hook returns `true` when it has moved focus, so Rune never applies its
+desktop group rules in big-screen mode. A focused text field is the exception — Rune keeps its
+keys — so Search passes Down out of the field in its own `on_input_key`.
 
 ## 4. Buttons per context
 
@@ -164,8 +167,20 @@ rows) join the sidebar in the router. A focused panel, menu or scrollbar is left
 router only moves when the focused key belongs to one of its zones, so the card menu, the gear
 sheet and the subtitle panel keep their own directions.
 
-Still open: scrub-and-commit on the timeline (today a press seeks immediately), and a focus
-snapshot scene.
+Fifth pass: the router had only ever run on the window's `on_key`, which Rune calls *after* its
+own focus navigation once a control is focused; the arrow keys were still wrapping the rail. It
+now hangs off the root element's `on_key`, so it sees directions first. The first runtime tests
+that press real keys pin this: Down changes Home lanes instead of moving one card, and Down from
+the Search field lands on the first movie. Settings maps Up/Down to its tab order and leaves
+Left/Right to the focused slider or switch. The player's timeline scrubs with Left/Right and
+commits with OK; the OSD asks for the timeline's focus when it opens, and a live stream omits the
+timeline zone because it has no bar. Two big-screen focus shots (`focus-card-big`,
+`focus-sidebar-big`) join the committed set; focus is runtime state, so they render past the first
+poll and the sidebar one walks there with a script.
+
+Still open: a hardware pass over the zones now that the router actually receives the keys, and a
+decision on whether Settings text fields should let Up/Down leave them (today they keep every
+arrow, as Rune does for inputs).
 
 Fourth pass: Seerr's detail page (Back, the action row, the season picker, the cast rail). The
 zones mirror what the page actually draws: only rendered actions take focus (no request button
