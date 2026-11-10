@@ -149,6 +149,9 @@ fn zones(s: &State) -> (Vec<Zone>, bool) {
         Route::Home => (home_zones(s), true),
         Route::Library { .. } => (library_zones(s), true),
         Route::Detail { .. } => (detail_zones(s), false),
+        Route::Search { .. } => (search_zones(s), false),
+        Route::Person { .. } => (person_zones(s), false),
+        Route::Seerr => (seerr_zones(s), false),
         _ => (Vec::new(), false),
     }
 }
@@ -352,6 +355,151 @@ fn detail_zones(s: &State) -> Vec<Zone> {
     zones
 }
 
+fn search_zones(s: &State) -> Vec<Zone> {
+    let results = &s.search.results;
+    let mut zones = vec![Zone {
+        keys: vec!["search-input".into()],
+        columns: 1,
+        parent: None,
+    }];
+    let rail = |prefix: &str, items: &[jellyfin_api::Item]| Zone {
+        keys: items
+            .iter()
+            .map(|item| format!("{prefix}-{}", item.id))
+            .collect(),
+        columns: 0,
+        parent: Some(0),
+    };
+    if !results.movies.is_empty() {
+        zones.push(rail("search-movies", &results.movies));
+    }
+    if !results.shows.is_empty() {
+        zones.push(rail("search-shows", &results.shows));
+    }
+    if !results.episodes.is_empty() {
+        zones.push(rail("search-episodes", &results.episodes));
+    }
+    if !results.people.is_empty() {
+        zones.push(Zone {
+            keys: results
+                .people
+                .iter()
+                .map(|person| format!("search-person-{}", person.id))
+                .collect(),
+            columns: 0,
+            parent: Some(0),
+        });
+    }
+    if !s.search.seerr.results.is_empty() {
+        zones.push(Zone {
+            keys: s
+                .search
+                .seerr
+                .results
+                .iter()
+                .map(|item| format!("seerr-card-{}-{}", item.media_type, item.id))
+                .collect(),
+            columns: 0,
+            parent: Some(0),
+        });
+    }
+    zones
+}
+
+fn person_zones(s: &State) -> Vec<Zone> {
+    let Some(person) = &s.person else {
+        return Vec::new();
+    };
+    let mut zones = vec![Zone {
+        keys: vec!["person-back".into()],
+        columns: 1,
+        parent: None,
+    }];
+    let known: Vec<String> = person
+        .items
+        .iter()
+        .take(5)
+        .map(|item| {
+            format!(
+                "person-known-{}",
+                item.series_id.as_deref().unwrap_or(&item.id)
+            )
+        })
+        .collect();
+    if !known.is_empty() {
+        zones.push(Zone {
+            keys: known,
+            columns: 0,
+            parent: Some(0),
+        });
+    }
+    let grid: Vec<String> = person
+        .items
+        .iter()
+        .map(|item| format!("person-{}", item.series_id.as_deref().unwrap_or(&item.id)))
+        .collect();
+    if !grid.is_empty() {
+        zones.push(Zone {
+            keys: grid,
+            columns: 5,
+            parent: Some(0),
+        });
+    }
+    zones
+}
+
+fn seerr_zones(s: &State) -> Vec<Zone> {
+    let mut zones = vec![Zone {
+        keys: vec!["seerr-tab-discover".into(), "seerr-tab-requests".into()],
+        columns: 0,
+        parent: None,
+    }];
+    match s.seerr.tab {
+        crate::state::SeerrTab::Discover => {
+            let mut keys = Vec::new();
+            // The page renders either the editorial rails or the browse result, never both.
+            let items: Vec<&seerr_api::DiscoverItem> =
+                if s.seerr.discover_mode == crate::state::DiscoverMode::Browse {
+                    s.seerr.discover.browse.iter().collect()
+                } else {
+                    s.seerr
+                        .discover
+                        .trending
+                        .iter()
+                        .chain(s.seerr.discover.movies.iter())
+                        .chain(s.seerr.discover.tv.iter())
+                        .collect()
+                };
+            for item in items {
+                keys.push(format!("seerr-card-{}-{}", item.media_type, item.id));
+            }
+            if !keys.is_empty() {
+                zones.push(Zone {
+                    keys,
+                    columns: 0,
+                    parent: Some(0),
+                });
+            }
+        }
+        crate::state::SeerrTab::Requests => {
+            let keys: Vec<String> = s
+                .seerr
+                .requests
+                .iter()
+                .map(|request| format!("seerr-request-{}", request.id))
+                .collect();
+            if !keys.is_empty() {
+                zones.push(Zone {
+                    keys,
+                    columns: 1,
+                    parent: Some(0),
+                });
+            }
+        }
+    }
+    zones
+}
+
 fn in_app_zones(s: &State) -> Vec<Zone> {
     if !s.osd_visible {
         return Vec::new();
@@ -468,6 +616,51 @@ mod tests {
         assert_eq!(
             step(&state, Some("detail-play"), TvAction::Up).as_deref(),
             Some("detail-back")
+        );
+    }
+
+    #[test]
+    fn search_moves_from_the_field_into_its_groups() {
+        let mut state = home();
+        state.route = Route::Search { scope: None };
+        state.search.results = crate::demo::search_results();
+        assert_eq!(
+            step(&state, Some("search-input"), TvAction::Down).as_deref(),
+            Some("search-movies-his-girl-friday")
+        );
+        assert_eq!(
+            step(&state, Some("search-movies-his-girl-friday"), TvAction::Up).as_deref(),
+            Some("search-input")
+        );
+        let down =
+            step(&state, Some("search-movies-plan-9"), TvAction::Down).expect("the next group");
+        assert!(down.starts_with("search-shows-"), "{down}");
+    }
+
+    #[test]
+    fn a_person_page_reaches_known_for_and_the_library_grid() {
+        let mut state = home();
+        state.route = Route::Person {
+            id: "mara-ellison".into(),
+        };
+        state.person = Some(crate::demo::person());
+        let down = step(&state, Some("person-back"), TvAction::Down).expect("known for");
+        assert!(down.starts_with("person-known-"), "{down}");
+        let grid = step(&state, Some(&down), TvAction::Down).expect("the grid");
+        assert!(grid.starts_with("person-"), "{grid}");
+    }
+
+    #[test]
+    fn seerr_tabs_lead_into_the_current_list() {
+        let mut state = home();
+        state.route = Route::Seerr;
+        state.seerr.tab = crate::state::SeerrTab::Requests;
+        state.seerr.requests = crate::demo::seerr_requests();
+        let down = step(&state, Some("seerr-tab-discover"), TvAction::Down).expect("a request");
+        assert!(down.starts_with("seerr-request-"), "{down}");
+        assert_eq!(
+            step(&state, Some("seerr-tab-discover"), TvAction::Right).as_deref(),
+            Some("seerr-tab-requests")
         );
     }
 

@@ -276,6 +276,23 @@ fn on_key(s: &mut State, key: &KeyEvent, tx: &mut Tx) -> bool {
             _ => {}
         }
     }
+    // Settings is a vertical form with dozens of control keys; the tab order already follows
+    // the page, so a direction becomes Next/Previous there instead of a hand-kept key list.
+    if s.big_screen
+        && matches!(s.route, Route::Settings)
+        && let Some(action) = tv_input::action(key)
+        && action.is_direction()
+    {
+        let back = matches!(action, tv_input::TvAction::Up | tv_input::TvAction::Left);
+        tx.send_key(KeyEvent {
+            key: Key::Tab,
+            mods: rune::Mods {
+                shift: back,
+                ..rune::Mods::default()
+            },
+        });
+        return true;
+    }
     // The living-room router owns the four directions: it steps between zones, clamps at the
     // edges and asks Rune to focus the key it chose. A screen with no zones is left to Rune.
     if s.big_screen

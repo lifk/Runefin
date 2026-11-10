@@ -154,5 +154,11 @@ absorbed by S1 anyway.
   accent highlight wash are gone.
 - `--windowed`: same layout, zones and keys in a normal window, for laptop iteration.
 
-Still open: zones for Search, Settings, Person and the Seerr pages (they keep Rune's behaviour),
-scrub-and-commit on the timeline (today a press seeks immediately), and a focus snapshot scene.
+Second pass (later the same day): zones for Search (the field plus each result group), Person
+(back, Known for, the library grid) and Seerr (the tabs plus the current tab's cards or request
+rows). Settings is a vertical form with dozens of control keys, so a direction there becomes
+Next/Previous in tab order, which already follows the page, instead of a hand-kept key list.
+
+Still open: a Settings zone that can also enter a row's control sideways, the same for Live TV
+and Remote if their groups feel wrong on hardware, scrub-and-commit on the timeline (today a
+press seeks immediately), and a focus snapshot scene.
