@@ -2172,6 +2172,25 @@ fn stats_panel(s: &State, session: &crate::state::InAppSession) -> El {
                 if session.paused { "paused" } else { "playing" }
             ),
         ),
+        (
+            "Colour",
+            session.player.colour_facts().map_or_else(
+                || "—".to_string(),
+                |facts| {
+                    let mut parts = vec![format!("{} · {}", facts.transfer, facts.matrix)];
+                    if facts.max_luminance > 0.0 {
+                        parts.push(format!(
+                            "{:.0}/{:.4} nits",
+                            facts.max_luminance, facts.min_luminance
+                        ));
+                    }
+                    if facts.max_cll > 0 {
+                        parts.push(format!("CLL {}", facts.max_cll));
+                    }
+                    parts.join(" · ")
+                },
+            ),
+        ),
         ("Last request", format!("{} ms", crate::net::last_job_ms())),
         ("Position", position),
         ("Frames", session.player.frames().to_string()),

@@ -90,6 +90,19 @@ pub struct InAppSession {
     pub position_calibrated: bool,
 }
 
+/// A Dolby Vision source, by the server's own range label.
+fn item_is_dolby_vision(item: &Item) -> bool {
+    item.media_sources
+        .iter()
+        .flat_map(|source| source.media_streams.iter())
+        .filter(|stream| stream.kind == "Video")
+        .filter_map(|stream| stream.video_range.as_deref())
+        .any(|range| {
+            let range = range.to_ascii_lowercase();
+            range.contains("dovi") || range.contains("dolby")
+        })
+}
+
 /// The offset to add to a transcoded stream's clock so it reads in file time. A stream that
 /// starts at the resume point but reports zero needs the resume point added; one that carries
 /// the file's own timestamps needs nothing.
@@ -1498,6 +1511,11 @@ impl State {
                 let Some(pending) = self.pending_in_app.take() else {
                     return;
                 };
+                if method == "Transcode" && item_is_dolby_vision(&pending.item) {
+                    self.show_toast(
+                        "Dolby Vision: the server is tone-mapping this to SDR.".to_string(),
+                    );
+                }
                 // A transcode URL already starts at `start_time_ticks`; seeking again would
                 // land at twice the resume point and leave the subtitles behind.
                 if pending.start_ms > 0 && method != "Transcode" {
@@ -2965,6 +2983,24 @@ mod tests {
         }));
         assert_eq!(state.in_app_subtitles.selected, Some(0));
         assert_eq!(state.in_app_subtitles.tracks.len(), 2);
+    }
+
+    #[test]
+    fn a_dolby_vision_item_is_recognised_from_its_range_label() {
+        let item = |range: &str| Item {
+            media_sources: vec![jellyfin_api::MediaSource {
+                media_streams: vec![jellyfin_api::MediaStream {
+                    kind: "Video".into(),
+                    video_range: Some(range.into()),
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        assert!(item_is_dolby_vision(&item("DOVIWithHDR10")));
+        assert!(item_is_dolby_vision(&item("Dolby Vision")));
+        assert!(!item_is_dolby_vision(&item("HDR10")));
     }
 
     #[test]

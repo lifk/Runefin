@@ -22,6 +22,7 @@ use gstreamer_video::{VideoInfo, VideoMeta};
 use rune::NativeSurface;
 
 use crate::playback_trace::Trace;
+use crate::player::ColourFacts;
 use rune::native_surface::dmabuf::{DmabufFrame, Lease, Plane};
 use rune::native_surface::{ColorInfo, Format, Matrix, Transfer};
 
@@ -61,6 +62,7 @@ pub struct Imp {
     frame_id: Mutex<Arc<AtomicU64>>,
     format_label: Mutex<Arc<Mutex<Option<&'static str>>>>,
     trace: Mutex<Arc<Trace>>,
+    facts: Mutex<Arc<std::sync::Mutex<Option<ColourFacts>>>>,
 }
 
 #[glib::object_subclass]
@@ -151,6 +153,38 @@ impl BaseSinkImpl for Imp {
                 (Format::Nv12Video | Format::Nv12Full, _) => "NV12",
                 (Format::Bgra, _) => "BGRA",
             });
+        }
+        // Static HDR metadata lives in the caps. Keep it for the Statistics panel and for the
+        // tone-map work that follows; absent boxes leave zeroes.
+        let mastering = gstreamer_video::VideoMasteringDisplayInfo::from_caps(caps).ok();
+        let light = gstreamer_video::VideoContentLightLevel::from_caps(caps).ok();
+        let facts = ColourFacts {
+            transfer: match color.transfer {
+                Transfer::Pq => "PQ",
+                Transfer::Hlg => "HLG",
+                Transfer::Srgb => "sRGB",
+                _ => "BT.709",
+            },
+            matrix: match color.matrix {
+                Matrix::Bt2020 => "BT.2020",
+                Matrix::Bt601 => "BT.601",
+                _ => "BT.709",
+            },
+            max_luminance: mastering.as_ref().map_or(0.0, |m| {
+                m.max_display_mastering_luminance() as f32 / 10_000.0
+            }),
+            min_luminance: mastering.as_ref().map_or(0.0, |m| {
+                m.min_display_mastering_luminance() as f32 / 10_000.0
+            }),
+            max_cll: light.as_ref().map_or(0, |l| l.max_content_light_level()),
+            max_fall: light
+                .as_ref()
+                .map_or(0, |l| l.max_frame_average_light_level()),
+        };
+        if let Ok(slot) = self.facts.lock()
+            && let Ok(mut slot) = slot.lock()
+        {
+            *slot = Some(facts);
         }
         *self
             .caps
@@ -312,6 +346,7 @@ impl DmabufSink {
         frame_id: Arc<AtomicU64>,
         format_label: Arc<Mutex<Option<&'static str>>>,
         trace: Arc<Trace>,
+        facts: Arc<std::sync::Mutex<Option<ColourFacts>>>,
     ) -> Self {
         let sink: Self = glib::Object::builder().build();
         let imp = sink.imp();
@@ -331,6 +366,9 @@ impl DmabufSink {
         *imp.trace
             .lock()
             .unwrap_or_else(|poison| poison.into_inner()) = trace;
+        *imp.facts
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner()) = facts;
         sink
     }
 }

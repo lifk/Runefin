@@ -19,6 +19,31 @@ use rune::native_surface::{ByteFrame, ColorInfo, Format, Matrix, Transfer};
 
 use crate::playback_trace::{self, Trace};
 
+/// The static colour facts of the current video stream, read from the caps. `max_luminance`
+/// and `min_luminance` are the mastering display's, in nits; the light levels are the content's.
+#[derive(Clone, Copy, Debug)]
+pub struct ColourFacts {
+    pub transfer: &'static str,
+    pub matrix: &'static str,
+    pub max_luminance: f32,
+    pub min_luminance: f32,
+    pub max_cll: u16,
+    pub max_fall: u16,
+}
+
+impl Default for ColourFacts {
+    fn default() -> Self {
+        Self {
+            transfer: "",
+            matrix: "",
+            max_luminance: 0.0,
+            min_luminance: 0.0,
+            max_cll: 0,
+            max_fall: 0,
+        }
+    }
+}
+
 pub struct Player {
     pipeline: gst::Pipeline,
     bus: gst::Bus,
@@ -47,6 +72,8 @@ pub struct Player {
     trace: Arc<Trace>,
     /// Tells the trace reporter to stop before the pipeline is torn down.
     stopped: Arc<AtomicBool>,
+    /// Static HDR facts from the caps, for the Statistics panel.
+    colour: Arc<Mutex<Option<ColourFacts>>>,
 }
 
 impl Player {
@@ -81,6 +108,7 @@ impl Player {
             dynamic: None,
             trace: Arc::new(Trace::default()),
             stopped: Arc::new(AtomicBool::new(false)),
+            colour: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -170,6 +198,7 @@ impl Player {
             dynamic: None,
             trace: Arc::new(Trace::default()),
             stopped: Arc::new(AtomicBool::new(false)),
+            colour: Arc::new(Mutex::new(None)),
         })
     }
 
@@ -232,6 +261,11 @@ impl Player {
     #[cfg(test)]
     pub fn pacing(&self) -> crate::playback_trace::TraceSnapshot {
         self.trace.snapshot()
+    }
+
+    /// The static colour facts negotiated for this stream, once the sink has seen caps.
+    pub fn colour_facts(&self) -> Option<ColourFacts> {
+        self.colour.lock().ok().and_then(|facts| *facts)
     }
 
     pub fn frames(&self) -> u64 {
@@ -523,6 +557,7 @@ fn start_pipeline(
     let dmabuf_kind = Arc::new(Mutex::new(None));
     let trace = Arc::new(Trace::default());
     let stopped = Arc::new(AtomicBool::new(false));
+    let colour: Arc<Mutex<Option<ColourFacts>>> = Arc::new(Mutex::new(None));
     let sink: gst::Element = if prefer_dmabuf {
         let caps = dmabuf_caps(&convert)
             .ok_or_else(|| "VA-API exposes no AR24 DMA-BUF modifier".to_string())?;
@@ -537,6 +572,7 @@ fn start_pipeline(
             Arc::clone(&frame_id),
             Arc::clone(&dmabuf_kind),
             Arc::clone(&trace),
+            Arc::clone(&colour),
         );
         let sink = dmabuf.upcast::<gst::Element>();
         // A late frame is dropped rather than drawn immediately: the default (-1) renders the
@@ -577,6 +613,7 @@ fn start_pipeline(
             Arc::clone(&error),
             Arc::clone(&frame_id),
             Arc::clone(&trace),
+            Arc::clone(&colour),
         );
         let bin = gst::Bin::new();
         bin.add_many([&convert, &filter, sink.upcast_ref::<gst::Element>()])
@@ -659,6 +696,7 @@ fn start_pipeline(
         dynamic,
         trace: Arc::clone(&trace),
         stopped: Arc::clone(&stopped),
+        colour: Arc::clone(&colour),
     })
 }
 
@@ -763,6 +801,7 @@ fn set_cpu_callbacks(
     error: Arc<Mutex<Option<String>>>,
     frame_id: Arc<AtomicU64>,
     trace: Arc<Trace>,
+    colour: Arc<Mutex<Option<ColourFacts>>>,
 ) {
     sink.set_callbacks(
         gstreamer_app::AppSinkCallbacks::builder()
@@ -798,6 +837,35 @@ fn set_cpu_callbacks(
                         return Err(gst::FlowError::Error);
                     };
                     uv_plane.extend_from_slice(line);
+                }
+                if let Ok(mut slot) = colour.lock()
+                    && slot.is_none()
+                {
+                    let mastering =
+                        gstreamer_video::VideoMasteringDisplayInfo::from_caps(caps).ok();
+                    let light = gstreamer_video::VideoContentLightLevel::from_caps(caps).ok();
+                    *slot = Some(ColourFacts {
+                        transfer: match info.colorimetry().transfer() {
+                            gstreamer_video::VideoTransferFunction::Smpte2084 => "PQ",
+                            gstreamer_video::VideoTransferFunction::AribStdB67 => "HLG",
+                            _ => "BT.709",
+                        },
+                        matrix: match info.colorimetry().matrix() {
+                            gstreamer_video::VideoColorMatrix::Bt2020 => "BT.2020",
+                            gstreamer_video::VideoColorMatrix::Bt601 => "BT.601",
+                            _ => "BT.709",
+                        },
+                        max_luminance: mastering.as_ref().map_or(0.0, |m| {
+                            m.max_display_mastering_luminance() as f32 / 10_000.0
+                        }),
+                        min_luminance: mastering.as_ref().map_or(0.0, |m| {
+                            m.min_display_mastering_luminance() as f32 / 10_000.0
+                        }),
+                        max_cll: light.as_ref().map_or(0, |l| l.max_content_light_level()),
+                        max_fall: light
+                            .as_ref()
+                            .map_or(0, |l| l.max_frame_average_light_level()),
+                    });
                 }
                 let colorimetry = info.colorimetry();
                 let color = ColorInfo {
