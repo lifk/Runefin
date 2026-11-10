@@ -2638,6 +2638,40 @@ mod tests {
     }
 
     #[test]
+    fn a_big_screen_home_focuses_a_card_so_space_opens_it() {
+        let env = Env {
+            system_dark: true,
+            scale: 1.5,
+        };
+        let mut state = home_state();
+        state.big_screen = true;
+        state.route = Route::Home;
+        let mut rt = Runtime::new(state, view, (1280.0, 720.0), env);
+        rt.frame(0.0);
+        let key = rt
+            .state
+            .take_focus_key()
+            .expect("home asks for its first card");
+        assert!(key.starts_with("rail-continue-watching-"), "{key}");
+        rt.update(|_, tx| tx.focus_key(key.clone()));
+        rt.frame(0.016);
+        assert_eq!(
+            rt.focused_key().as_deref(),
+            Some(key.as_str()),
+            "the focus request from poll lands on the card"
+        );
+        rt.key(KeyEvent {
+            key: Key::Text(" ".into()),
+            mods: Default::default(),
+        });
+        rt.frame(0.032);
+        assert!(
+            matches!(rt.state.route, Route::Detail { .. }),
+            "Space opens the focused card"
+        );
+    }
+
+    #[test]
     fn big_screen_asks_for_the_first_item_on_the_route() {
         let mut state = State::from_config(config::Config::fresh());
         state.big_screen = true;
