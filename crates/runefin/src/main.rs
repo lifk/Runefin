@@ -280,7 +280,11 @@ fn on_key(s: &mut State, key: &KeyEvent, tx: &mut Tx) -> bool {
     if s.in_app.is_some() {
         s.show_in_app_osd();
         match &key.key {
-            _ if s.shortcut_matches(crate::shortcuts::Action::PlayPause, key) => {
+            // A CEC remote's OK arrives as Return. With nothing focused it is the play/pause
+            // key; a focused OSD control sees it first and activates itself instead.
+            _ if s.shortcut_matches(crate::shortcuts::Action::PlayPause, key)
+                || (key.key == Key::Enter && tx.focused().is_none()) =>
+            {
                 s.toggle_in_app_pause();
                 return true;
             }
