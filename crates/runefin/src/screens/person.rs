@@ -316,6 +316,7 @@ fn error_card(error: &str, t: &tok::Theme) -> El {
                 .hover(t.hover)
                 .motion(motion::SNAPPY)
                 .focusable(true)
+                .focus_visual(2.0)
                 .press_scale(0.97)
                 .child(text("Try again").font(type_::label()).color(t.text))
                 .cursor(rune::Cursor::Pointer)
