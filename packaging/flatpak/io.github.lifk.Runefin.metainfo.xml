@@ -42,6 +42,15 @@
   </screenshots>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.1.27" date="2026-11-11">
+      <description>
+        <p>
+          In name order the library pins the first visible row's letter at the top-left, so a
+          long grid or list always says where the reader is. It sits with the back-to-top pill
+          and the Attention panel from 0.1.26.
+        </p>
+      </description>
+    </release>
     <release version="0.1.26" date="2026-11-11">
       <description>
         <p>

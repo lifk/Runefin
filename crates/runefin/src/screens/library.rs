@@ -848,6 +848,30 @@ fn library_body(s: &State, library: &LibraryState, t: &tok::Theme) -> El {
         .min_h(0.0)
         .h_full()
         .child(body);
+    if let Some(section) = current_section(library) {
+        // The current letter stays put while its group scrolls under it, so a long
+        // name-sorted grid always says where the reader is.
+        stack = stack.child(
+            el().key("library-section-layer")
+                .absolute(0.0, 0.0)
+                .w_full()
+                .h_full()
+                .items_start()
+                .pt(8.0)
+                .pl(8.0)
+                .child(
+                    el().key("library-section")
+                        .h(26.0)
+                        .min_w(26.0)
+                        .px(7.0)
+                        .radius(7.0)
+                        .center()
+                        .fill(t.bg.alpha(0.86))
+                        .outline(1.0, 0.0, t.card_border)
+                        .child(text(section).font(type_::caption()).color(t.text)),
+                ),
+        );
+    }
     if library.scroll_y() > 720.0 {
         stack = stack.child(
             el().key("library-top-layer")
@@ -1240,6 +1264,31 @@ fn library_error(message: &str, t: &tok::Theme) -> El {
         ))
 }
 
+/// The letter of the first row under the viewport, for the sticky band. Only name order has
+/// letters; every other sort would put unrelated titles under one.
+fn current_section(library: &LibraryState) -> Option<String> {
+    if library.sort != SortMode::Name || library.items.is_empty() {
+        return None;
+    }
+    let offset = library.scroll_y();
+    if offset <= 8.0 {
+        return None;
+    }
+    let (row_height, columns) = match library.view {
+        ViewMode::Grid => (GRID_ROW_H, library.columns.max(1)),
+        ViewMode::List => (LIST_ROW_H, 1),
+    };
+    let row = (offset / row_height).floor() as usize;
+    let index = (row * columns).min(library.items.len() - 1);
+    let name = &library.items[index].name;
+    Some(
+        name.chars()
+            .find(|c| c.is_alphanumeric())
+            .map(|c| c.to_uppercase().to_string())
+            .unwrap_or_else(|| "#".into()),
+    )
+}
+
 /// `123 items · 47 unwatched · 2 missing · 2 d 6 h`. The counts come from the server's own
 /// filtered totals; runtime only appears once every item is loaded, because a partial sum would
 /// be a lie.
@@ -1406,6 +1455,35 @@ mod tests {
             library_summary(&library),
             "1 item · 1 h 30 min · 2 filter(s)"
         );
+    }
+
+    #[test]
+    fn the_section_band_follows_the_first_visible_row() {
+        let mut library = LibraryState::new("m".into(), "Movies".into(), Some("movies".into()));
+        library.items = [
+            "Aurora", "Beacon", "Cascade", "Drift", "Ember", "Foxtrot", "Garden", "Harbour",
+            "Island", "Jupiter",
+        ]
+        .into_iter()
+        .map(|name| Item {
+            id: name.to_lowercase(),
+            name: name.into(),
+            kind: "Movie".into(),
+            ..Item::default()
+        })
+        .collect();
+        library.total = 10;
+        assert_eq!(library.columns, 5);
+        // At the top there is nothing to stick yet.
+        assert_eq!(current_section(&library), None);
+        library.set_scroll_y(GRID_ROW_H * 1.5);
+        assert_eq!(current_section(&library).as_deref(), Some("F"));
+        library.view = ViewMode::List;
+        library.set_scroll_y(LIST_ROW_H * 7.2);
+        assert_eq!(current_section(&library).as_deref(), Some("H"));
+        // Another sort has no letters to show.
+        library.sort = SortMode::Added;
+        assert_eq!(current_section(&library), None);
     }
 
     #[test]

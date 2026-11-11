@@ -6516,6 +6516,10 @@ mod tests {
             rt.find("library-top").is_some(),
             "the pill appears when deep"
         );
+        assert!(
+            rt.find("library-section").is_some(),
+            "the first visible name section is named"
+        );
         rt.state.toggle_library_attention();
         rt.update(|_, tx| tx.settle());
         rt.frame(0.016);

@@ -130,7 +130,8 @@ own filtered totals: `60 items · 11 unwatched · 2 missing · 4 d 23 h`, with r
 the whole page set is loaded. When the same query reports missing or unaired items, an
 **Attention** chip opens a two-row panel (Missing, Unaired) with counts; a clean library shows
 neither. Past 720 points of scroll a **↑ Top** pill returns to the first row through the same
-scroll request as reopening the library. **Filters** opens the full sheet: both facets,
+scroll request as reopening the library. In name order the first visible row's letter sticks
+to the top-left while its group scrolls under it; other sorts have no letters. **Filters** opens the full sheet: both facets,
 every sort (Name, Added, Rating, Played, Release, Runtime, Plays, Random), the direction, genre
 chips, year, minimum rating, audio/subtitle language, “has subtitles” and “4K only”. **Select**
 turns the cards into checkboxes with a bulk bar (Mark watched, Clear, Done); no card opens while
