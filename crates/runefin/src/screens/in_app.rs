@@ -301,6 +301,7 @@ fn goto_panel(s: &State, t: &tok::Theme) -> El {
                 .padding(16.0)
                 .gap(10.0)
                 .radius(12.0)
+                .focus_group()
                 .fill(t.card)
                 .outline(1.0, 0.0, t.card_border)
                 .child(text("Go to time").font(type_::section()).color(t.text))
@@ -407,6 +408,7 @@ fn quality_panel(s: &State, session: &crate::state::InAppSession, t: &tok::Theme
                 .padding(12.0)
                 .gap(4.0)
                 .radius(12.0)
+                .focus_group()
                 .fill(t.card)
                 .outline(1.0, 0.0, t.card_border)
                 .shadow(0.0, 18.0, Color::BLACK.alpha(0.5))
@@ -496,6 +498,7 @@ fn sleep_panel(s: &State, t: &tok::Theme) -> El {
                 .padding(6.0)
                 .gap(2.0)
                 .radius(10.0)
+                .focus_group()
                 .fill(t.card)
                 .outline(1.0, 0.0, t.card_border)
                 .shadow(0.0, 16.0, Color::BLACK.alpha(0.45))
@@ -1057,6 +1060,7 @@ fn audio_panel(s: &State, t: &tok::Theme) -> El {
         .padding(16.0)
         .gap(6.0)
         .radius(14.0)
+        .focus_group()
         .child(text("Audio").font(type_::section()).color(t.text));
     if s.in_app_audio_tracks.is_empty() {
         panel = panel.child(
@@ -1177,6 +1181,7 @@ fn chapter_panel(s: &State, session: &crate::state::InAppSession, t: &tok::Theme
         .padding(14.0)
         .gap(4.0)
         .radius(14.0)
+        .focus_group()
         .child(text("Chapters").font(type_::section()).color(t.text));
     for (at, chapter) in chapters.iter().take(8).enumerate() {
         let selected = at == current;
@@ -1292,6 +1297,7 @@ fn queue_panel(s: &State, t: &tok::Theme) -> El {
         .padding(14.0)
         .gap(4.0)
         .radius(14.0)
+        .focus_group()
         .child(
             row()
                 .w_full()
@@ -1424,7 +1430,8 @@ fn subtitle_tracks_panel(s: &State, t: &tok::Theme) -> El {
         .w(360.0)
         .padding(16.0)
         .gap(6.0)
-        .radius(14.0);
+        .radius(14.0)
+        .focus_group();
     panel = panel.child(
         row()
             .w_full()
@@ -1644,6 +1651,7 @@ fn subtitle_search_panel(s: &State, t: &tok::Theme) -> El {
         .padding(16.0)
         .gap(6.0)
         .radius(14.0)
+        .focus_group()
         .child(
             row()
                 .key("subtitle-search-close")
@@ -2417,8 +2425,16 @@ fn live_status(s: &State, session: &crate::state::InAppSession, t: &tok::Theme) 
 fn volume_slider(s: &State, t: &tok::Theme) -> El {
     let fraction = s.in_app_volume.clamp(0.0, 1.0) as f32;
     let width = 86.0;
-    let knob_x = (width * fraction - 5.0).clamp(0.0, width - 10.0);
-    el().key("in-app-volume-slider")
+    // A TV has no pointer to reveal the slider: the focused state is the knob itself. A wash
+    // over the whole 86×24 box read as a grey pill stuck to the bar, so big screen keeps the
+    // hover wash off and grows the knob instead.
+    let focused =
+        theme::is_big_screen() && s.focused_key.as_deref() == Some("in-app-volume-slider");
+    let knob = if focused { 14.0 } else { 10.0 };
+    let track = if focused { 5.0 } else { 4.0 };
+    let knob_x = (width * fraction - knob / 2.0).clamp(0.0, width - knob);
+    let mut slider = el()
+        .key("in-app-volume-slider")
         .role("slider")
         .label(format!("Volume {}%", (s.in_app_volume * 100.0).round()))
         .w(width)
@@ -2429,7 +2445,6 @@ fn volume_slider(s: &State, t: &tok::Theme) -> El {
         // stayed at the vertical centre, and the slider read as tilted.
         .items_center()
         .focusable(true)
-        .focus_visual(2.0)
         .hover(t.hover)
         .cursor(rune::Cursor::Grab)
         .on_drag(|s: &mut State, drag: &mut Drag, _tx| {
@@ -2442,40 +2457,70 @@ fn volume_slider(s: &State, t: &tok::Theme) -> El {
         .child(
             row()
                 .w_full()
-                .h(4.0)
-                .radius(2.0)
+                .h(track)
+                .radius(2.5)
                 .items_center()
                 .child(
                     el().w(width * fraction)
-                        .h(4.0)
-                        .radius(2.0)
+                        .h(track)
+                        .radius(2.5)
                         .fill(tok::accent(0, true)),
                 )
                 .child(
                     el().grow(1.0)
-                        .h(4.0)
-                        .radius(2.0)
+                        .h(track)
+                        .radius(2.5)
                         .fill(Color::WHITE.alpha(0.24)),
                 ),
         )
         .child(
-            el().absolute(knob_x, 7.0)
-                .w(10.0)
-                .h(10.0)
-                .radius(5.0)
+            el().absolute(knob_x, (24.0 - knob) / 2.0)
+                .w(knob)
+                .h(knob)
+                .radius(knob / 2.0)
                 .fill(Color::WHITE)
-                .shadow(0.0, 2.0, Color::BLACK.alpha(0.45)),
+                .outline(if focused { 2.0 } else { 0.0 }, 0.0, tok::accent(0, true))
+                .shadow(
+                    0.0,
+                    if focused { 6.0 } else { 2.0 },
+                    if focused {
+                        tok::accent(0, true).alpha(0.55)
+                    } else {
+                        Color::BLACK.alpha(0.45)
+                    },
+                ),
         )
-        .help("Volume")
+        .help("Volume");
+    slider = if theme::is_big_screen() {
+        slider.no_focus_ring()
+    } else {
+        slider.focus_ring(theme::focus_width(), 2.0, theme::ring())
+    };
+    slider
 }
 
 fn seek_bar(s: &State, session: &crate::state::InAppSession, progress: f32, t: &tok::Theme) -> El {
     let big = theme::is_big_screen();
     let hovering = s.in_app_hover.is_some() || big;
+    // Focus on a TV is shown by the bar itself: a taller rule and a ringed knob. A translucent
+    // wash across the whole width read as a grey band over the picture.
+    let focused = big && s.focused_key.as_deref() == Some("in-app-seek");
     // Resting, the bar is a quiet 4 pt rule. Under the pointer, or on a TV with no pointer,
     // it stays thick and keeps the knob visible.
-    let track = if big || hovering { 8.0 } else { 4.0 };
-    let knob = if big { 16.0 } else { 14.0 };
+    let track = if focused {
+        10.0
+    } else if big || hovering {
+        8.0
+    } else {
+        4.0
+    };
+    let knob = if focused {
+        20.0
+    } else if big {
+        16.0
+    } else {
+        14.0
+    };
     let knob_x = (s.in_app_seek_width * progress - knob / 2.0)
         .clamp(0.0, (s.in_app_seek_width - knob).max(0.0));
     let knob_y = 24.0 - track / 2.0 - knob / 2.0;
@@ -2484,10 +2529,14 @@ fn seek_bar(s: &State, session: &crate::state::InAppSession, progress: f32, t: &
         .w_full()
         .h(24.0)
         .focusable(true)
-        .focus_visual(12.0)
         .cursor(rune::Cursor::Grab)
-        .on_layout_tx(|s: &mut State, rect: [f32; 4], _tx: &mut rune::Tx| {
-            s.in_app_seek_width = rect[2];
+        .on_layout_tx(|s: &mut State, rect: [f32; 4], tx: &mut rune::Tx| {
+            // The knob is placed from the last measured width. Without a settle the first
+            // OSD frame drew it at zero, at the left edge.
+            if (s.in_app_seek_width - rect[2]).abs() > 0.5 {
+                s.in_app_seek_width = rect[2];
+                tx.settle();
+            }
         })
         .on_pointer_move_local(|s: &mut State, event: rune::PointerEvent, _tx| {
             s.hover_in_app_seek(event.x);
@@ -2540,7 +2589,13 @@ fn seek_bar(s: &State, session: &crate::state::InAppSession, progress: f32, t: &
                             el().grow((1.0 - progress).max(0.001))
                                 .h(track)
                                 .radius(track / 2.0)
-                                .fill(Color::WHITE.alpha(if hovering { 0.42 } else { 0.24 })),
+                                .fill(Color::WHITE.alpha(if focused {
+                                    0.62
+                                } else if hovering {
+                                    0.42
+                                } else {
+                                    0.24
+                                })),
                         ),
                 ),
         )
@@ -2551,15 +2606,22 @@ fn seek_bar(s: &State, session: &crate::state::InAppSession, progress: f32, t: &
                 .h(knob)
                 .radius(knob / 2.0)
                 .fill(Color::WHITE)
-                .shadow(0.0, 3.0, Color::BLACK.alpha(0.55))
+                .outline(if focused { 2.5 } else { 0.0 }, 0.0, tok::accent(0, true))
+                .shadow(
+                    0.0,
+                    if focused { 8.0 } else { 3.0 },
+                    if focused {
+                        tok::accent(0, true).alpha(0.55)
+                    } else {
+                        Color::BLACK.alpha(0.55)
+                    },
+                )
         }))
         .children(seek_preview(s, session, t));
-    // The TV's focused timeline gets the same neutral wash as every other control; the knob
-    // stays visible anyway, so the wash is what says "the arrows scrub this".
-    if theme::is_big_screen() {
-        bar.focus_fill(t.hover)
+    if big {
+        bar.no_focus_ring()
     } else {
-        bar
+        bar.focus_ring(theme::focus_width(), 12.0, theme::ring())
     }
 }
 
@@ -2875,6 +2937,7 @@ fn gear_panel(s: &State, t: &tok::Theme) -> El {
     let rows = row()
         .w_full()
         .flex_wrap()
+        .focus_group()
         .gap(3.0)
         .child(gear_heading("Tracks", t))
         .child(gear_row(

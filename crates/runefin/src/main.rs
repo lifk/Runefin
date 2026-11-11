@@ -351,6 +351,13 @@ fn tv_key(s: &mut State, key: &KeyEvent, tx: &mut Tx) -> bool {
                 }
                 s.note_focus(target.clone());
                 tx.focus_key(target.clone());
+                // A vertical move glides the page to the new row instead of jumping; a
+                // horizontal one only reveals the card in its rail.
+                if matches!(action, tv_input::TvAction::Up | tv_input::TvAction::Down) {
+                    tx.scroll_center(target.clone());
+                } else {
+                    tx.scroll_into_view(target.clone());
+                }
             }
             return true;
         }
@@ -713,11 +720,28 @@ fn seerr_scene(s: &mut State) {
 fn in_app_osd_scene(s: &mut State) {
     demo::signed_in(s);
     s.in_app = Some(demo::in_app());
-    s.osd_visible = true;
+    // The real launch path asks for the timeline once the chrome appears.
+    s.show_in_app_osd();
+    s.focus_first = false;
+    s.focused_key = Some("in-app-seek".into());
+    // Headless frames do not run the settle pass that measures the bar before the knob.
+    s.in_app_seek_width = 1232.0;
 }
 
 #[cfg(not(debug_assertions))]
 fn in_app_osd_scene(_s: &mut State) {}
+
+#[cfg(debug_assertions)]
+fn in_app_sound_scene(s: &mut State) {
+    demo::signed_in(s);
+    s.in_app = Some(demo::in_app());
+    s.osd_visible = true;
+    s.focus_first = false;
+    s.focused_key = Some("in-app-volume-slider".into());
+}
+
+#[cfg(not(debug_assertions))]
+fn in_app_sound_scene(_s: &mut State) {}
 
 #[cfg(debug_assertions)]
 fn in_app_mini_scene(s: &mut State) {
@@ -1135,14 +1159,25 @@ fn main() {
         rune::set_return_activates(true);
         crate::theme::set_big_screen(true);
     }
-    let size = if startup.window_width >= 900.0 && startup.window_height >= 600.0 {
+    let mut size = if startup.window_width >= 900.0 && startup.window_height >= 600.0 {
         (
             startup.window_width.min(3840.0),
             startup.window_height.min(2160.0),
         )
+    } else if big_screen_requested() {
+        // A TV is 16:9. The desk default is 16:10, which would leave small black bars above
+        // and below the picture if the compositor keeps the window rather than going fullscreen.
+        (1280.0, 720.0)
     } else {
         (1280.0, 800.0)
     };
+    if big_screen_requested()
+        && !std::env::args().any(|arg| arg == "--windowed")
+        && (size.0 / size.1 - 16.0 / 9.0).abs() > 0.04
+    {
+        // Carry the width, take a 16:9 height: a 1366×768 TV and a 1920×1080 TV both fill.
+        size.1 = size.0 * 9.0 / 16.0;
+    }
     let saved_position = startup
         .window_x
         .zip(startup.window_y)
@@ -1968,6 +2003,7 @@ fn main() {
                 s.in_app_launching = true;
             }),
             ("in-app-osd", in_app_osd_scene),
+            ("in-app-sound", in_app_sound_scene),
             ("in-app-mini", in_app_mini_scene),
             ("in-app-intro", in_app_intro_scene),
             ("in-app-gear", in_app_gear_scene),
@@ -4607,15 +4643,15 @@ mod tests {
             mods: Default::default(),
         });
         rt.frame(0.048);
-        let season = rt.focused_key().expect("the season chips");
-        assert!(season.starts_with("season-"), "{season}");
+        assert_eq!(rt.focused_key().as_deref(), Some("detail-next-up-card"));
 
         rt.key(KeyEvent {
             key: Key::Down,
             mods: Default::default(),
         });
         rt.frame(0.064);
-        assert_eq!(rt.focused_key().as_deref(), Some("detail-next-up-card"));
+        let season = rt.focused_key().expect("the season chips");
+        assert!(season.starts_with("season-"), "{season}");
 
         rt.key(KeyEvent {
             key: Key::Down,
@@ -4688,6 +4724,117 @@ mod tests {
         rt.frame(0.032);
         let result = rt.focused_key().expect("the first result group");
         assert!(result.starts_with("search-movies-"), "{result}");
+    }
+
+    #[test]
+    fn a_settings_jump_chip_moves_the_selector_into_its_section() {
+        // The big-screen entry sets this; the remote's OK arrives as Enter.
+        rune::set_return_activates(true);
+        let env = Env {
+            system_dark: true,
+            scale: 1.5,
+        };
+        let mut state = home_state();
+        state.route = Route::Settings;
+        state.big_screen = true;
+        let mut rt = Runtime::new(state, view, (1280.0, 720.0), env);
+        rt.on_key = Some(on_key);
+        rt.frame(0.0);
+        rt.update(|_, tx| tx.focus_key("settings-jump-subtitles"));
+        rt.frame(0.016);
+        assert_eq!(rt.focused_key().as_deref(), Some("settings-jump-subtitles"));
+        rt.key(KeyEvent {
+            key: Key::Enter,
+            mods: Default::default(),
+        });
+        rt.frame(0.032);
+        rt.frame(0.048);
+        assert_eq!(
+            rt.focused_key().as_deref(),
+            Some("setting-subtitle-mode"),
+            "the chip puts the selector in the section it jumps to"
+        );
+    }
+
+    #[test]
+    fn the_subtitle_panel_keeps_arrow_focus_inside_it() {
+        let env = Env {
+            system_dark: true,
+            scale: 1.5,
+        };
+        let mut state = home_state();
+        state.big_screen = true;
+        state.in_app = Some(demo::in_app());
+        state.osd_visible = true;
+        state.in_app_subtitles.open = true;
+        let mut rt = Runtime::new(state, view, (1280.0, 720.0), env);
+        rt.on_key = Some(on_key);
+        rt.frame(0.0);
+        rt.update(|_, tx| tx.focus_key("subtitle-track-off"));
+        rt.frame(0.016);
+        rt.key(KeyEvent {
+            key: Key::Down,
+            mods: Default::default(),
+        });
+        rt.frame(0.032);
+        let focused = rt.focused_key().expect("a control in the subtitle panel");
+        assert!(
+            focused.starts_with("subtitle-"),
+            "Down stayed in the panel, got {focused}"
+        );
+    }
+
+    #[test]
+    fn closing_a_player_panel_returns_focus_to_its_gear_row() {
+        let mut state = home_state();
+        state.big_screen = true;
+        state.in_app = Some(demo::in_app());
+        state.osd_visible = true;
+        state.toggle_in_app_gear();
+        assert_eq!(state.take_focus_key().as_deref(), Some("in-app-subtitles"));
+        state.toggle_in_app_subtitles_menu();
+        assert_eq!(
+            state.take_focus_key().as_deref(),
+            Some("subtitle-track-off")
+        );
+        state.close_in_app_subtitles_menu();
+        assert_eq!(
+            state.take_focus_key().as_deref(),
+            Some("in-app-subtitles"),
+            "Back from subtitles returns to the gear sheet, not the page behind"
+        );
+        state.close_player_gear();
+        assert_eq!(state.take_focus_key().as_deref(), Some("in-app-gear"));
+    }
+
+    #[test]
+    fn the_gear_sheet_keeps_arrow_focus_inside_it() {
+        let env = Env {
+            system_dark: true,
+            scale: 1.5,
+        };
+        let mut state = home_state();
+        state.big_screen = true;
+        state.in_app = Some(demo::in_app());
+        state.osd_visible = true;
+        state.in_app_gear_open = true;
+        let mut rt = Runtime::new(state, view, (1280.0, 720.0), env);
+        rt.on_key = Some(on_key);
+        rt.frame(0.0);
+        rt.update(|_, tx| tx.focus_key("in-app-subtitles"));
+        rt.frame(0.016);
+        assert_eq!(rt.focused_key().as_deref(), Some("in-app-subtitles"));
+        rt.key(KeyEvent {
+            key: Key::Down,
+            mods: Default::default(),
+        });
+        rt.frame(0.032);
+        let focused = rt.focused_key().expect("a row in the gear sheet");
+        assert!(
+            focused != "in-app-seek" && focused != "in-app-pause",
+            "Down stayed in the sheet, got {focused}"
+        );
+        assert!(rt.find(&focused).is_some(), "{focused} is drawn");
     }
 
     #[test]

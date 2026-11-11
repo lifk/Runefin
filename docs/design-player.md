@@ -158,6 +158,10 @@ exactly the difference between "a client" and "a toy". Budget real time here.
   runtime, title, overview, a ceiling countdown and Play now / Watch credits / Dismiss. The
   card wakes the OSD and takes focus from the timeline. EOS rolls to that episode unless
   dismissed, reporting the finished one first; the last episode stops as before.
+- Focus: the settings sheet and every panel are focus groups, so D-pad Up/Down and Left/Right
+  rove inside them. Back closes one level and returns to the gear row that opened it; focus never
+  falls to the page behind the picture. The focused timeline and volume show a larger ringed
+  knob instead of a wash across the frame.
 - Settings sheet: one sheet in the panel slot, grouped Tracks / Playback / Timers / Navigate /
   This device, each row showing its current value. A row that needs a list (audio, subtitles,
   quality, chapters, sleep, go-to) closes the sheet; `Esc` returns to the sheet, then to the

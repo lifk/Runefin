@@ -408,6 +408,15 @@ fn detail_zones(s: &State) -> Vec<Zone> {
             parent: Some(0),
         },
     ];
+    // Below the actions the page runs: Next up (when the server has one), the season chips,
+    // the episode controls and list, then collections, cast, extras and similar titles.
+    if detail.next_up.is_some() {
+        zones.push(Zone {
+            keys: vec!["detail-next-up-card".into()],
+            columns: 1,
+            parent: Some(0),
+        });
+    }
     if !detail.seasons.is_empty() {
         zones.push(Zone {
             keys: detail
@@ -416,13 +425,6 @@ fn detail_zones(s: &State) -> Vec<Zone> {
                 .map(|season| format!("season-{}", season.id))
                 .collect(),
             columns: 0,
-            parent: Some(0),
-        });
-    }
-    if detail.next_up.is_some() {
-        zones.push(Zone {
-            keys: vec!["detail-next-up-card".into()],
-            columns: 1,
             parent: Some(0),
         });
     }
@@ -446,6 +448,62 @@ fn detail_zones(s: &State) -> Vec<Zone> {
                 .map(|episode| format!("detail-episode-{}", episode.id))
                 .collect(),
             columns: 1,
+            parent: Some(0),
+        });
+    }
+    if !s.detail_collections.is_empty() {
+        zones.push(Zone {
+            keys: s
+                .detail_collections
+                .iter()
+                .map(|collection| format!("detail-collection-{}", collection.id))
+                .collect(),
+            columns: 0,
+            parent: Some(0),
+        });
+    }
+    if !detail.item.people.is_empty() {
+        zones.push(Zone {
+            keys: detail
+                .item
+                .people
+                .iter()
+                .take(16)
+                .map(|person| format!("detail-cast-{}", person.id))
+                .collect(),
+            columns: 0,
+            parent: Some(0),
+        });
+    }
+    if !s.detail_extras.is_empty() {
+        zones.push(Zone {
+            keys: s
+                .detail_extras
+                .iter()
+                .map(|extra| format!("detail-extra-{}", extra.id))
+                .collect(),
+            columns: 0,
+            parent: Some(0),
+        });
+    }
+    if !detail.similar.is_empty() {
+        let mut seen = std::collections::HashSet::new();
+        zones.push(Zone {
+            keys: detail
+                .similar
+                .iter()
+                .filter(|item| {
+                    seen.insert(
+                        item.series_id
+                            .as_deref()
+                            .unwrap_or(item.id.as_str())
+                            .to_string(),
+                    )
+                })
+                .take(12)
+                .map(|item| format!("similar-{}", item.series_id.as_deref().unwrap_or(&item.id)))
+                .collect(),
+            columns: 0,
             parent: Some(0),
         });
     }
@@ -742,8 +800,12 @@ fn in_app_zones(s: &State) -> Vec<Zone> {
     }
     // A live stream has no timeline: the transport is the whole OSD.
     let live = s.in_app.as_ref().is_some_and(|session| session.live);
-    let controls = Zone {
-        keys: [
+    let mut control_keys: Vec<String> = Vec::new();
+    if s.queue.len() > 1 {
+        control_keys.push("in-app-queue".into());
+    }
+    control_keys.extend(
+        [
             "in-app-pause",
             "in-app-volume-slider",
             "in-app-mute",
@@ -751,8 +813,10 @@ fn in_app_zones(s: &State) -> Vec<Zone> {
             "in-app-gear",
         ]
         .into_iter()
-        .map(String::from)
-        .collect(),
+        .map(String::from),
+    );
+    let controls = Zone {
+        keys: control_keys,
         columns: 0,
         parent: (!live).then_some(0),
     };
@@ -905,19 +969,20 @@ mod tests {
             step(&state, Some("detail-play"), TvAction::Up).as_deref(),
             Some("detail-back")
         );
-        // The season chips sit under the actions, then Next up, then the episode controls.
+        // Next up sits directly under the actions, then the season chips and the episode list.
         assert!(contains(&state, "detail-next-up-card"));
         assert!(contains(&state, "detail-play-season"));
         assert!(contains(&state, "detail-shuffle-season"));
         assert!(contains(&state, "detail-season-watched"));
-        let season = step(&state, Some("detail-play"), TvAction::Down).expect("the season chips");
+        assert_eq!(
+            step(&state, Some("detail-play"), TvAction::Down).as_deref(),
+            Some("detail-next-up-card")
+        );
+        let season =
+            step(&state, Some("detail-next-up-card"), TvAction::Down).expect("the season chips");
         assert!(season.starts_with("season-"), "{season}");
         assert_eq!(
             step(&state, Some(&season), TvAction::Down).as_deref(),
-            Some("detail-next-up-card")
-        );
-        assert_eq!(
-            step(&state, Some("detail-next-up-card"), TvAction::Down).as_deref(),
             Some("detail-play-season")
         );
         assert_eq!(
@@ -927,6 +992,33 @@ mod tests {
         let episode =
             step(&state, Some("detail-play-season"), TvAction::Down).expect("the episode list");
         assert!(episode.starts_with("detail-episode-"), "{episode}");
+    }
+
+    #[test]
+    fn a_movie_detail_reaches_its_cast_extras_and_similar_titles() {
+        let mut state = home();
+        state.route = Route::Detail {
+            id: "metropolis".into(),
+        };
+        // The movie fixture is enough for the hero; borrow the series fixture's people so the
+        // cast rail has someone to focus.
+        let mut detail = crate::demo::movie_detail();
+        detail.item.people = crate::demo::detail().item.people;
+        state.detail = Some(detail);
+        state.detail_extras = crate::demo::extras();
+        let cast = step(&state, Some("detail-play"), TvAction::Down).expect("the cast is below");
+        assert!(cast.starts_with("detail-cast-"), "{cast}");
+        // Right walks the cast rail; Down leaves it for the extras.
+        let next_cast = step(&state, Some(&cast), TvAction::Right).expect("another cast member");
+        assert!(next_cast.starts_with("detail-cast-"), "{next_cast}");
+        let extra = step(&state, Some(&cast), TvAction::Down).expect("the extras rail");
+        assert!(extra.starts_with("detail-extra-"), "{extra}");
+        let similar = step(&state, Some(&extra), TvAction::Down).expect("More like this");
+        assert!(similar.starts_with("similar-"), "{similar}");
+        assert_eq!(
+            step(&state, Some(&similar), TvAction::Up).as_deref(),
+            Some(extra.as_str())
+        );
     }
 
     #[test]

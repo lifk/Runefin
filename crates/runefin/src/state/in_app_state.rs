@@ -1565,6 +1565,9 @@ impl State {
                 });
                 self.idle.hold();
                 self.osd_visible = true;
+                // The remote has no pointer to find the bar: a fresh player starts with the
+                // timeline focused, not with the page behind the picture.
+                self.osd_focus_pending = true;
                 self.osd_hide_at = Some(Instant::now() + Duration::from_secs(3));
                 self.in_app_minimized = false;
                 if pending.rewound > 0 {

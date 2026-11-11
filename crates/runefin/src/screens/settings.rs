@@ -142,45 +142,58 @@ pub(super) fn settings_screen(s: &State) -> El {
                             "Appearance",
                             "settings-jump-appearance",
                             "settings-section-appearance",
+                            "setting-ui-mode",
                         ),
                         (
                             "Playback",
                             "settings-jump-playback",
                             "settings-section-playback",
+                            "setting-autoplay",
                         ),
                         (
                             "Subtitles",
                             "settings-jump-subtitles",
                             "settings-section-subtitles",
+                            "setting-subtitle-mode",
                         ),
                         (
                             "Keyboard",
                             "settings-jump-keyboard",
                             "settings-section-keyboard",
+                            "setting-key-play-/-pause",
                         ),
                         (
                             "Metadata",
                             "settings-jump-metadata",
                             "settings-section-metadata",
+                            "setting-omdb-key",
                         ),
-                        ("Seerr", "settings-jump-seerr", "settings-section-seerr"),
+                        (
+                            "Seerr",
+                            "settings-jump-seerr",
+                            "settings-section-seerr",
+                            "setting-seerr-url",
+                        ),
                         (
                             "Storage",
                             "settings-jump-storage",
                             "settings-section-storage",
+                            "settings-clear-images",
                         ),
                         (
                             "History",
                             "settings-jump-history",
                             "settings-section-history",
+                            "settings-history",
                         ),
                         (
                             "Account",
                             "settings-jump-account",
                             "settings-section-account",
+                            "settings-reset",
                         ),
                     ]
-                    .map(|(label, key, target)| {
+                    .map(|(label, key, target, first)| {
                         el().key(key)
                             .role("button")
                             .h(28.0)
@@ -197,7 +210,10 @@ pub(super) fn settings_screen(s: &State) -> El {
                             .child(text(label).font(type_::caption()).color(t.text_secondary))
                             .cursor(rune::Cursor::Pointer)
                             .on_press_tx(move |_s: &mut State, tx: &mut rune::Tx| {
-                                tx.scroll_key_to(target, 8.0);
+                                // The chip is both a jump and a focus move: the selector lands
+                                // on the section's first control, and the page glides there.
+                                tx.focus_key(first);
+                                tx.scroll_center(target);
                             })
                     }),
                 ),

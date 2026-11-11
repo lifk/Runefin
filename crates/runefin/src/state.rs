@@ -331,7 +331,9 @@ struct FocusLayers {
     goto: bool,
     card: bool,
     gear: bool,
+    gear_visible: bool,
     subtitles: bool,
+    subtitle_search: bool,
     audio: bool,
     chapters: bool,
     queue: bool,
@@ -3065,6 +3067,18 @@ impl State {
 
     /// The first control of a layer that just opened, so Start on a card lands inside the menu
     /// and A on a gear row lands inside the panel. Only edges return a key.
+    /// Focus a key that lives in the player chrome. When the player is gone, fall back to the
+    /// ordinary route focus so a stale key can never be requested.
+    fn in_app_focus(&mut self, key: &str) -> Option<String> {
+        if self.in_app.is_some() && self.osd_visible {
+            self.focus_first = false;
+            Some(key.into())
+        } else {
+            self.focus_first = true;
+            None
+        }
+    }
+
     fn layer_focus_key(&mut self) -> Option<String> {
         let card = self.card_menu.is_some();
         if card != self.focus_layers.card {
@@ -3083,7 +3097,25 @@ impl State {
             if gear {
                 return Some("in-app-subtitles".into());
             }
-            self.focus_first = true;
+            // A panel replaced the sheet: its own branch below takes the focus. Only a plain
+            // close returns to the gear button.
+            if !self.player_panel_open()
+                && let Some(key) = self.in_app_focus("in-app-gear")
+            {
+                return Some(key);
+            }
+        }
+        // The sheet can also disappear without `gear` changing: a panel opened from it keeps
+        // `gear_returns` set, and dismissing both makes it vanish. Hand focus back to the OSD.
+        let gear_visible = self.player_gear_visible();
+        if gear_visible != self.focus_layers.gear_visible {
+            self.focus_layers.gear_visible = gear_visible;
+            if !gear_visible
+                && !self.player_panel_open()
+                && let Some(key) = self.in_app_focus("in-app-gear")
+            {
+                return Some(key);
+            }
         }
         let subtitles = self.in_app_subtitles.open;
         if subtitles != self.focus_layers.subtitles {
@@ -3091,7 +3123,20 @@ impl State {
             if subtitles {
                 return Some("subtitle-track-off".into());
             }
-            self.focus_first = true;
+            let back = if self.player_gear_visible() {
+                "in-app-subtitles"
+            } else {
+                "in-app-gear"
+            };
+            return self.in_app_focus(back);
+        }
+        let search = self.in_app_subtitle_search.open;
+        if search != self.focus_layers.subtitle_search {
+            self.focus_layers.subtitle_search = search;
+            if search {
+                return Some("subtitle-search-close".into());
+            }
+            return self.in_app_focus("subtitle-search-open");
         }
         let audio = self.in_app_audio_open;
         if audio != self.focus_layers.audio {
@@ -3102,7 +3147,7 @@ impl State {
                     .first()
                     .map(|track| format!("audio-track-{}", track.ordinal));
             }
-            self.focus_first = true;
+            return self.in_app_focus("in-app-audio");
         }
         let chapters = self.in_app_chapters_open;
         if chapters != self.focus_layers.chapters {
@@ -3110,7 +3155,7 @@ impl State {
             if chapters {
                 return Some("in-app-chapter-0".into());
             }
-            self.focus_first = true;
+            return self.in_app_focus("in-app-chapters");
         }
         let shortcuts = self.shortcuts_open;
         if shortcuts != self.focus_layers.shortcuts {
@@ -3206,7 +3251,7 @@ impl State {
             if quality {
                 return Some("quality-auto".into());
             }
-            self.focus_first = true;
+            return self.in_app_focus("in-app-quality");
         }
         let sleep = self.in_app_sleep_open;
         if sleep != self.focus_layers.sleep {
@@ -3214,7 +3259,7 @@ impl State {
             if sleep {
                 return Some("sleep-off".into());
             }
-            self.focus_first = true;
+            return self.in_app_focus("in-app-sleep");
         }
         let goto = self.in_app_goto_open;
         if goto != self.focus_layers.goto {
@@ -3222,7 +3267,7 @@ impl State {
             if goto {
                 return Some("in-app-goto-input".into());
             }
-            self.focus_first = true;
+            return self.in_app_focus("in-app-goto");
         }
         let queue = self.in_app_queue_open;
         if queue != self.focus_layers.queue {
@@ -3230,7 +3275,7 @@ impl State {
             if queue {
                 return Some("in-app-queue-0".into());
             }
-            self.focus_first = true;
+            return self.in_app_focus("in-app-queue");
         }
         None
     }

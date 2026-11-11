@@ -162,6 +162,14 @@ folder tree.
 say why the rail contains it (“Why this?”). Hidden ids are local config, never a server write;
 Undo puts the card back.
 
+**TV focus.** The router's zones cover the whole page, not just the first row: a detail page
+adds collections, cast, extras and *More like this* below the episode list, and the player's gear
+sheet and each panel are focus groups so a remote can enter them. Back from a panel returns to
+the gear row that opened it, never to the page behind the picture. A vertical move glides the
+page to the new row instead of jumping, and a settings index chip moves the selector into the
+section it jumps to. On the timeline and the volume slider, focus is shown by the knob (larger,
+ringed, glowing) rather than a translucent band across the picture.
+
 **Player extras.** `,` / `.` step one frame and pause. The OSD marks an A–B loop as a coloured
 range and seeks back to A at B. **Go to** accepts `mm:ss` or `h:mm:ss`, clamps to the duration and
 keeps the same seek path as the timeline.

@@ -45,8 +45,13 @@ web wrapper and does not embed a second render stack.
 - **Two interface modes**: Desktop (default) and **Big screen**, chosen in Settings → Interface,
   by `--big-screen`, or by `RUNEFIN_UI=big` for one launch; the file's `ui_mode` is the default.
   Big screen keeps the 1280×720 design height (1.5× at 1080p, 3× at 4K), a 64 pt safe gutter,
-  fullscreen on launch and initial focus on each screen's first item. A mode change takes effect
-  at restart and the Settings row says so.
+  fullscreen on launch and initial focus on each screen's first item. It launches at 16:9 even
+  when the desk window was 1280×800, so a compositor that keeps the window cannot letterbox the
+  picture. A mode change takes effect at restart and the Settings row says so.
+- **Remote reach**: on a big screen the zones cover the whole page — a detail's collections,
+  cast, extras and *More like this* below the episode list; the player's gear sheet and each
+  panel. Back from a player panel returns to the gear row that opened it. Settings index chips
+  put the selector in the section they jump to, and vertical moves glide the page.
 - **Controller navigation** in both modes: D-pad/left stick moves, A activates, B goes back,
   LB/RB change focus group, Start opens the focused card's menu or the player's gear. The pad is
   read natively through `gilrs`; `RUNEFIN_GAMEPAD=0` disables it.
@@ -102,6 +107,7 @@ web wrapper and does not embed a second render stack.
   one click applies that filter (also in the Filters sheet).
 - **↑ Top** pill past 720 points of scroll, and a sticky letter band that names the first
   visible row while a name-sorted grid or list scrolls.
+- On a TV, moving between sections glides the page to the new row instead of jumping.
 - Grid/list toggle; card shows poster, watched badge and resume progress, capability badges
   (4K/HDR/CC/5.1/Atmos/VERS/NEW) and an `EXTRA` badge when the item has special features
   (`SpecialFeatureCount`).
@@ -449,7 +455,7 @@ keys the player already uses.
 ```sh
 cargo test -p jellyfin-api        # 45 API tests, no network
 cargo test -p seerr-api           # 25 Seerr API tests, no network
-cargo test -p runefin             # 358 app tests (22 ignored), headless
+cargo test -p runefin             # 363 app tests (22 ignored), headless
 scripts/check.sh                  # fmt, clippy, all three suites, release build
 scripts/snapshots.sh              # the committed views, in place
 JELLYFIN_URL=... JELLYFIN_USER_ID=... JELLYFIN_TOKEN=... \
