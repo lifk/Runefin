@@ -4389,6 +4389,63 @@ mod tests {
     }
 
     #[test]
+    fn the_big_screen_detail_reaches_start_over_and_the_season_actions() {
+        let env = Env {
+            system_dark: true,
+            scale: 1.5,
+        };
+        let mut state = home_state();
+        state.big_screen = true;
+        state.route = Route::Detail {
+            id: "quiet-floor".into(),
+        };
+        state.detail = Some(demo::detail());
+        let mut rt = Runtime::new(state, view, (1280.0, 720.0), env);
+        rt.on_key = Some(on_key);
+        rt.frame(0.0);
+        let key = rt
+            .state
+            .take_focus_key()
+            .expect("the detail page asks for its primary action");
+        assert_eq!(key, "detail-play");
+        rt.update(|_, tx| tx.focus_key(key));
+        rt.frame(0.016);
+
+        rt.key(KeyEvent {
+            key: Key::Right,
+            mods: Default::default(),
+        });
+        rt.frame(0.032);
+        assert_eq!(
+            rt.focused_key().as_deref(),
+            Some("detail-restart"),
+            "Right reaches Start over"
+        );
+
+        rt.key(KeyEvent {
+            key: Key::Down,
+            mods: Default::default(),
+        });
+        rt.frame(0.048);
+        let season = rt.focused_key().expect("the season chips");
+        assert!(season.starts_with("season-"), "{season}");
+
+        rt.key(KeyEvent {
+            key: Key::Down,
+            mods: Default::default(),
+        });
+        rt.frame(0.064);
+        assert_eq!(rt.focused_key().as_deref(), Some("detail-next-up-card"));
+
+        rt.key(KeyEvent {
+            key: Key::Down,
+            mods: Default::default(),
+        });
+        rt.frame(0.080);
+        assert_eq!(rt.focused_key().as_deref(), Some("detail-play-season"));
+    }
+
+    #[test]
     fn the_search_field_leaves_down_for_its_results() {
         let env = Env {
             system_dark: true,
