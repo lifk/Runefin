@@ -1902,6 +1902,7 @@ fn resume_card(item: &Item, s: &State, t: &tok::Theme, highlight: bool) -> El {
         .hover_group()
         .focusable(true)
         .focus_visual(4.0)
+        .focus_scale(1.04)
         .press_scale(0.985)
         .motion(motion::SNAPPY)
         .cursor(rune::Cursor::Pointer)
@@ -2766,42 +2767,41 @@ pub(super) fn card(item: &Item, rail: &str, s: &State, t: &tok::Theme) -> El {
     }
     let title = item.series_name.as_deref().unwrap_or(&item.name);
     let focus_key = format!("{rail}-{key_id}");
-    theme::tv_focus(
-        col()
-            .key(focus_key.clone())
-            .role("button")
-            .w(CARD_W)
-            .gap(6.0)
-            .hover_group()
-            .focusable(true)
-            .focus_visual(4.0)
-            .press_scale(0.985)
-            .motion(motion::SNAPPY)
-            .label(title.to_string())
-            .cursor(rune::Cursor::Pointer)
-            .on_press(move |s: &mut State| s.open_detail(press_id.clone()))
-            .on_secondary_press({
-                let item = item.clone();
-                let focus_key = focus_key.clone();
-                move |s: &mut State, press: rune::PointerPress, _tx: &mut rune::Tx| {
-                    s.open_card_menu_at(item.clone(), press.x, press.y, Some(focus_key.clone()));
-                }
-            })
-            .child(poster_box)
-            .child(
-                text(title.to_string())
-                    .font(type_::card_title())
-                    .color(t.text)
-                    .max_lines(2)
-                    .truncate(),
-            )
-            .child(
-                text(crate::home::subtitle(item))
-                    .font(type_::meta())
-                    .color(t.text_secondary)
-                    .truncate(),
-            ),
-    )
+    col()
+        .key(focus_key.clone())
+        .role("button")
+        .w(CARD_W)
+        .gap(6.0)
+        .radius(10.0)
+        .hover_group()
+        .focusable(true)
+        .focus_visual(4.0)
+        .press_scale(0.985)
+        .motion(motion::SNAPPY)
+        .label(title.to_string())
+        .cursor(rune::Cursor::Pointer)
+        .on_press(move |s: &mut State| s.open_detail(press_id.clone()))
+        .on_secondary_press({
+            let item = item.clone();
+            let focus_key = focus_key.clone();
+            move |s: &mut State, press: rune::PointerPress, _tx: &mut rune::Tx| {
+                s.open_card_menu_at(item.clone(), press.x, press.y, Some(focus_key.clone()));
+            }
+        })
+        .child(poster_box)
+        .child(
+            text(title.to_string())
+                .font(type_::card_title())
+                .color(t.text)
+                .max_lines(2)
+                .truncate(),
+        )
+        .child(
+            text(crate::home::subtitle(item))
+                .font(type_::meta())
+                .color(t.text_secondary)
+                .truncate(),
+        )
 }
 
 /// A poster's blurred wash under its full image. The wash stays put while the full image fades

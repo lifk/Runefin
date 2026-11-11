@@ -15,7 +15,7 @@ they contain the real session's ids and artwork.
 | `in-app-osd.png` | `in-app-osd` | 1280×800 at 2× | the player chrome and timeline |
 | `home-big.png` | `home` | 1920×1080 at 1.5× | the 10-foot home; linked from the README |
 | `library-big.png` | `library` | 1920×1080 at 1.5× | the 10-foot library; linked from AppStream |
-| `focus-card-big.png` | `home` | 1920×1080 at 1.5× | a card's hover-wash focus (no ring) |
+| `focus-card-big.png` | `home` | 1920×1080 at 1.5× | a focused card's 6 % lift (no ring) |
 | `focus-sidebar-big.png` | `home` | 1920×1080 at 1.5× | focus on the selected sidebar entry |
 
 These ten are the screens a change is most likely to touch, plus the two frames the README and

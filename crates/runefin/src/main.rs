@@ -259,15 +259,16 @@ fn tv_key(s: &mut State, key: &KeyEvent, tx: &mut Tx) -> bool {
         return false;
     };
     let focused = tx.focused().map(str::to_owned);
-    // A focused volume slider spends Left/Right on the level.
+    // A focused volume slider spends Up/Down on the level, so Left/Right stay free to move to
+    // the next control; otherwise the row had no way past the slider to the gear.
     if s.in_app.is_some() && s.osd_visible && focused.as_deref() == Some("in-app-volume-slider") {
         match action {
-            tv_input::TvAction::Left => {
-                s.adjust_in_app_volume(-0.05);
+            tv_input::TvAction::Up => {
+                s.adjust_in_app_volume(0.05);
                 return true;
             }
-            tv_input::TvAction::Right => {
-                s.adjust_in_app_volume(0.05);
+            tv_input::TvAction::Down => {
+                s.adjust_in_app_volume(-0.05);
                 return true;
             }
             _ => {}
@@ -4386,6 +4387,43 @@ mod tests {
                 .is_some_and(|key| key.starts_with("rail-continue-watching-")),
             "Up returns to the rail above"
         );
+    }
+
+    #[test]
+    fn the_player_volume_slider_leaves_right_for_the_gear() {
+        let env = Env {
+            system_dark: true,
+            scale: 1.5,
+        };
+        let mut state = home_state();
+        state.big_screen = true;
+        state.in_app = Some(demo::in_app());
+        state.osd_visible = true;
+        let mut rt = Runtime::new(state, view, (1280.0, 720.0), env);
+        rt.on_key = Some(on_key);
+        rt.frame(0.0);
+        rt.update(|_, tx| tx.focus_key("in-app-volume-slider"));
+        rt.frame(0.016);
+
+        rt.key(KeyEvent {
+            key: Key::Up,
+            mods: Default::default(),
+        });
+        rt.frame(0.032);
+        assert_eq!(
+            rt.focused_key().as_deref(),
+            Some("in-app-volume-slider"),
+            "Up adjusts the level and keeps the slider focused"
+        );
+
+        for expected in ["in-app-mute", "in-app-fullscreen", "in-app-gear"] {
+            rt.key(KeyEvent {
+                key: Key::Right,
+                mods: Default::default(),
+            });
+            rt.frame(0.048);
+            assert_eq!(rt.focused_key().as_deref(), Some(expected));
+        }
     }
 
     #[test]

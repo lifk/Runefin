@@ -169,6 +169,10 @@ pub fn ring() -> Color {
 /// selection box, not as focus.
 pub trait FocusVisual {
     fn focus_visual(self, radius: f32) -> El;
+    /// A lifted card shows focus by its scale alone; desktop keeps its ring.
+    fn focus_lift_only(self, radius: f32) -> El;
+    /// The focus lift itself, big screen only.
+    fn focus_grow(self, scale: f32) -> El;
 }
 
 impl FocusVisual for El {
@@ -178,6 +182,22 @@ impl FocusVisual for El {
             self.focus_fill(colors().hover).no_focus_ring()
         } else {
             self.focus_ring(focus_width(), radius, ring())
+        }
+    }
+
+    fn focus_lift_only(self, radius: f32) -> El {
+        if is_big_screen() {
+            self.no_focus_ring()
+        } else {
+            self.focus_ring(focus_width(), radius, ring())
+        }
+    }
+
+    fn focus_grow(self, scale: f32) -> El {
+        if is_big_screen() {
+            self.focus_scale(scale)
+        } else {
+            self
         }
     }
 }

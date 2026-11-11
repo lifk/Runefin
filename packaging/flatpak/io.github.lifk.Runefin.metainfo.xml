@@ -42,6 +42,15 @@
   </screenshots>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.1.17" date="2026-11-11">
+      <description>
+        <p>
+          A focused card now lifts 6% instead of showing a box, the player's volume slider
+          moves on with Left/Right so the gear is reachable, and the Detail page's action,
+          Next up and season controls are all focus targets.
+        </p>
+      </description>
+    </release>
     <release version="0.1.16" date="2026-11-11">
       <description>
         <p>

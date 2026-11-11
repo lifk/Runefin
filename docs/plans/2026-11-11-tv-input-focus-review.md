@@ -58,7 +58,7 @@ Navigation rules:
    card.
 5. Right from the sidebar enters the current section's first content zone.
 6. The player OSD is its own screen of zones (timeline, transport, bottom bar); a focused control
-   decides what Left/Right means (the timeline scrubs, the volume slider adjusts).
+   decides what Up/Down means (the timeline scrubs; the volume slider adjusts).
 7. Modals trap all of it; Back closes them first.
 
 The router is attached to the root element's `on_key`, which Rune runs before its focus-group
@@ -82,6 +82,7 @@ keys — so Search passes Down out of the field in its own `on_input_key`.
 | Player, OSD hidden | Left/Right seek 10 s; Up/Down volume | play/pause | stop | — | open gear |
 | Player, OSD shown | move between OSD zones; focused control decides Left/Right | activate the focused control; on the timeline, play/pause | close OSD | switch zone | gear |
 | Player, timeline focused | Left/Right scrub with the trickplay preview and a time bubble | commit the scrub (or pause if not scrubbing) | close OSD | — | — |
+| Player, volume focused | Up/Down adjust the level; Left/Right move to the next control | — | close OSD | — | — |
 
 The CEC mapping needs one change: OK arrives as Return, which the player did not bind. The router
 handles Return as OK; Space stays as a second activation key for the pad.
@@ -90,10 +91,11 @@ handles Return as OK; Space stays as a second activation key for the pad.
 
 One system for both modes:
 
-- **Big screen: the hover wash, no ring.** A focused control gets exactly the pointer's `t.hover`
-  fill and suppresses Rune's default ring (`no_focus_ring`). A ring around a card, a sidebar row
-  or a detail button read as a selection box, not as focus. Desktop keeps its accent
-  `focus_ring`; `theme::FocusVisual` picks the treatment.
+- **Big screen: a lift or the hover wash, no ring.** A focused card grows 6 % from its top-left so a rail edge never clips it
+  (`El::focus_scale`); other controls get the pointer's `t.hover` fill. Both suppress Rune's
+  default ring (`no_focus_ring`). A ring around a card, a sidebar row or a detail button read as
+  a selection box, not as focus. Desktop keeps its accent `focus_ring`; `theme::FocusVisual`
+  picks the treatment.
 - **Fill**: `t.hover`, exactly the desktop hover token, at the element's own radius.
 - **Selected ≠ focused**: the sidebar's current destination keeps its accent pill; focus adds the
   neutral wash inside it.
@@ -151,11 +153,11 @@ absorbed by S1 anyway.
   switch lanes, Left at a zone's start returns to the sidebar, edges clamp, nothing wraps. The
   window's `on_key` runs the router before Rune and consumes the direction when it owns the
   screen.
-- OSD: Down from the timeline reaches the controls, the volume slider spends Left/Right on the
-  level, Return on the timeline is play/pause, and a remote seek shows the trickplay preview at
-  the new position while the chrome is up.
-- Focus visuals: neutral `t.hover` wash plus a 2 pt neutral ring; the 4 pt solid blue and the
-  accent highlight wash are gone.
+- OSD: Down from the timeline reaches the controls, the volume slider spends Up/Down on the
+  level (Left/Right move on to the next control), Return on the timeline is play/pause, and a
+  remote seek shows the trickplay preview at the new position while the chrome is up.
+- Focus visuals: neutral `t.hover` wash; the 4 pt solid blue and the accent highlight wash are
+  gone (the 2 pt ring this first pass kept was removed in the sixth).
 - `--windowed`: same layout, zones and keys in a normal window, for laptop iteration.
 
 Second pass (later the same day): zones for Search (the field plus each result group), Person
@@ -168,6 +170,14 @@ rows) join the sidebar in the router. A focused panel, menu or scrollbar is left
 router only moves when the focused key belongs to one of its zones, so the card menu, the gear
 sheet and the subtitle panel keep their own directions.
 
+Fourth pass: Seerr's detail page (Back, the action row, the season picker, the cast rail). The
+zones mirror what the page actually draws: only rendered actions take focus (no request button
+while a season is still unchosen, or once Seerr owns the title), seasons skip specials and empty
+ones, and only the first twelve named cast members are reachable. Moving down from a vertical
+list into a rail now starts at the rail's first item instead of carrying the row number across as
+a column. The router also claims Search, Person, Seerr, Live TV, Remote and the Seerr detail page
+at their edges, not only when a move succeeded, so Rune's group rules cannot take over there.
+
 Fifth pass: the router had only ever run on the window's `on_key`, which Rune calls *after* its
 own focus navigation once a control is focused; the arrow keys were still wrapping the rail. It
 now hangs off the root element's `on_key`, so it sees directions first. The first runtime tests
@@ -179,22 +189,15 @@ timeline zone because it has no bar. Two big-screen focus shots (`focus-card-big
 `focus-sidebar-big`) join the committed set; focus is runtime state, so they render past the first
 poll and the sidebar one walks there with a script.
 
-Still open: a hardware pass over the zones now that the router actually receives the keys, and a
-decision on whether Settings text fields should let Up/Down leave them (today they keep every
-arrow, as Rune does for inputs).
-
-Sixth pass: big-screen focus is the pointer's `t.hover` wash with no ring at all (Rune's default
-ring is suppressed too), because the 2 pt outline still read as a selection box around cards,
-sidebar rows and buttons; desktop keeps its accent ring. The Detail zones now mirror the whole
-page: every action that is drawn (play options, Start over from the item the primary opens, theme
+Sixth pass: big-screen focus is a 6 % card lift plus, for buttons and rows, the pointer's
+`t.hover` wash, with no ring at all (Rune's default ring is suppressed too), because the 2 pt
+outline still read as a selection box around cards, sidebar rows and buttons; desktop keeps its
+accent ring. The lift is a small Rune addition, `El::focus_scale`, pinned with the fork rev.
+The Detail zones now mirror the whole page: every action that is drawn (play options, Start over from the item the primary opens, theme
 audio/video, trailer, Seerr request, collection Play all/Shuffle, favourite, watched, playlist),
 the Next up card, the season chips, and the episode header's Play season / Shuffle / Season
 watched controls. That is what made Start over, Play next, Play season and Shuffle unreachable.
 
-Fourth pass: Seerr's detail page (Back, the action row, the season picker, the cast rail). The
-zones mirror what the page actually draws: only rendered actions take focus (no request button
-while a season is still unchosen, or once Seerr owns the title), seasons skip specials and empty
-ones, and only the first twelve named cast members are reachable. Moving down from a vertical
-list into a rail now starts at the rail's first item instead of carrying the row number across as
-a column. The router also claims Search, Person, Seerr, Live TV, Remote and the Seerr detail page
-at their edges, not only when a move succeeded, so Rune's group rules cannot take over there.
+Still open: a hardware pass over the zones now that the router actually receives the keys, and a
+decision on whether Settings text fields should let Up/Down leave them (today they keep every
+arrow, as Rune does for inputs).
