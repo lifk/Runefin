@@ -201,6 +201,12 @@ audio/video, trailer, Seerr request, collection Play all/Shuffle, favourite, wat
 the Next up card, the season chips, and the episode header's Play season / Shuffle / Season
 watched controls. That is what made Start over, Play next, Play season and Shuffle unreachable.
 
+Seventh pass: the card halo was a child of the card, so the rail's horizontal scroll viewport
+clipped it at the poster's top, bottom and left. A focused card now reports its drawn rect
+(`on_drawn_layout`), and the window paints a smaller four-sided blurred frame at the root, after
+the screen: outside the clip, with a clear centre so the artwork is not washed. Focus changes clear
+the rect, so a panel or non-card focus has no halo.
+
 Still open: a hardware pass over the zones now that the router actually receives the keys, and a
 decision on whether Settings text fields should let Up/Down leave them (today they keep every
 arrow, as Rune does for inputs).

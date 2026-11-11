@@ -373,7 +373,8 @@ both.
 
 **Controller.** A gamepad is a first-class input in both modes; Big Screen is the mode where it
 is the only one. A focused card takes its pointer-hover treatment — the rounded white poster
-outline, the play/remove affordance and a soft halo — with no scale, no fill and no ring; other
+outline, the play/remove affordance and a soft halo — with no scale, no fill and no ring; the
+halo is painted at the window root, outside any rail scroll clip, so all four sides survive. Other
 controls take the pointer's `t.hover` wash. Focus reads like hover rather than a selection box. Return activation comes from `set_return_activates`, so a CEC
 remote's Select/OK reaches the same control. Desktop keeps its accent ring. The light theme uses a light text
 halo over artwork, and the selected nav pill uses dark text on the blue fill. D-pad and the left
