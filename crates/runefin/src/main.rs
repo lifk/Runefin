@@ -4359,6 +4359,45 @@ mod tests {
     }
 
     #[test]
+    fn a_tall_sidebar_keeps_every_library_and_pins_settings() {
+        let env = Env {
+            system_dark: true,
+            scale: 1.5,
+        };
+        let mut state = home_state();
+        state.big_screen = true;
+        let base = state
+            .home_data
+            .libraries
+            .first()
+            .cloned()
+            .expect("the demo server has a library");
+        for index in 0..12 {
+            let mut library = base.clone();
+            library.id = format!("extra-{index}");
+            library.name = format!("Extra {index}");
+            state.home_data.libraries.push(library);
+        }
+        let mut rt = Runtime::new(state, view, (1280.0, 720.0), env);
+        rt.frame(0.0);
+        for index in 0..12 {
+            assert!(
+                rt.find(&format!("library-extra-{index}")).is_some(),
+                "library {index} is in the sidebar, not dropped by a cap"
+            );
+        }
+        assert!(rt.find("sidebar-nav-scroll").is_some());
+        assert!(
+            rt.find("nav-settings").is_some(),
+            "Settings stays pinned below the scroll"
+        );
+        assert!(
+            rt.find("server-name").is_none(),
+            "the server name is no longer repeated under the wordmark"
+        );
+    }
+
+    #[test]
     fn the_tv_router_owns_directions_before_runes_group_navigation() {
         let env = Env {
             system_dark: true,

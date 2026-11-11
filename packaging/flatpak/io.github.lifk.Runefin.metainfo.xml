@@ -42,6 +42,15 @@
   </screenshots>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.1.22" date="2026-11-11">
+      <description>
+        <p>
+          The sidebar shows every library and playlist in one scroll with no eight-item cap;
+          Search, Remote and Controls share that scroll, and Settings is pinned below it. The
+          server name is no longer repeated under the wordmark.
+        </p>
+      </description>
+    </release>
     <release version="0.1.21" date="2026-11-11">
       <description>
         <p>

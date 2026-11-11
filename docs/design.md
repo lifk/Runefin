@@ -96,17 +96,19 @@ API** — the current endpoints are `/UserViews?userId=`, `/Items?userId=`, `/Us
 Adapted from `research/02-media-ux-patterns.md`; that file holds the requirement table (R1-R12).
 
 **Shell.** Collapsible sidebar: Home, one entry per library (server order, pinned first), Live TV,
-Playlists, **Discover** (only when the optional Seerr companion is configured), then Search, Remote
-and Settings. The header carries the wordmark from `Assets/Logo_with_name.png` (the mark alone when
-collapsed), decoded once through the existing `image` crate. A library's icon comes from its
-collection type — film, TV, layers, antenna, list,
-record — not one folder for every entry; Watchlist keeps the heart and Discover the compass. Below
-it a status strip: server name + connection state, and the active play session when one exists.
-Content area owns its own scroll.
+Watchlist, Playlists, **Discover** (only when the optional Seerr companion is configured), then
+Search, Remote and Controls. **Settings is pinned below the scroll.** Every library, playlist and
+tool row shares one scroll viewport with no count cap: a server with many libraries scrolls rather
+than dropping entries, and the pinned Settings row keeps the way out in reach. The header carries
+the wordmark from `Assets/Logo_with_name.png` (the mark alone when collapsed), decoded once through
+the existing `image` crate. The server name is not repeated under it; it lives in Settings. A
+library's icon comes from its collection type — film, TV, layers, antenna, list, record — not one
+folder for every entry; Watchlist keeps the heart and Discover the compass. Content area owns its
+own scroll.
 
 **Home.** The page heading *is* the Continue Watching rail's heading: the rail carries no second
-title, and its **See all** sits at the header's right. The server name lives in the sidebar, not
-in a chip on the page. A 360 pt card-to-transparent band lights the top of the page, so the
+title, and its **See all** sits at the header's right. The server name lives in Settings, not
+in a chip on the page or under the wordmark. A 360 pt card-to-transparent band lights the top of the page, so the
 header has depth and the rails sit on the page's own black — no artwork needed for it. Fixed order: Continue Watching (merged) → Next Up (the server's
 one-episode-per-series answer) → **one Recently Added rail for every video library** → Recently
 Played → Collections. There is no rail cap: a server with many libraries gets many rails and Home

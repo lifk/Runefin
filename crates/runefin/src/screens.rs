@@ -976,10 +976,6 @@ fn home(s: &State) -> El {
 }
 
 pub(super) fn sidebar(s: &State, t: &tok::Theme) -> El {
-    let server = match &s.step {
-        Step::Ready { server_name } => server_name.clone(),
-        _ => "your server".to_string(),
-    };
     let collapsed = s.sidebar_collapsed;
     let width = if collapsed { 88.0 } else { theme::SIDEBAR_W };
     let brand = if collapsed {
@@ -1073,15 +1069,6 @@ pub(super) fn sidebar(s: &State, t: &tok::Theme) -> El {
         .gradient(t.card, t.bg)
         .focus_group()
         .child(header);
-    if !collapsed {
-        list = list.child(
-            text(server)
-                .key("server-name")
-                .font(type_::mono_caption())
-                .color(t.text_secondary)
-                .mb(10.0),
-        );
-    }
     let mut nav = col()
         .key("sidebar-nav")
         .w_full()
@@ -1112,7 +1099,7 @@ pub(super) fn sidebar(s: &State, t: &tok::Theme) -> El {
                     .mb(2.0),
             );
         }
-        for library in s.home_data.libraries.iter().take(8) {
+        for library in s.home_data.libraries.iter() {
             let is_live = library.collection_type.as_deref() == Some("livetv");
             let selected = if is_live {
                 matches!(s.route, Route::LiveTv)
@@ -1179,7 +1166,7 @@ pub(super) fn sidebar(s: &State, t: &tok::Theme) -> El {
                     .mb(2.0),
             );
         }
-        for playlist in s.playlists.iter().take(8) {
+        for playlist in s.playlists.iter() {
             let id = playlist.id.clone();
             let name = playlist.name.clone();
             nav = nav.child(
@@ -1209,19 +1196,8 @@ pub(super) fn sidebar(s: &State, t: &tok::Theme) -> El {
         nav = nav.child(item);
     }
 
-    list = list.child(
-        el().key("sidebar-nav-scroll")
-            .w_full()
-            .grow(1.0)
-            .min_h(0.0)
-            .scroll(ScrollSpec {
-                stick_bottom: false,
-            })
-            .scroll_edge_fade(16.0)
-            .child(nav),
-    );
     if !collapsed {
-        list = list.child(
+        nav = nav.child(
             text("TOOLS")
                 .key("tools-label")
                 .font(type_::section())
@@ -1230,7 +1206,7 @@ pub(super) fn sidebar(s: &State, t: &tok::Theme) -> El {
                 .mb(2.0),
         );
     }
-    list = list
+    nav = nav
         .child(
             nav_item(
                 "Search",
@@ -1263,7 +1239,28 @@ pub(super) fn sidebar(s: &State, t: &tok::Theme) -> El {
                 collapsed,
             )
             .on_press(|s: &mut State| s.toggle_shortcuts())
-        }))
+        }));
+
+    list = list.child(
+        el().key("sidebar-nav-scroll")
+            .w_full()
+            .grow(1.0)
+            .min_h(0.0)
+            .scroll(ScrollSpec {
+                stick_bottom: false,
+            })
+            .scroll_edge_fade(16.0)
+            .child(nav),
+    );
+    list = list
+        .child(
+            el().key("sidebar-footer-separator")
+                .w_full()
+                .h(1.0)
+                .mt(6.0)
+                .mb(4.0)
+                .fill(t.separator),
+        )
         .child(
             nav_item(
                 "Settings",
