@@ -823,11 +823,14 @@ fn person_zones(s: &State) -> Vec<Zone> {
     let Some(person) = &s.person else {
         return Vec::new();
     };
-    let mut zones = vec![Zone {
-        keys: vec!["person-back".into()],
-        columns: 1,
-        parent: None,
-    }];
+    let mut zones = vec![
+        sidebar(s),
+        Zone {
+            keys: vec!["person-back".into()],
+            columns: 1,
+            parent: Some(0),
+        },
+    ];
     let known: Vec<String> = person
         .items
         .iter()
@@ -862,52 +865,145 @@ fn person_zones(s: &State) -> Vec<Zone> {
 }
 
 fn seerr_zones(s: &State) -> Vec<Zone> {
-    let mut zones = vec![Zone {
-        keys: vec!["seerr-tab-discover".into(), "seerr-tab-requests".into()],
+    use crate::state::{DiscoverKind, DiscoverMode, SeerrTab};
+
+    let mut zones = vec![sidebar(s)];
+    let mut toolbar = vec![
+        "seerr-back",
+        "seerr-refresh",
+        "seerr-tab-discover",
+        "seerr-tab-requests",
+    ];
+    if s.seerr.tab == SeerrTab::Discover {
+        // The search field owns Left/Right, so it ends the toolbar row; the mode tabs are a
+        // row of their own below it.
+        toolbar.push("seerr-search");
+    }
+    zones.push(Zone {
+        keys: toolbar.into_iter().map(String::from).collect(),
         columns: 0,
-        parent: None,
-    }];
+        parent: Some(0),
+    });
     match s.seerr.tab {
-        crate::state::SeerrTab::Discover => {
-            let mut keys = Vec::new();
-            // The page renders either the editorial rails or the browse result, never both.
-            let items: Vec<&seerr_api::DiscoverItem> =
-                if s.seerr.discover_mode == crate::state::DiscoverMode::Browse {
-                    s.seerr.discover.browse.iter().collect()
-                } else {
-                    s.seerr
-                        .discover
-                        .trending
-                        .iter()
-                        .chain(s.seerr.discover.movies.iter())
-                        .chain(s.seerr.discover.tv.iter())
-                        .collect()
-                };
-            for item in items {
-                keys.push(format!("seerr-card-{}-{}", item.media_type, item.id));
-            }
-            if !keys.is_empty() {
+        SeerrTab::Discover => {
+            zones.push(Zone {
+                keys: vec!["seerr-mode-explore".into(), "seerr-mode-browse".into()],
+                columns: 0,
+                parent: Some(0),
+            });
+            if s.seerr.discover_mode == DiscoverMode::Browse {
+                // One zone per filter row, then the result grid.
                 zones.push(Zone {
-                    keys,
+                    keys: [
+                        "seerr-browse-films",
+                        "seerr-browse-series",
+                        "seerr-browse-popular",
+                        "seerr-browse-rating",
+                        "seerr-browse-newest",
+                    ]
+                    .into_iter()
+                    .map(String::from)
+                    .collect(),
                     columns: 0,
                     parent: Some(0),
                 });
-            }
-        }
-        crate::state::SeerrTab::Requests => {
-            let keys: Vec<String> = s
-                .seerr
-                .requests
-                .iter()
-                .map(|request| format!("seerr-request-{}", request.id))
-                .collect();
-            if !keys.is_empty() {
                 zones.push(Zone {
-                    keys,
-                    columns: 1,
+                    keys: [
+                        "seerr-browse-year-any",
+                        "seerr-browse-year-2020",
+                        "seerr-browse-year-2010",
+                        "seerr-browse-year-2000",
+                        "seerr-browse-year-1990",
+                        "seerr-browse-year-older",
+                    ]
+                    .into_iter()
+                    .map(String::from)
+                    .collect(),
+                    columns: 0,
                     parent: Some(0),
                 });
+                let mut genres = vec!["seerr-browse-genre-all".to_string()];
+                genres.extend(
+                    s.seerr
+                        .discover
+                        .genres()
+                        .iter()
+                        .map(|genre| format!("seerr-browse-genre-{}", genre.id)),
+                );
+                zones.push(Zone {
+                    keys: genres,
+                    columns: 0,
+                    parent: Some(0),
+                });
+                let hubs = match s.seerr.discover.filters.kind {
+                    DiscoverKind::Movies => crate::state::STUDIOS,
+                    DiscoverKind::Series => crate::state::NETWORKS,
+                };
+                let mut hub_keys = vec!["seerr-browse-hub-all".to_string()];
+                hub_keys.extend(hubs.iter().map(|(_, id)| format!("seerr-browse-hub-{id}")));
+                zones.push(Zone {
+                    keys: hub_keys,
+                    columns: 0,
+                    parent: Some(0),
+                });
+                let mut cards: Vec<String> = s
+                    .seerr
+                    .discover
+                    .browse
+                    .iter()
+                    .map(|item| format!("seerr-card-{}-{}", item.media_type, item.id))
+                    .collect();
+                if s.seerr.discover.browse_pages > 0
+                    && s.seerr.discover.browse_page < s.seerr.discover.browse_pages
+                {
+                    cards.push("seerr-browse-more".into());
+                }
+                if !cards.is_empty() {
+                    zones.push(Zone {
+                        keys: cards,
+                        columns: 5,
+                        parent: Some(0),
+                    });
+                }
+            } else {
+                let cards: Vec<String> = s
+                    .seerr
+                    .discover
+                    .trending
+                    .iter()
+                    .chain(s.seerr.discover.movies.iter())
+                    .chain(s.seerr.discover.tv.iter())
+                    .map(|item| format!("seerr-card-{}-{}", item.media_type, item.id))
+                    .collect();
+                if !cards.is_empty() {
+                    zones.push(Zone {
+                        keys: cards,
+                        columns: 5,
+                        parent: Some(0),
+                    });
+                }
             }
+        }
+        SeerrTab::Requests => {
+            let mut keys = vec!["seerr-filter-active".to_string(), "seerr-filter-all".into()];
+            for request in &s.seerr.requests {
+                keys.push(format!("seerr-request-{}", request.id));
+                let has_open = request.media.jellyfin_media_id.is_some()
+                    || s.seerr
+                        .library_id(
+                            &request.media_type,
+                            request.media.tmdb_id.unwrap_or_default(),
+                        )
+                        .is_some();
+                if has_open {
+                    keys.push(format!("seerr-open-{}", request.id));
+                }
+            }
+            zones.push(Zone {
+                keys,
+                columns: 1,
+                parent: Some(0),
+            });
         }
     }
     zones
@@ -964,16 +1060,25 @@ fn live_zones(s: &State) -> Vec<Zone> {
 }
 
 fn remote_zones(s: &State) -> Vec<Zone> {
-    let mut zones = vec![sidebar(s)];
-    let keys: Vec<String> = s
-        .cast_sessions
-        .iter()
-        .map(|session| format!("remote-session-{}", session.id))
-        .collect();
-    if !keys.is_empty() {
+    let mut zones = vec![
+        sidebar(s),
+        Zone {
+            keys: vec!["remote-refresh".into()],
+            columns: 1,
+            parent: Some(0),
+        },
+    ];
+    // One row per session: the card, then its pause/seek/stop controls when it is playing.
+    for session in &s.remote.sessions {
+        let mut keys = vec![format!("remote-session-{}", session.id)];
+        if session.play_state.is_some() {
+            keys.push(format!("remote-pause-{}", session.id));
+            keys.push(format!("remote-seek-{}", session.id));
+            keys.push(format!("remote-stop-{}", session.id));
+        }
         zones.push(Zone {
             keys,
-            columns: 1,
+            columns: 0,
             parent: Some(0),
         });
     }
@@ -984,11 +1089,14 @@ fn seerr_detail_zones(s: &State) -> Vec<Zone> {
     let Some(detail) = &s.seerr.detail else {
         return Vec::new();
     };
-    let mut zones = vec![Zone {
-        keys: vec!["seerr-detail-back".into()],
-        columns: 1,
-        parent: None,
-    }];
+    let mut zones = vec![
+        sidebar(s),
+        Zone {
+            keys: vec!["seerr-detail-back".into()],
+            columns: 1,
+            parent: Some(0),
+        },
+    ];
     let Some(details) = &detail.details else {
         return zones;
     };
@@ -1443,7 +1551,7 @@ mod tests {
         assert_eq!(down, "live-channel-meridian");
 
         state.route = Route::Remote;
-        state.cast_sessions = crate::demo::sessions();
+        state.remote.sessions = crate::demo::sessions();
         let down = step(&state, Some("remote-session-living-room"), TvAction::Down)
             .expect("the next session");
         assert_eq!(down, "remote-session-bedroom");

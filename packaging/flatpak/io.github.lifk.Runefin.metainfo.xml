@@ -42,6 +42,16 @@
   </screenshots>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.1.34" date="2026-11-11">
+      <description>
+        <p>
+          The D-pad reachability walk now covers every remaining screen: Seerr explore, browse
+          and requests, Seerr detail, person pages and the remote control. Their sidebars,
+          toolbars, filter rows and per-session controls are in the zones, so nothing on those
+          pages is a dead end for a controller.
+        </p>
+      </description>
+    </release>
     <release version="0.1.33" date="2026-11-11">
       <description>
         <p>

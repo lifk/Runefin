@@ -7812,6 +7812,75 @@ mod tv_reach_tests {
     }
 
     #[test]
+    fn every_seerr_discover_control_is_reachable() {
+        let mut state = base();
+        super::seerr_scene(&mut state);
+        state.route = Route::Seerr;
+        state.seerr.tab = state::SeerrTab::Discover;
+        state.seerr.discover = demo::seerr_discover();
+        check("seerr discover", state);
+    }
+
+    #[test]
+    fn every_seerr_explore_control_is_reachable() {
+        let mut state = base();
+        super::seerr_scene(&mut state);
+        state.route = Route::Seerr;
+        state.seerr.tab = state::SeerrTab::Discover;
+        state.seerr.discover_mode = state::DiscoverMode::Explore;
+        state.seerr.discover = demo::seerr_discover();
+        check("seerr explore", state);
+    }
+
+    #[test]
+    fn every_seerr_requests_control_is_reachable() {
+        let mut state = base();
+        super::seerr_scene(&mut state);
+        state.route = Route::Seerr;
+        state.seerr.tab = state::SeerrTab::Requests;
+        state.seerr.requests = demo::seerr_requests();
+        check("seerr requests", state);
+    }
+
+    #[test]
+    fn every_seerr_detail_control_is_reachable() {
+        let mut state = base();
+        super::seerr_scene(&mut state);
+        state.seerr.detail = Some(state::SeerrDetailState {
+            media_type: "movie".into(),
+            tmdb_id: 438631,
+            details: Some(demo::seerr_movie_detail()),
+            selected_seasons: std::collections::HashSet::new(),
+            loading: false,
+            error: None,
+            requesting: false,
+        });
+        state.route = Route::SeerrDetail {
+            media_type: "movie".into(),
+            tmdb_id: 438631,
+        };
+        check("seerr detail", state);
+    }
+
+    #[test]
+    fn every_person_control_is_reachable() {
+        let mut state = base();
+        state.route = Route::Person {
+            id: "mara-ellison".into(),
+        };
+        state.person = Some(demo::person());
+        check("person", state);
+    }
+
+    #[test]
+    fn every_remote_control_is_reachable() {
+        let mut state = base();
+        state.route = Route::Remote;
+        state.remote.sessions = demo::sessions();
+        check("remote", state);
+    }
+
+    #[test]
     fn every_card_menu_control_is_reachable() {
         let mut state = base();
         state.card_menu = Some(crate::state::CardMenu {

@@ -40,7 +40,8 @@ exist because Rune's author enforces the same ones upstream.
   visible focusable is unreachable from the first focus (`crates/runefin/src/tv_reach.rs`). The
   overlays covered include the card menu, pre-play sheet, playlist/collection/cast pickers, the
   new-playlist prompt, still-watching and resume-conflict cards, the shortcut sheet, online
-  subtitle search and the shelf. A new screen or panel gets a case there; a panel passes its
+  subtitle search and the shelf; the same walk covers the Seerr discover (explore, browse and
+  requests), Seerr detail, person and remote screens. A new screen or panel gets a case there; a panel passes its
   layer key as the scope.
 - Anything needing a server is mocked at the `Client` boundary. No default test hits the network;
   the ignored `tests/live.rs` checks are opt-in and run only when their `JELLYFIN_*` or `SEERR_*`

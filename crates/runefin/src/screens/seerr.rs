@@ -544,6 +544,22 @@ fn search_box(s: &State, t: &tok::Theme) -> El {
         .w_full()
         .on_edit(|s: &mut State| &mut s.seerr.query)
         .on_input_change(|s: &mut State, _| s.seerr_search_changed())
+        .on_input_key(|s: &mut State, key: &rune::KeyEvent, tx: &mut rune::Tx| {
+            if !s.big_screen {
+                return false;
+            }
+            let action = match key.key {
+                rune::Key::Up => crate::tv_input::TvAction::Up,
+                rune::Key::Down => crate::tv_input::TvAction::Down,
+                _ => return false,
+            };
+            // The field owns the arrows; on a TV Up/Down must leave for the zones.
+            if let Some(target) = crate::tv_focus::step(s, Some("seerr-search"), action) {
+                s.note_focus(target.clone());
+                tx.focus_key(target);
+            }
+            true
+        })
         .color(t.text);
     el().key("seerr-search-box")
         .h(42.0)
