@@ -1899,14 +1899,14 @@ fn resume_card(item: &Item, s: &State, t: &tok::Theme, highlight: bool) -> El {
     el().key(format!("rail-continue-watching-{id}"))
         .role("button")
         .w(RESUME_W)
-        .hover_group()
+        .hover_group_focus()
         .focusable(true)
-        .focus_visual(4.0)
-        .focus_scale(1.04)
+        .focus_lift_only(4.0)
         .press_scale(0.985)
         .motion(motion::SNAPPY)
         .cursor(rune::Cursor::Pointer)
         .on_press(move |s: &mut State| s.open_detail(id.clone()))
+        .child(theme::card_glow(RESUME_W, RESUME_H))
         .child(art)
 }
 
@@ -2773,9 +2773,9 @@ pub(super) fn card(item: &Item, rail: &str, s: &State, t: &tok::Theme) -> El {
         .w(CARD_W)
         .gap(6.0)
         .radius(10.0)
-        .hover_group()
+        .hover_group_focus()
         .focusable(true)
-        .focus_visual(4.0)
+        .focus_lift_only(4.0)
         .press_scale(0.985)
         .motion(motion::SNAPPY)
         .label(title.to_string())
@@ -2788,6 +2788,7 @@ pub(super) fn card(item: &Item, rail: &str, s: &State, t: &tok::Theme) -> El {
                 s.open_card_menu_at(item.clone(), press.x, press.y, Some(focus_key.clone()));
             }
         })
+        .child(theme::card_glow(CARD_W, CARD_H))
         .child(poster_box)
         .child(
             text(title.to_string())

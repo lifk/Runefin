@@ -91,11 +91,12 @@ handles Return as OK; Space stays as a second activation key for the pad.
 
 One system for both modes:
 
-- **Big screen: a lift or the hover wash, no ring.** A focused card grows 6 % from its top-left so a rail edge never clips it
-  (`El::focus_scale`); other controls get the pointer's `t.hover` fill. Both suppress Rune's
-  default ring (`no_focus_ring`). A ring around a card, a sidebar row or a detail button read as
-  a selection box, not as focus. Desktop keeps its accent `focus_ring`; `theme::FocusVisual`
-  picks the treatment.
+- **Big screen: the hover treatment or the hover wash, no ring.** A focused card shows the same
+  rounded poster outline, play/remove affordance and soft halo as the pointer, without scaling
+  or filling the title; other controls get the pointer's `t.hover` fill. Both suppress Rune's
+  default ring (`no_focus_ring`). A ring or a filled box around a card, sidebar row or detail
+  button reads as a selection, not as focus. Desktop keeps its accent `focus_ring`;
+  `theme::FocusVisual` picks the treatment.
 - **Fill**: `t.hover`, exactly the desktop hover token, at the element's own radius.
 - **Selected ≠ focused**: the sidebar's current destination keeps its accent pill; focus adds the
   neutral wash inside it.
@@ -189,11 +190,13 @@ timeline zone because it has no bar. Two big-screen focus shots (`focus-card-big
 `focus-sidebar-big`) join the committed set; focus is runtime state, so they render past the first
 poll and the sidebar one walks there with a script.
 
-Sixth pass: big-screen focus is a 6 % card lift plus, for buttons and rows, the pointer's
-`t.hover` wash, with no ring at all (Rune's default ring is suppressed too), because the 2 pt
-outline still read as a selection box around cards, sidebar rows and buttons; desktop keeps its
-accent ring. The lift is a small Rune addition, `El::focus_scale`, pinned with the fork rev.
-The Detail zones now mirror the whole page: every action that is drawn (play options, Start over from the item the primary opens, theme
+Sixth pass: big-screen focus is the pointer's hover treatment (rounded poster outline, play or
+remove affordance, a soft halo) and, for buttons and rows, the hover wash, with no ring at all
+(Rune's default ring is suppressed too), because an outline or fill still read as a selection box.
+A 6 % card lift (`El::focus_scale`, added to the fork and pinned) was tried and removed in the
+seventh pass: it zoomed the card in place without making the row breathe, and it only applied to
+the Continue Watching cards until every card builder shared the treatment. The Detail zones now
+mirror the whole page: every action that is drawn (play options, Start over from the item the primary opens, theme
 audio/video, trailer, Seerr request, collection Play all/Shuffle, favourite, watched, playlist),
 the Next up card, the season chips, and the episode header's Play season / Shuffle / Season
 watched controls. That is what made Start over, Play next, Play season and Shuffle unreachable.

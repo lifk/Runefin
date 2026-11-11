@@ -171,8 +171,6 @@ pub trait FocusVisual {
     fn focus_visual(self, radius: f32) -> El;
     /// A lifted card shows focus by its scale alone; desktop keeps its ring.
     fn focus_lift_only(self, radius: f32) -> El;
-    /// The focus lift itself, big screen only.
-    fn focus_grow(self, scale: f32) -> El;
 }
 
 impl FocusVisual for El {
@@ -192,14 +190,17 @@ impl FocusVisual for El {
             self.focus_ring(focus_width(), radius, ring())
         }
     }
+}
 
-    fn focus_grow(self, scale: f32) -> El {
-        if is_big_screen() {
-            self.focus_scale(scale)
-        } else {
-            self
-        }
-    }
+/// A soft halo behind a poster card, faded in by the card's hover group (pointer or focus).
+pub fn card_glow(w: f32, h: f32) -> El {
+    el().absolute(-10.0, -10.0)
+        .w(w + 20.0)
+        .h(h + 20.0)
+        .radius(18.0)
+        .fill(Color::WHITE.alpha(0.20))
+        .blur(20.0)
+        .group_opacity(0.0, 1.0)
 }
 
 /// Give a big-screen control the pointer's neutral wash while it holds keyboard focus. Return

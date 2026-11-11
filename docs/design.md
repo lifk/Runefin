@@ -367,9 +367,9 @@ restart. Both modes share every screen and every focus group, so a bug fixed in 
 both.
 
 **Controller.** A gamepad is a first-class input in both modes; Big Screen is the mode where it
-is the only one. A focused card lifts 6 % from its top-left so a rail edge never clips it and takes no fill; other controls take
-the pointer's `t.hover` wash, with no ring and Rune's default ring suppressed, so focus reads like
-hover rather than a selection box. Return activation comes from `set_return_activates`, so a CEC
+is the only one. A focused card takes its pointer-hover treatment — the rounded white poster
+outline, the play/remove affordance and a soft halo — with no scale, no fill and no ring; other
+controls take the pointer's `t.hover` wash. Focus reads like hover rather than a selection box. Return activation comes from `set_return_activates`, so a CEC
 remote's Select/OK reaches the same control. Desktop keeps its accent ring. The light theme uses a light text
 halo over artwork, and the selected nav pill uses dark text on the blue fill. D-pad and the left
 stick move focus (400 ms then 80 ms repeats), A is Space —

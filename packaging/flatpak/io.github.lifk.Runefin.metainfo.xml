@@ -42,6 +42,15 @@
   </screenshots>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.1.18" date="2026-11-11">
+      <description>
+        <p>
+          Card focus is the pointer's hover treatment on every rail: a rounded white outline,
+          the play/remove affordance and a soft halo, with no scale and no fill. The volume
+          slider keeps Up/Down for the level so Left/Right reach the gear.
+        </p>
+      </description>
+    </release>
     <release version="0.1.17" date="2026-11-11">
       <description>
         <p>
