@@ -8,6 +8,7 @@ use rune::{El, ScrollSpec, SurfaceFit, col, el, row, text};
 
 use crate::state::{PersonPage, State};
 use crate::theme::FocusVisual;
+use crate::theme::SurfaceStyle;
 use crate::theme::{self, type_};
 
 pub(super) fn person_screen(s: &State, person: &PersonPage) -> El {
@@ -39,6 +40,9 @@ pub(super) fn person_screen(s: &State, person: &PersonPage) -> El {
                     .radius(52.0)
                     .clip_rounded(52.0)
                     .fill(t.card)
+                    .outline(1.0, 0.0, t.card_border)
+                    .shadow(1.0, 2.0, t.shadow)
+                    .shadow(6.0, 18.0, t.shadow_soft)
                     .child(image),
             )
             .child(
@@ -92,6 +96,8 @@ pub(super) fn person_screen(s: &State, person: &PersonPage) -> El {
                         .radius(8.0)
                         .center()
                         .fill(t.card)
+                        .surface_sheen()
+                        .shadow(1.0, 2.0, t.shadow)
                         .hover(t.hover)
                         .motion(motion::SNAPPY)
                         .focusable(true)

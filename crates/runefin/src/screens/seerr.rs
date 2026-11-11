@@ -11,6 +11,7 @@ use crate::state::{
     DiscoverKind, DiscoverMode, DiscoverSort, NETWORKS, RequestsFilter, STUDIOS, SeerrTab, State,
 };
 use crate::theme::FocusVisual;
+use crate::theme::SurfaceStyle;
 use crate::theme::{self, type_};
 
 use super::{CARD_GAP, CARD_H, CARD_W, initial, poster_layers, sidebar};
@@ -69,6 +70,8 @@ fn page_header(s: &State, t: &tok::Theme) -> El {
                 .radius(8.0)
                 .center()
                 .fill(t.card)
+                .surface_sheen()
+                .shadow(1.0, 2.0, t.shadow)
                 .hover(t.hover)
                 .motion(motion::SNAPPY)
                 .focusable(true)
@@ -607,6 +610,7 @@ pub(super) fn discover_card(item: &seerr_api::DiscoverItem, s: &State, t: &tok::
         .gap(6.0)
         .radius(10.0)
         .hover_group_focus()
+        .hover_motion(motion::SNAPPY, motion::SNAPPY)
         .focusable(true)
         .focus_lift_only(4.0)
         .press_scale(0.985)
@@ -621,6 +625,7 @@ pub(super) fn discover_card(item: &seerr_api::DiscoverItem, s: &State, t: &tok::
                 .radius(10.0)
                 .clip_rounded(10.0)
                 .fill(t.card)
+                .inset_edge()
                 .outline(1.0, 0.0, t.card_border)
                 .shadow(10.0, 24.0, t.shadow_soft)
                 .child(poster)
@@ -899,8 +904,12 @@ fn request_row(request: &seerr_api::MediaRequest, s: &State, t: &tok::Theme) -> 
         .gap(14.0)
         .items_start()
         .fill(t.card)
+        .surface_sheen()
+        .inset_edge()
         .radius(12.0)
         .outline(1.0, 0.0, t.card_border)
+        .shadow(1.0, 2.0, t.shadow)
+        .shadow(6.0, 18.0, t.shadow_soft)
         .child(
             el().w(82.0)
                 .h(123.0)

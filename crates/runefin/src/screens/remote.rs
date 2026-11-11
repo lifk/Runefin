@@ -4,6 +4,7 @@ use jellyfin_api::SessionInfo;
 use rune::tok::{self, motion};
 
 use crate::theme::FocusVisual;
+use crate::theme::SurfaceStyle;
 use crate::theme::{self, type_};
 use rune::{El, ScrollSpec, col, el, row, text};
 
@@ -139,7 +140,10 @@ fn session_row(session: &SessionInfo, t: &tok::Theme) -> El {
                     .radius(7.0)
                     .center()
                     .fill(if paused { tok::accent(0, true) } else { t.bg })
+                    .surface_sheen()
+                    .shadow(1.0, 2.0, t.shadow)
                     .hover(t.hover)
+                    .motion(motion::SNAPPY)
                     .focusable(true)
                     .focus_visual(2.0)
                     .press_scale(0.97)
@@ -164,7 +168,10 @@ fn session_row(session: &SessionInfo, t: &tok::Theme) -> El {
                     .radius(7.0)
                     .center()
                     .fill(t.bg)
+                    .surface_sheen()
+                    .shadow(1.0, 2.0, t.shadow)
                     .hover(t.hover)
+                    .motion(motion::SNAPPY)
                     .focusable(true)
                     .focus_visual(2.0)
                     .press_scale(0.97)
@@ -180,7 +187,10 @@ fn session_row(session: &SessionInfo, t: &tok::Theme) -> El {
                     .radius(7.0)
                     .center()
                     .fill(t.bg)
+                    .surface_sheen()
+                    .shadow(1.0, 2.0, t.shadow)
                     .hover(t.hover)
+                    .motion(motion::SNAPPY)
                     .focusable(true)
                     .focus_visual(2.0)
                     .press_scale(0.97)
@@ -197,6 +207,11 @@ fn session_row(session: &SessionInfo, t: &tok::Theme) -> El {
         .gap(14.0)
         .radius(10.0)
         .fill(t.card)
+        .surface_sheen()
+        .inset_edge()
+        .outline(1.0, 0.0, t.card_border)
+        .shadow(1.0, 2.0, t.shadow)
+        .shadow(6.0, 18.0, t.shadow_soft)
         .child(
             col()
                 .grow(1.0)

@@ -5,6 +5,7 @@ use jellyfin_api::Item;
 use rune::tok::{self, motion};
 
 use crate::theme::FocusVisual;
+use crate::theme::SurfaceStyle;
 use crate::theme::{self, type_};
 use rune::{Color, El, ScrollSpec, SurfaceFit, col, el, row, text, text_input};
 
@@ -65,6 +66,8 @@ pub(super) fn detail_screen(s: &State, detail: &DetailState) -> El {
                 .radius(8.0)
                 .center()
                 .fill(t.card)
+                .surface_sheen()
+                .shadow(1.0, 2.0, t.shadow)
                 .hover(t.hover)
                 .motion(motion::SNAPPY)
                 .focusable(true)
@@ -1680,8 +1683,10 @@ fn collections_row(s: &State, t: &tok::Theme) -> Option<El> {
                 .fill(t.card)
                 .outline(1.0, 0.0, t.card_border)
                 .hover(t.hover)
+                .motion(motion::SNAPPY)
                 .focusable(true)
                 .focus_visual(2.0)
+                .press_scale(0.97)
                 .cursor(rune::Cursor::Pointer)
                 .child(
                     text(format!("Part of {}", collection.name))
@@ -2040,7 +2045,11 @@ fn next_up(s: &State, detail: &DetailState, t: &tok::Theme) -> Option<El> {
                     .items_center()
                     .radius(12.0)
                     .fill(t.card)
+                    .surface_sheen()
+                    .inset_edge()
                     .outline(1.0, 0.0, t.card_border)
+                    .shadow(1.0, 2.0, t.shadow)
+                    .shadow(6.0, 18.0, t.shadow_soft)
                     .hover(t.hover)
                     .motion(motion::SNAPPY)
                     .role("button")

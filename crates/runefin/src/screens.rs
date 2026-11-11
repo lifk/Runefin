@@ -5,6 +5,7 @@ use jellyfin_api::Item;
 use rune::tok::{self, motion};
 
 use crate::theme::FocusVisual;
+use crate::theme::SurfaceStyle;
 use crate::theme::{self, type_};
 use rune::{
     Color, Cx, El, Icon, ScrollSpec, SurfaceFit, TextEdit, TextStyle, col, el, icon, row, text,
@@ -150,6 +151,10 @@ pub fn view(s: &State, _cx: &mut Cx<State>) -> El {
                         .padding(12.0)
                         .px(18.0)
                         .radius(12.0)
+                        .transition(
+                            rune::Transition::offset(0.0, 12.0)
+                                .combined(rune::Transition::opacity()),
+                        )
                         .backdrop_blur(14.0)
                         .fill(theme::colors().card.alpha(0.68))
                         .gradient(Color::WHITE.alpha(0.06), Color::TRANSPARENT)
@@ -1518,7 +1523,10 @@ fn home_hero(s: &State, t: &tok::Theme) -> El {
         .radius(14.0)
         .clip_rounded(14.0)
         .fill(t.card)
+        .surface_sheen()
         .outline(1.0, 0.0, t.card_border)
+        .shadow(1.0, 2.0, t.shadow)
+        .shadow(8.0, 24.0, t.shadow_soft)
         .child(
             el().absolute(0.0, 0.0)
                 .w_full()
@@ -1900,6 +1908,7 @@ fn resume_card(item: &Item, s: &State, t: &tok::Theme, highlight: bool) -> El {
         .role("button")
         .w(RESUME_W)
         .hover_group_focus()
+        .hover_motion(motion::SNAPPY, motion::SNAPPY)
         .focusable(true)
         .focus_lift_only(4.0)
         .press_scale(0.985)
@@ -2078,6 +2087,7 @@ pub(super) fn card_menu(s: &State) -> El {
     }
     let mut panel = col()
         .key("card-menu")
+        .transition(rune::Transition::offset(0.0, 8.0).combined(rune::Transition::opacity()))
         .w(300.0)
         .padding(6.0)
         .gap(2.0)
@@ -2473,6 +2483,7 @@ pub(super) fn card(item: &Item, rail: &str, s: &State, t: &tok::Theme) -> El {
         .radius(10.0)
         .clip_rounded(10.0)
         .fill(t.card)
+        .inset_edge()
         .outline(1.0, 0.0, t.card_border)
         .shadow(10.0, 24.0, t.shadow_soft)
         .matched(match_id)
@@ -2774,6 +2785,7 @@ pub(super) fn card(item: &Item, rail: &str, s: &State, t: &tok::Theme) -> El {
         .gap(6.0)
         .radius(10.0)
         .hover_group_focus()
+        .hover_motion(motion::SNAPPY, motion::SNAPPY)
         .focusable(true)
         .focus_lift_only(4.0)
         .press_scale(0.985)

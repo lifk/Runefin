@@ -7,6 +7,7 @@ use rune::{Color, El, SurfaceFit, col, el, icon, row, text};
 
 use crate::state::State;
 use crate::theme::FocusVisual;
+use crate::theme::SurfaceStyle;
 use crate::theme::{self, type_};
 
 pub(super) fn live_tv_screen(s: &State) -> El {
@@ -221,6 +222,7 @@ fn channel_row(s: &State, channel: &jellyfin_api::Item, t: &tok::Theme) -> El {
         .radius(12.0)
         .fill(t.card)
         .gradient(Color::WHITE.alpha(0.045), Color::TRANSPARENT)
+        .inset_edge()
         .outline(1.0, 0.0, t.card_border)
         .shadow(1.0, 2.0, Color::BLACK.alpha(0.25))
         .shadow(6.0, 18.0, Color::BLACK.alpha(0.16))
@@ -369,8 +371,10 @@ fn channel_row(s: &State, channel: &jellyfin_api::Item, t: &tok::Theme) -> El {
                     t.bg
                 })
                 .hover(t.hover)
+                .motion(motion::SNAPPY)
                 .focusable(true)
                 .focus_visual(2.0)
+                .press_scale(0.94)
                 .cursor(rune::Cursor::Pointer)
                 .child(
                     text(if s.live.favorites.contains(&channel.id) {
@@ -392,6 +396,9 @@ fn channel_row(s: &State, channel: &jellyfin_api::Item, t: &tok::Theme) -> El {
                 .radius(8.0)
                 .center()
                 .fill(tok::accent(0, true))
+                .gradient(Color::WHITE.alpha(0.18), Color::TRANSPARENT)
+                .shadow(1.0, 2.0, Color::BLACK.alpha(0.30))
+                .shadow(4.0, 12.0, tok::accent(0, true).alpha(0.35))
                 .child(text("Watch").font(type_::label()).color(t.bg)),
         )
 }

@@ -291,6 +291,11 @@ full-width gradient, because chrome that sits on the film should not read as a s
 Rune blurs at most four elements in a frame (`MAX_BACKDROP_BLURS`), so only the open panel or the
 menu is frosted.
 
+**Quiet surfaces.** Settings groups, Live TV channels, Remote sessions, Seerr requests and the
+Detail Next up card use `theme::SurfaceStyle`: a 3.5 % top sheen and a 1 px inset white edge over
+the card fill, so a panel that is not floating over artwork still catches the light. Menus and
+player panels rise 8–12 pt as they enter; the toast does too.
+
 **Elevation.** A floating surface uses `theme::elevation::floating_layers`: contact 0/1/2.5 at
 35 %, mid 0/6/12/−2 at 38 %, ambient 0/16/48/−6 at 45 %, and a 1 px inset white at 6 %. One wide
 shadow reads as a halo; the layers give a contact edge, and Rune springs the first four, so a

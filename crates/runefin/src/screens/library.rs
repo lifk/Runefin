@@ -7,6 +7,7 @@ use jellyfin_api::Item;
 use rune::tok::{self, motion};
 
 use crate::theme::FocusVisual;
+use crate::theme::SurfaceStyle;
 use crate::theme::{self, type_};
 use rune::{Color, El, GrowthSpec, ScrollSpec, SurfaceFit, col, el, icon, row, text, text_input};
 
@@ -223,6 +224,8 @@ fn back_button(t: &tok::Theme) -> El {
         .radius(8.0)
         .center()
         .fill(t.card)
+        .surface_sheen()
+        .shadow(1.0, 2.0, t.shadow)
         .hover(t.hover)
         .motion(motion::SNAPPY)
         .focusable(true)

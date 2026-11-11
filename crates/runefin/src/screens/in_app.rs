@@ -961,6 +961,7 @@ fn audio_panel(s: &State, t: &tok::Theme) -> El {
         .unwrap_or(-1);
     let mut panel = col()
         .key("in-app-audio-panel")
+        .transition(rune::Transition::offset(0.0, 8.0).combined(rune::Transition::opacity()))
         .w(360.0)
         .padding(16.0)
         .gap(6.0)
@@ -1195,6 +1196,7 @@ fn queue_control(
 fn queue_panel(s: &State, t: &tok::Theme) -> El {
     let mut panel = col()
         .key("in-app-queue-panel")
+        .transition(rune::Transition::offset(0.0, 8.0).combined(rune::Transition::opacity()))
         .w(360.0)
         .padding(14.0)
         .gap(4.0)
@@ -2859,6 +2861,7 @@ fn gear_panel(s: &State, t: &tok::Theme) -> El {
 
     let menu = col()
         .key("in-app-gear-menu")
+        .transition(rune::Transition::offset(0.0, 8.0).combined(rune::Transition::opacity()))
         .w(368.0)
         .padding(10.0)
         .gap(6.0)

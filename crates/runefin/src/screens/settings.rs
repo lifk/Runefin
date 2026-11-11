@@ -3,6 +3,7 @@
 use rune::tok::{self, motion};
 
 use crate::theme::FocusVisual;
+use crate::theme::SurfaceStyle;
 use crate::theme::{self, type_};
 use rune::{Color, El, col, el, row, text, text_input};
 
@@ -214,6 +215,7 @@ pub(super) fn settings_screen(s: &State) -> El {
         .padding(18.0)
         .gap(14.0)
         .fill(t.card)
+        .surface_sheen()
         .radius(12.0)
         .outline(1.0, 0.0, t.card_border)
         .box_shadow(rune::Shadow {
@@ -262,6 +264,7 @@ pub(super) fn settings_screen(s: &State) -> El {
         .padding(18.0)
         .gap(10.0)
         .fill(t.card)
+        .surface_sheen()
         .radius(12.0)
         .outline(1.0, 0.0, t.card_border)
         .box_shadow(rune::Shadow {
@@ -281,6 +284,7 @@ pub(super) fn settings_screen(s: &State) -> El {
         .padding(18.0)
         .gap(10.0)
         .fill(t.card)
+        .surface_sheen()
         .radius(12.0)
         .outline(1.0, 0.0, t.card_border)
         .box_shadow(rune::Shadow {
@@ -298,6 +302,7 @@ pub(super) fn settings_screen(s: &State) -> El {
         .padding(18.0)
         .gap(10.0)
         .fill(t.card)
+        .surface_sheen()
         .radius(12.0)
         .outline(1.0, 0.0, t.card_border)
         .box_shadow(rune::Shadow {
@@ -703,6 +708,7 @@ pub(super) fn settings_screen(s: &State) -> El {
         .padding(18.0)
         .gap(10.0)
         .fill(t.card)
+        .surface_sheen()
         .radius(12.0)
         .outline(1.0, 0.0, t.card_border)
         .box_shadow(rune::Shadow {
@@ -844,6 +850,7 @@ pub(super) fn settings_screen(s: &State) -> El {
         .padding(18.0)
         .gap(10.0)
         .fill(t.card)
+        .surface_sheen()
         .radius(12.0)
         .outline(1.0, 0.0, t.card_border)
         .box_shadow(rune::Shadow {
@@ -997,6 +1004,7 @@ pub(super) fn settings_screen(s: &State) -> El {
             .padding(18.0)
             .gap(10.0)
             .fill(t.card)
+            .surface_sheen()
             .radius(12.0)
             .outline(1.0, 0.0, t.card_border)
             .box_shadow(rune::Shadow {
@@ -1103,6 +1111,9 @@ pub(super) fn settings_screen(s: &State) -> El {
                             .radius(8.0)
                             .center()
                             .fill(tok::accent(0, true))
+                            .gradient(Color::WHITE.alpha(0.18), Color::TRANSPARENT)
+                            .shadow(1.0, 2.0, Color::BLACK.alpha(0.30))
+                            .shadow(4.0, 12.0, tok::accent(0, true).alpha(0.35))
                             .hover(t.hover)
                             .motion(motion::SNAPPY)
                             .focusable(true)
@@ -1171,6 +1182,7 @@ pub(super) fn settings_screen(s: &State) -> El {
         .padding(18.0)
         .gap(12.0)
         .fill(t.card)
+        .surface_sheen()
         .radius(12.0)
         .outline(1.0, 0.0, t.card_border)
         .box_shadow(rune::Shadow {
@@ -1254,6 +1266,7 @@ pub(super) fn settings_screen(s: &State) -> El {
                 .padding(18.0)
                 .gap(8.0)
                 .fill(t.card)
+                .surface_sheen()
                 .radius(12.0)
                 .outline(1.0, 0.0, t.card_border)
                 .box_shadow(rune::Shadow {
@@ -1298,9 +1311,13 @@ pub(super) fn settings_screen(s: &State) -> El {
                         .radius(8.0)
                         .center()
                         .fill(t.bg)
+                        .surface_sheen()
+                        .shadow(1.0, 2.0, t.shadow)
                         .hover(t.hover)
+                        .motion(motion::SNAPPY)
                         .focusable(true)
                         .focus_visual(2.0)
+                        .press_scale(0.97)
                         .cursor(rune::Cursor::Pointer)
                         .child(
                             text("Export Letterboxd CSV")
@@ -1317,9 +1334,13 @@ pub(super) fn settings_screen(s: &State) -> El {
                         .radius(8.0)
                         .center()
                         .fill(t.bg)
+                        .surface_sheen()
+                        .shadow(1.0, 2.0, t.shadow)
                         .hover(t.hover)
+                        .motion(motion::SNAPPY)
                         .focusable(true)
                         .focus_visual(2.0)
+                        .press_scale(0.97)
                         .cursor(rune::Cursor::Pointer)
                         .child(text("Clear history").font(type_::label()).color(t.text))
                         .on_press(|s: &mut State| s.clear_history()),

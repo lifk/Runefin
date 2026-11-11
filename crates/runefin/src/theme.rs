@@ -2,7 +2,7 @@
 //! app-level type, spacing, radius and surface choices so screens do not drift.
 
 use rune::tok::{self, Theme};
-use rune::{Color, El, Pixels, el, text};
+use rune::{Color, El, Pixels, Shadow, el, text};
 
 pub mod type_ {
     use rune::TextStyle;
@@ -189,6 +189,31 @@ impl FocusVisual for El {
         } else {
             self.focus_ring(focus_width(), radius, ring())
         }
+    }
+}
+
+/// The lit-card details that keep a flat fill from reading as a printed rectangle.
+pub trait SurfaceStyle {
+    /// A 3.5 % white sheen from the top edge, under the content.
+    fn surface_sheen(self) -> El;
+    /// A 1 px inset white top edge, the contact light on a raised card.
+    fn inset_edge(self) -> El;
+}
+
+impl SurfaceStyle for El {
+    fn surface_sheen(self) -> El {
+        self.gradient(Color::WHITE.alpha(0.035), Color::TRANSPARENT)
+    }
+
+    fn inset_edge(self) -> El {
+        self.box_shadow(Shadow {
+            y: 1.0,
+            blur: 0.0,
+            spread: 0.0,
+            color: Color::WHITE.alpha(0.05),
+            inset: true,
+            ..Shadow::default()
+        })
     }
 }
 
