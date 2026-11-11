@@ -366,7 +366,7 @@ fn seerr_section(s: &State, t: &tok::Theme) -> Option<El> {
             )
             .child(
                 el().w_full().scroll_x().scroll_edge_fade(28.0).child(
-                    row().px(6.0).py(6.0).gap(CARD_GAP).focus_group().children(
+                    row().gap(CARD_GAP).focus_group().children(
                         items
                             .into_iter()
                             .map(|item| super::seerr::discover_card(item, s, t)),

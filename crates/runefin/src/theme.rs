@@ -217,15 +217,29 @@ impl SurfaceStyle for El {
     }
 }
 
-/// A soft halo behind a poster card, faded in by the card's hover group (pointer or focus).
-pub fn card_glow(w: f32, h: f32) -> El {
-    el().absolute(-5.0, -5.0)
-        .w(w + 10.0)
-        .h(h + 10.0)
-        .radius(14.0)
-        .fill(Color::WHITE.alpha(0.22))
-        .blur(10.0)
-        .group_opacity(0.0, 1.0)
+/// The focus halo, drawn at the window root so a rail's scroll clip cannot cut it. Four
+/// blurred bars form a frame outside the focused poster; the centre stays clear, so the card's
+/// artwork is never washed out.
+pub fn focus_glow(rect: [f32; 4]) -> El {
+    let (x, y, w, h) = (rect[0], rect[1], rect[2], rect[3]);
+    let glow = Color::WHITE.alpha(0.24);
+    let bar = |left: f32, top: f32, width: f32, height: f32| {
+        el().absolute(left, top)
+            .w(width)
+            .h(height)
+            .radius(4.0)
+            .fill(glow)
+            .blur(10.0)
+    };
+    el().key("focus-glow")
+        .absolute(x - 6.0, y - 6.0)
+        .w(w + 12.0)
+        .h(h + 12.0)
+        .child(bar(0.0, 0.0, w + 12.0, 6.0))
+        .child(bar(0.0, h + 6.0, w + 12.0, 6.0))
+        .child(bar(0.0, 6.0, 6.0, h))
+        .child(bar(w + 6.0, 6.0, 6.0, h))
+        .no_focus_ring()
 }
 
 /// Give a big-screen control the pointer's neutral wash while it holds keyboard focus. Return

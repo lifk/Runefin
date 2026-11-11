@@ -579,7 +579,7 @@ fn card_section(
         .child(text(title).font(type_::section()).color(t.text))
         .child(
             el().w_full().scroll_x().scroll_edge_fade(28.0).child(
-                row().px(6.0).py(6.0).gap(CARD_GAP).focus_group().children(
+                row().gap(CARD_GAP).focus_group().children(
                     items
                         .iter()
                         .take(20)
@@ -603,8 +603,9 @@ pub(super) fn discover_card(item: &seerr_api::DiscoverItem, s: &State, t: &tok::
         .as_ref()
         .map(|info| info.media_status())
         .unwrap_or(seerr_api::MediaStatus::Unknown);
+    let card_key = format!("seerr-card-{}-{}", item.media_type, item.id);
     col()
-        .key(format!("seerr-card-{}-{}", item.media_type, item.id))
+        .key(card_key.clone())
         .role("button")
         .w(CARD_W)
         .gap(6.0)
@@ -618,7 +619,6 @@ pub(super) fn discover_card(item: &seerr_api::DiscoverItem, s: &State, t: &tok::
         .label(item.title().to_string())
         .cursor(rune::Cursor::Pointer)
         .on_press(move |s: &mut State| s.open_seerr_detail(media_type.clone(), tmdb_id))
-        .child(theme::card_glow(CARD_W, CARD_H))
         .child(
             el().w(CARD_W)
                 .h(CARD_H)
@@ -628,6 +628,17 @@ pub(super) fn discover_card(item: &seerr_api::DiscoverItem, s: &State, t: &tok::
                 .inset_edge()
                 .outline(1.0, 0.0, t.card_border)
                 .shadow(10.0, 24.0, t.shadow_soft)
+                .on_drawn_layout_tx({
+                    let key = card_key.clone();
+                    move |s: &mut State, rect: [f32; 4], tx: &mut rune::Tx| {
+                        if s.focused_key.as_deref() == Some(key.as_str())
+                            && s.focused_card_rect != Some(rect)
+                        {
+                            s.focused_card_rect = Some(rect);
+                            tx.wake_after(std::time::Duration::from_millis(0));
+                        }
+                    }
+                })
                 .child(poster)
                 .children(
                     (state != seerr_api::MediaStatus::Unknown)

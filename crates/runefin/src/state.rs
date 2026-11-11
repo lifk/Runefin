@@ -697,6 +697,10 @@ pub struct State {
     pub ui_mode_restart: bool,
     /// The big-screen launch or a route change asks for focus on the screen's first item.
     pub focus_first: bool,
+    /// The key the app last asked Rune to focus; a card compares it in its layout callback.
+    pub focused_key: Option<String>,
+    /// The focused poster's drawn rect, for the halo that must paint outside a rail's clip.
+    pub focused_card_rect: Option<[f32; 4]>,
     /// The route the last focus request was for, so a route change arms `focus_first` once.
     focus_route: Option<Route>,
     /// Layer-open edges, so a menu that appears takes focus once instead of every poll.
@@ -1028,6 +1032,8 @@ impl State {
             big_screen,
             ui_mode_restart: false,
             focus_first: big_screen,
+            focused_key: None,
+            focused_card_rect: None,
             focus_route: None,
             focus_layers: FocusLayers::default(),
             card_menu_focus: None,
@@ -2847,6 +2853,13 @@ impl State {
         crate::theme::set_light(self.light_theme);
     }
 
+    /// Remember the key the app asked Rune to focus. A card whose key matches records its
+    /// drawn rect in `on_drawn_layout`, and the window paints the halo outside the rail's clip.
+    pub fn note_focus(&mut self, key: String) {
+        self.focused_key = Some(key);
+        self.focused_card_rect = None;
+    }
+
     /// The key to focus after a big-screen launch or a route change, once that screen has data.
     /// Returns `None` while a screen is still loading; the request stays armed.
     pub fn take_focus_key(&mut self) -> Option<String> {
@@ -4319,6 +4332,8 @@ mod tests {
             big_screen: false,
             ui_mode_restart: false,
             focus_first: false,
+            focused_key: None,
+            focused_card_rect: None,
             focus_route: None,
             focus_layers: FocusLayers::default(),
             card_menu_focus: None,

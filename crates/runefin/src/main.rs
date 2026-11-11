@@ -48,7 +48,17 @@ fn view(s: &State, cx: &mut Cx<State>) -> El {
     // open at the size the reader left. The write itself happens on close, not here.
     // Rune calls an element's own key handler before its focus-group navigation. Without this
     // hook a focused card never reaches the router: Rune would have already wrapped the rail.
-    screens::view(s, cx)
+    let screen = screens::view(s, cx);
+    // The halo is a sibling of the whole screen, at the focused poster's window rect: the rail's
+    // scroll viewport clips its own children, never this overlay.
+    let screen = if s.big_screen
+        && let Some(rect) = s.focused_card_rect
+    {
+        screen.child(crate::theme::focus_glow(rect))
+    } else {
+        screen
+    };
+    screen
         .on_key(tv_key)
         .on_screen_layout(|s: &mut State, rect: [f32; 4]| {
             if rect[2] >= 1.0 && rect[3] >= 1.0 {
@@ -208,6 +218,7 @@ fn poll(s: &mut State, _clock: f64, tx: &mut Tx) -> bool {
     let started = std::time::Instant::now();
     let mut changed = s.poll();
     if let Some(key) = s.take_focus_key() {
+        s.note_focus(key.clone());
         tx.focus_key(key);
         changed = true;
     }
@@ -332,6 +343,7 @@ fn tv_key(s: &mut State, key: &KeyEvent, tx: &mut Tx) -> bool {
                 } else if focused.as_deref() == Some("search-input") {
                     s.search.query.focused = false;
                 }
+                s.note_focus(target.clone());
                 tx.focus_key(target.clone());
             }
             return true;
@@ -4481,6 +4493,40 @@ mod tests {
         });
         rt.frame(0.080);
         assert_eq!(rt.focused_key().as_deref(), Some("detail-play-season"));
+    }
+
+    #[test]
+    fn the_focused_card_glow_is_an_overlay_and_hides_off_a_card() {
+        let env = Env {
+            system_dark: true,
+            scale: 1.5,
+        };
+        let mut state = home_state();
+        state.big_screen = true;
+        state.route = Route::Home;
+        let mut rt = Runtime::new(state, view, (1280.0, 720.0), env);
+        rt.on_key = Some(on_key);
+        rt.frame(0.0);
+        let key = rt
+            .state
+            .take_focus_key()
+            .expect("home asks for its first card");
+        rt.state.note_focus(key.clone());
+        rt.update(|_, tx| tx.focus_key(key));
+        for step in 1..=4 {
+            rt.frame(step as f64 * 0.016);
+        }
+        assert!(
+            rt.state.focused_card_rect.is_some(),
+            "the card reports the rect the overlay paints at"
+        );
+        assert!(rt.find("focus-glow").is_some(), "the halo is drawn");
+
+        rt.state.note_focus("nav-home".into());
+        assert!(
+            rt.state.focused_card_rect.is_none(),
+            "a non-card focus clears the halo rect"
+        );
     }
 
     #[test]

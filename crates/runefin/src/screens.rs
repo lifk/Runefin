@@ -1791,6 +1791,7 @@ fn resume_card(item: &Item, s: &State, t: &tok::Theme, highlight: bool) -> El {
         .unwrap_or_else(|| placeholder(item, t));
     let title = item.series_name.as_deref().unwrap_or(&item.name);
     let id = item.series_id.clone().unwrap_or_else(|| item.id.clone());
+    let focus_key = format!("rail-continue-watching-{id}");
     let watched = crate::home::progress(item);
     let mut art = el()
         .w(RESUME_W)
@@ -1906,7 +1907,16 @@ fn resume_card(item: &Item, s: &State, t: &tok::Theme, highlight: bool) -> El {
                 })),
         );
     }
-    el().key(format!("rail-continue-watching-{id}"))
+    art = art.on_drawn_layout_tx({
+        let key = focus_key.clone();
+        move |s: &mut State, rect: [f32; 4], tx: &mut rune::Tx| {
+            if s.focused_key.as_deref() == Some(key.as_str()) && s.focused_card_rect != Some(rect) {
+                s.focused_card_rect = Some(rect);
+                tx.wake_after(std::time::Duration::from_millis(0));
+            }
+        }
+    });
+    el().key(focus_key.clone())
         .role("button")
         .w(RESUME_W)
         .hover_group_focus()
@@ -1917,7 +1927,6 @@ fn resume_card(item: &Item, s: &State, t: &tok::Theme, highlight: bool) -> El {
         .motion(motion::SNAPPY)
         .cursor(rune::Cursor::Pointer)
         .on_press(move |s: &mut State| s.open_detail(id.clone()))
-        .child(theme::card_glow(RESUME_W, RESUME_H))
         .child(art)
 }
 
@@ -2042,18 +2051,13 @@ fn resume_rail(key: &str, items: &[Item], s: &State, t: &tok::Theme) -> El {
                 .scroll_x()
                 .scroll_edge_fade(28.0)
                 .child(
-                    row()
-                        .px(6.0)
-                        .py(6.0)
-                        .gap(theme::CARD_GAP)
-                        .focus_group()
-                        .children(
-                            items
-                                .iter()
-                                .filter(|item| !s.is_home_hidden(&item.id))
-                                .enumerate()
-                                .map(|(index, item)| resume_card(item, s, t, index == 0)),
-                        ),
+                    row().gap(theme::CARD_GAP).focus_group().children(
+                        items
+                            .iter()
+                            .filter(|item| !s.is_home_hidden(&item.id))
+                            .enumerate()
+                            .map(|(index, item)| resume_card(item, s, t, index == 0)),
+                    ),
                 ),
         )
 }
@@ -2476,6 +2480,7 @@ pub(super) fn card(item: &Item, rail: &str, s: &State, t: &tok::Theme) -> El {
     } else {
         item.series_id.as_deref().unwrap_or(&item.id)
     };
+    let focus_key = format!("{rail}-{key_id}");
     let detail_id = item.series_id.clone().unwrap_or_else(|| item.id.clone());
     let match_id = format!("poster-{detail_id}");
     let press_id = detail_id.clone();
@@ -2494,6 +2499,17 @@ pub(super) fn card(item: &Item, rail: &str, s: &State, t: &tok::Theme) -> El {
         .outline(1.0, 0.0, t.card_border)
         .shadow(10.0, 24.0, t.shadow_soft)
         .matched(match_id)
+        .on_drawn_layout_tx({
+            let key = focus_key.clone();
+            move |s: &mut State, rect: [f32; 4], tx: &mut rune::Tx| {
+                if s.focused_key.as_deref() == Some(key.as_str())
+                    && s.focused_card_rect != Some(rect)
+                {
+                    s.focused_card_rect = Some(rect);
+                    tx.wake_after(std::time::Duration::from_millis(0));
+                }
+            }
+        })
         .child(
             el().absolute(0.0, 0.0)
                 .w_full()
@@ -2784,7 +2800,6 @@ pub(super) fn card(item: &Item, rail: &str, s: &State, t: &tok::Theme) -> El {
         );
     }
     let title = item.series_name.as_deref().unwrap_or(&item.name);
-    let focus_key = format!("{rail}-{key_id}");
     col()
         .key(focus_key.clone())
         .role("button")
@@ -2807,7 +2822,6 @@ pub(super) fn card(item: &Item, rail: &str, s: &State, t: &tok::Theme) -> El {
                 s.open_card_menu_at(item.clone(), press.x, press.y, Some(focus_key.clone()));
             }
         })
-        .child(theme::card_glow(CARD_W, CARD_H))
         .child(poster_box)
         .child(
             text(title.to_string())
