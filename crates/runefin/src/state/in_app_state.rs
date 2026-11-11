@@ -80,6 +80,8 @@ pub struct InAppSession {
     pub report: bool,
     /// What the server agreed to on start.
     pub play_method: &'static str,
+    /// The plain-language reason for that method; the quality panel shows it.
+    pub play_reason: Option<String>,
     pub play_session_id: Option<String>,
     /// Position the play started at, so history records watched time rather than the resume point.
     pub history_start_ms: i64,
@@ -101,6 +103,34 @@ fn item_is_dolby_vision(item: &Item) -> bool {
             let range = range.to_ascii_lowercase();
             range.contains("dovi") || range.contains("dolby")
         })
+}
+
+/// Why the server is converting: the chosen cap is the most useful fact, then the codec and
+/// container the device profile refused. The quality panel shows this verbatim.
+fn transcode_reason(
+    source: &jellyfin_api::PlaybackMediaSource,
+    max_bitrate: Option<i64>,
+) -> String {
+    if let Some(cap) = max_bitrate
+        && let Some(bitrate) = source.bitrate
+        && bitrate > cap
+    {
+        return format!(
+            "The {} Mbps cap is below this file's {} Mbps.",
+            cap / 1_000_000,
+            bitrate / 1_000_000
+        );
+    }
+    let codec = source
+        .media_streams
+        .iter()
+        .find(|stream| stream.kind == "Video")
+        .and_then(|stream| stream.codec.as_deref());
+    let container = source.container.as_deref().unwrap_or("file");
+    match codec {
+        Some(codec) => format!("The device profile cannot direct-play {codec} in {container}."),
+        None => format!("The device profile cannot direct-play this {container} file."),
+    }
 }
 
 /// The offset to add to a transcoded stream's clock so it reads in file time. A stream that
@@ -166,7 +196,7 @@ fn choose_playback(
             client.authed_url(url),
             "DirectStream",
             play_session,
-            Some("The server is copying the video and converting another stream.".into()),
+            Some("The server is copying the video and converting its audio or subtitles.".into()),
         );
     }
     if source.supports_transcoding
@@ -176,7 +206,7 @@ fn choose_playback(
             client.authed_url(url),
             "Transcode",
             play_session,
-            Some("The server is converting this file for the chosen quality or codec.".into()),
+            Some(transcode_reason(source, max_bitrate)),
         );
     }
     (
@@ -1504,6 +1534,7 @@ impl State {
             Ok(started) => {
                 let method = started.method;
                 let play_session_id = started.play_session_id.clone();
+                let play_reason = started.notice.clone();
                 if let Some(notice) = &started.notice {
                     self.show_toast(notice.clone());
                 }
@@ -1557,6 +1588,7 @@ impl State {
                     buffering: None,
                     report: pending.report,
                     play_method: method,
+                    play_reason,
                     play_session_id: play_session_id.clone(),
                     history_start_ms: pending.start_ms,
                     position_base_ms: 0,
@@ -2503,7 +2535,14 @@ mod tests {
     fn source() -> jellyfin_api::PlaybackMediaSource {
         jellyfin_api::PlaybackMediaSource {
             id: "4k".into(),
+            container: Some("mkv".into()),
             bitrate: Some(31_000_000),
+            media_streams: vec![jellyfin_api::MediaStream {
+                index: 0,
+                kind: "Video".into(),
+                codec: Some("hevc".into()),
+                ..jellyfin_api::MediaStream::default()
+            }],
             supports_direct_play: true,
             supports_direct_stream: true,
             supports_transcoding: true,
@@ -2566,11 +2605,15 @@ mod tests {
             player: Player::preview(),
             method: "Transcode",
             play_session_id: Some("server-session".into()),
-            notice: None,
+            notice: Some("The 2 Mbps cap is below this file's 31 Mbps.".into()),
         }));
         let session = state.in_app.as_ref().expect("a session");
         assert_eq!(session.play_method, "Transcode");
         assert_eq!(session.play_session_id.as_deref(), Some("server-session"));
+        assert_eq!(
+            session.play_reason.as_deref(),
+            Some("The 2 Mbps cap is below this file's 31 Mbps.")
+        );
     }
 
     #[test]
@@ -2603,7 +2646,25 @@ mod tests {
         assert_eq!(method, "Transcode");
         assert!(url.contains("master.m3u8"), "{url}");
         assert!(url.contains("api_key=token"), "{url}");
-        assert!(notice.is_some());
+        let notice = notice.expect("the cap is explained");
+        assert!(notice.contains("2 Mbps cap"), "{notice}");
+        assert!(notice.contains("31 Mbps"), "{notice}");
+    }
+
+    #[test]
+    fn a_profile_transcode_names_the_codec_and_container() {
+        let mut source = source();
+        source.supports_direct_play = false;
+        source.supports_direct_stream = false;
+        let response = PlaybackInfoResponse {
+            media_sources: vec![source],
+            play_session_id: None,
+        };
+        let (_, method, _, notice) =
+            choose_playback(&client(), Some(&response), None, None, "fallback");
+        assert_eq!(method, "Transcode");
+        let notice = notice.expect("the profile is explained");
+        assert!(notice.contains("hevc in mkv"), "{notice}");
     }
 
     #[test]
@@ -2614,10 +2675,12 @@ mod tests {
             media_sources: vec![source],
             play_session_id: None,
         };
-        let (url, method, _, _) =
+        let (url, method, _, notice) =
             choose_playback(&client(), Some(&response), None, None, "fallback");
         assert_eq!(method, "DirectStream");
         assert!(url.contains("static=false"), "{url}");
+        let notice = notice.expect("the copy is explained");
+        assert!(notice.contains("audio or subtitles"), "{notice}");
     }
 
     #[test]

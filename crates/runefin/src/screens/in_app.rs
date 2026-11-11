@@ -354,11 +354,14 @@ fn quality_panel(s: &State, session: &crate::state::InAppSession, t: &tok::Theme
         "DirectStream" => "Direct stream",
         _ => "Direct play",
     };
-    let reason = match session.play_method {
-        "Transcode" => "The server is converting this file for the chosen quality or codec.",
-        "DirectStream" => "Video is copied; another stream is converted.",
-        _ => "The file matches the device profile; no server work.",
-    };
+    let reason = session
+        .play_reason
+        .as_deref()
+        .unwrap_or(match session.play_method {
+            "Transcode" => "The server is converting this file for the chosen quality or codec.",
+            "DirectStream" => "Video is copied; another stream is converted.",
+            _ => "The file matches the device profile; no server work.",
+        });
     el().key("in-app-quality-layer")
         .absolute(0.0, 0.0)
         .w_full()
