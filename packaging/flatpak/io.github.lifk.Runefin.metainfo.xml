@@ -42,6 +42,16 @@
   </screenshots>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.1.26" date="2026-11-11">
+      <description>
+        <p>
+          The library heading now summarises the view from exact server counts: items,
+          unwatched, missing and total runtime. An Attention chip appears when items are missing
+          or unaired, with a one-click filter for each, and a back-to-top pill returns to the
+          first row after a long scroll.
+        </p>
+      </description>
+    </release>
     <release version="0.1.25" date="2026-11-11">
       <description>
         <p>

@@ -1305,6 +1305,20 @@ fn main() {
                 s.library = Some(library);
             }),
             #[cfg(debug_assertions)]
+            ("library-attention", |s| {
+                demo::signed_in(s);
+                let mut library = demo::library(60);
+                library.unwatched_total = Some(11);
+                library.missing_total = Some(2);
+                library.unaired_total = Some(1);
+                library.attention_open = true;
+                library.set_scroll_y(900.0);
+                s.route = Route::Library {
+                    id: library.id.clone(),
+                };
+                s.library = Some(library);
+            }),
+            #[cfg(debug_assertions)]
             ("playlist-create", |s| {
                 demo::signed_in(s);
                 s.playlists = demo::playlists();
@@ -6479,6 +6493,42 @@ mod tests {
         assert_eq!(
             state.take_focus_key().as_deref(),
             Some("rail-continue-watching-quiet-floor")
+        );
+    }
+
+    #[test]
+    fn the_library_surfaces_attention_and_back_to_top() {
+        let env = Env {
+            system_dark: true,
+            scale: 1.5,
+        };
+        let mut state = library_state(12);
+        if let Some(library) = &mut state.library {
+            library.unwatched_total = Some(5);
+            library.missing_total = Some(2);
+            library.unaired_total = Some(1);
+            library.set_scroll_y(900.0);
+        }
+        let mut rt = Runtime::new(state, view, (1280.0, 800.0), env);
+        rt.frame(0.0);
+        assert!(rt.find("library-attention").is_some(), "the badge appears");
+        assert!(
+            rt.find("library-top").is_some(),
+            "the pill appears when deep"
+        );
+        rt.state.toggle_library_attention();
+        rt.update(|_, tx| tx.settle());
+        rt.frame(0.016);
+        assert!(rt.find("library-attention-panel").is_some());
+        assert!(rt.find("attention-missing").is_some());
+        assert!(rt.find("attention-unaired").is_some());
+        rt.state.scroll_library_top();
+        assert_eq!(rt.state.take_pending_scroll(), Some(0.0));
+        assert!(
+            rt.state
+                .library
+                .as_ref()
+                .is_some_and(|library| library.scroll_y() == 0.0)
         );
     }
 

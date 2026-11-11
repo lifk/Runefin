@@ -17,7 +17,9 @@ use crate::config::{
 use crate::detail::{DetailPage, DetailState, EpisodesPage};
 use crate::handoff::PlaybackHandle;
 use crate::home::{HomeData, HomeLoad};
-use crate::library::{LibraryPage, LibraryRequest, LibraryState, SortMode, ViewMode};
+use crate::library::{
+    LibraryCounts, LibraryPage, LibraryRequest, LibraryState, SortMode, ViewMode,
+};
 use crate::net::{Failure, Msg, ReportKind, Session, Stage, Worker};
 use crate::search::SearchLoad;
 use crate::shortcuts::{Action as ShortcutAction, KeyBindings};
@@ -374,6 +376,8 @@ pub struct State {
     pub playlist_editing: bool,
     playlist_remove_load: Latest<Result<(), String>>,
     pub library_page: Latest<LibraryPage>,
+    /// Header counts for the current view: unwatched, missing and unaired.
+    library_counts: Latest<LibraryCounts>,
     library_genres: Latest<Result<Vec<Item>, String>>,
     pub detail: Option<DetailState>,
     pub person: Option<PersonPage>,
@@ -793,6 +797,7 @@ impl State {
             playlist_editing: false,
             playlist_remove_load: Latest::default(),
             library_page: Latest::default(),
+            library_counts: Latest::default(),
             library_genres: Latest::default(),
             detail: None,
             person: None,
@@ -1775,6 +1780,7 @@ impl State {
         self.home_recently_played.set_waker(waker.clone());
         self.home_collections.set_waker(waker.clone());
         self.library_page.set_waker(waker.clone());
+        self.library_counts.set_waker(waker.clone());
         self.library_genres.set_waker(waker.clone());
         self.person_latest.set_waker(waker.clone());
         self.seerr_person_load.set_waker(waker.clone());
@@ -2024,6 +2030,14 @@ impl State {
         }
         if let Some(page) = self.library_page.take() {
             self.apply_library_page(page);
+            changed = true;
+        }
+        if let Some(counts) = self.library_counts.take() {
+            if let Some(library) = &mut self.library {
+                library.unwatched_total = Some(counts.unwatched);
+                library.missing_total = Some(counts.missing);
+                library.unaired_total = Some(counts.unaired);
+            }
             changed = true;
         }
         if let Some(genres) = self.library_genres.take() {
@@ -2539,6 +2553,7 @@ impl State {
         self.library_selecting = false;
         self.library_selected.clear();
         self.library_page.cancel();
+        self.library_counts.cancel();
         self.library_genres.cancel();
         self.detail_page.cancel();
         self.detail_episodes.cancel();
@@ -3331,6 +3346,21 @@ impl State {
         }
     }
 
+    /// Show or hide the two maintenance filters under the toolbar.
+    pub fn toggle_library_attention(&mut self) {
+        if let Some(library) = &mut self.library {
+            library.attention_open = !library.attention_open;
+        }
+    }
+
+    /// The back-to-top pill: the same scroll path as opening the library at the top.
+    pub fn scroll_library_top(&mut self) {
+        if let Some(library) = &mut self.library {
+            library.set_scroll_y(0.0);
+        }
+        self.pending_scroll = Some(0.0);
+    }
+
     pub fn toggle_library_unaired(&mut self) {
         let changed = match &mut self.library {
             Some(library) => {
@@ -3702,6 +3732,12 @@ impl State {
                 );
             return;
         }
+        let count_query = reset.then(|| {
+            let mut query = query.clone();
+            query.limit = 1;
+            query.start_index = 0;
+            query
+        });
         self.library_page
             .request(LibraryRequest { query, start }, move |request| match client
                 .items(&request.query)
@@ -3719,6 +3755,39 @@ impl State {
                     error: Some(error.user_message()),
                 },
             });
+        if let Some(base) = count_query {
+            self.load_library_counts(base);
+        }
+    }
+
+    /// Three exact counts for the header and the attention panel, in one background job. Each
+    /// query keeps the page's filters and adds one server filter, so the numbers match what a
+    /// click on that filter will show.
+    fn load_library_counts(&mut self, base: jellyfin_api::ItemQuery) {
+        let Some(client) = self.client() else {
+            return;
+        };
+        let with_filter = |apply: fn(&mut jellyfin_api::ItemQuery)| {
+            let mut query = base.clone();
+            query.limit = 1;
+            query.start_index = 0;
+            apply(&mut query);
+            query
+        };
+        let unwatched = with_filter(|query| query.unwatched_only = true);
+        let missing = with_filter(|query| query.missing_only = true);
+        let unaired = with_filter(|query| query.unaired_only = true);
+        self.library_counts.request((), move |_| LibraryCounts {
+            unwatched: client
+                .items(&unwatched)
+                .map_or(0, |page| page.total_record_count.max(0)),
+            missing: client
+                .items(&missing)
+                .map_or(0, |page| page.total_record_count.max(0)),
+            unaired: client
+                .items(&unaired)
+                .map_or(0, |page| page.total_record_count.max(0)),
+        });
     }
 
     fn apply_library_page(&mut self, page: LibraryPage) {
@@ -4138,6 +4207,7 @@ mod tests {
             playlist_editing: false,
             playlist_remove_load: Latest::default(),
             library_page: Latest::default(),
+            library_counts: Latest::default(),
             library_genres: Latest::default(),
             detail: None,
             person: None,

@@ -78,6 +78,15 @@ pub struct LibraryPage {
     pub error: Option<String>,
 }
 
+/// The header's counts, with the same filters as the visible page. Each is the server's
+/// `TotalRecordCount` for a one-item query, so it is exact without loading the library.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct LibraryCounts {
+    pub unwatched: i32,
+    pub missing: i32,
+    pub unaired: i32,
+}
+
 #[derive(Debug, Clone)]
 pub struct LibraryRequest {
     pub query: ItemQuery,
@@ -116,6 +125,13 @@ pub struct LibraryState {
     pub only_4k: bool,
     pub missing_only: bool,
     pub unaired_only: bool,
+    /// Counts for the header, with the same filters as the page. `None` until the count
+    /// request answers; the header simply omits them.
+    pub unwatched_total: Option<i32>,
+    pub missing_total: Option<i32>,
+    pub unaired_total: Option<i32>,
+    /// The attention panel is open under the toolbar.
+    pub attention_open: bool,
     /// Type-ahead text, applied after a short idle beat.
     pub search: Option<String>,
     pub letter: Option<String>,
@@ -156,6 +172,10 @@ impl LibraryState {
             only_4k: false,
             missing_only: false,
             unaired_only: false,
+            unwatched_total: None,
+            missing_total: None,
+            unaired_total: None,
+            attention_open: false,
             search: None,
             letter: None,
             loading: false,
@@ -267,6 +287,7 @@ impl LibraryState {
         self.only_4k.hash(&mut hasher);
         self.missing_only.hash(&mut hasher);
         self.unaired_only.hash(&mut hasher);
+        self.attention_open.hash(&mut hasher);
         self.search.hash(&mut hasher);
         self.letter.hash(&mut hasher);
         hasher.finish()

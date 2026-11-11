@@ -89,6 +89,11 @@ web wrapper and does not embed a second render stack.
 - Sort by Name, Added or Rating on the toolbar, with ascending/descending direction; the Filters
   sheet adds Played, Release date, Runtime, Play count and Random.
 - Filters: All / Unwatched / Favourites; a Genre menu; an A–Z letter rail when sorted by name.
+- Header summary from exact server counts: `60 items · 11 unwatched · 2 missing · 4 d 23 h`
+  (runtime only when every item is loaded).
+- **Attention** chip and panel when the library has missing or unaired items, with both counts;
+  one click applies that filter (also in the Filters sheet).
+- **↑ Top** pill past 720 points of scroll.
 - Grid/list toggle; card shows poster, watched badge and resume progress.
 - Quick play puck on hover; it does **not** navigate. Right-click or **Menu / ⇧F10** opens the
   item menu (watch state, favourite, resume removal, add to playlist/collection, Play on…).
@@ -434,7 +439,7 @@ keys the player already uses.
 ```sh
 cargo test -p jellyfin-api        # 45 API tests, no network
 cargo test -p seerr-api           # 25 Seerr API tests, no network
-cargo test -p runefin             # 347 app tests (22 ignored), headless
+cargo test -p runefin             # 351 app tests (22 ignored), headless
 scripts/check.sh                  # fmt, clippy, all three suites, release build
 scripts/snapshots.sh              # the committed views, in place
 JELLYFIN_URL=... JELLYFIN_USER_ID=... JELLYFIN_TOKEN=... \

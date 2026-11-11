@@ -45,7 +45,7 @@ fn library_content(s: &State, library: &LibraryState, t: &tok::Theme) -> El {
                 .items_end()
                 .child(text(library.name.clone()).font(type_::page()).color(t.text))
                 .child(
-                    text(count_label(library))
+                    text(library_summary(library))
                         .key("library-count")
                         .font(type_::meta())
                         .color(t.text_secondary)
@@ -92,6 +92,7 @@ fn library_content(s: &State, library: &LibraryState, t: &tok::Theme) -> El {
         .child(header)
         .child(library_toolbar(s, library, t))
         .children((s.library_selecting).then(|| bulk_bar(s, t)))
+        .children((library.attention_open).then(|| attention_panel(library, t)))
         .children((library.genres_open).then(|| genres_panel(library, t)))
         .children(library.filters_open.then(|| filters_panel(s, library, t)))
         .child(library_body(s, library, t))
@@ -371,6 +372,20 @@ fn library_toolbar(s: &State, library: &LibraryState, t: &tok::Theme) -> El {
                 t,
                 |s: &mut State| s.toggle_library_filters(),
             ))
+            .children({
+                // Only surfaces when there is something to fix; a clean library stays quiet.
+                let attention =
+                    library.missing_total.unwrap_or(0) + library.unaired_total.unwrap_or(0);
+                (attention > 0).then(|| {
+                    toolbar_button(
+                        &format!("Attention {attention}"),
+                        "library-attention",
+                        library.attention_open || library.missing_only || library.unaired_only,
+                        t,
+                        |s: &mut State| s.toggle_library_attention(),
+                    )
+                })
+            })
             .child(toolbar_button(
                 "Select",
                 "library-select",
@@ -826,7 +841,47 @@ fn library_body(s: &State, library: &LibraryState, t: &tok::Theme) -> El {
     if library.sort == SortMode::Name && library.total_items() >= 100 {
         body = body.child(letter_rail(library, t));
     }
-    body
+    let mut stack = el()
+        .key("library-body-stack")
+        .w_full()
+        .grow(1.0)
+        .min_h(0.0)
+        .h_full()
+        .child(body);
+    if library.scroll_y() > 720.0 {
+        stack = stack.child(
+            el().key("library-top-layer")
+                .absolute(0.0, 0.0)
+                .w_full()
+                .h_full()
+                .justify_end()
+                .items_end()
+                .pr(theme::gutter() + 12.0)
+                .pb(18.0)
+                .child(
+                    el().key("library-top")
+                        .role("button")
+                        .h(34.0)
+                        .px(14.0)
+                        .radius(17.0)
+                        .center()
+                        .fill(t.card)
+                        .outline(1.0, 0.0, t.card_border)
+                        .shadow(1.0, 3.0, t.shadow)
+                        .shadow(6.0, 18.0, t.shadow_soft)
+                        .hover(t.hover)
+                        .motion(motion::SNAPPY)
+                        .focusable(true)
+                        .focus_visual(2.0)
+                        .press_scale(0.96)
+                        .cursor(rune::Cursor::Pointer)
+                        .label("Back to top")
+                        .child(text("↑ Top").font(type_::caption()).color(t.text))
+                        .on_press(|s: &mut State| s.scroll_library_top()),
+                ),
+        );
+    }
+    stack
 }
 
 fn library_grid(s: &State, t: &tok::Theme) -> El {
@@ -1185,7 +1240,49 @@ fn library_error(message: &str, t: &tok::Theme) -> El {
         ))
 }
 
-fn count_label(library: &LibraryState) -> String {
+/// `123 items · 47 unwatched · 2 missing · 2 d 6 h`. The counts come from the server's own
+/// filtered totals; runtime only appears once every item is loaded, because a partial sum would
+/// be a lie.
+fn library_summary(library: &LibraryState) -> String {
+    let total = library.total_items();
+    let label = if library.loading && total == 0 {
+        "Loading…".to_string()
+    } else if total == 0 {
+        "No items".to_string()
+    } else if library.items.len() < total {
+        format!(
+            "{} of {}",
+            library.items.len(),
+            super::count_label(total, "item")
+        )
+    } else {
+        super::count_label(total, "item")
+    };
+    let mut parts = vec![label];
+    if !library.unwatched
+        && let Some(unwatched) = library.unwatched_total
+        && unwatched > 0
+    {
+        parts.push(format!("{unwatched} unwatched"));
+    }
+    if !library.missing_only
+        && let Some(missing) = library.missing_total
+        && missing > 0
+    {
+        parts.push(format!("{missing} missing"));
+    }
+    let complete = total > 0 && library.items.len() == total;
+    if complete
+        && let Some(runtime) = library
+            .items
+            .iter()
+            .map(jellyfin_api::Item::runtime_ms)
+            .collect::<Option<Vec<i64>>>()
+            .map(|runtimes| runtimes.iter().sum::<i64>())
+        && runtime > 0
+    {
+        parts.push(runtime_label(runtime));
+    }
     let filtered = [
         library.unwatched,
         library.favorites,
@@ -1204,23 +1301,120 @@ fn count_label(library: &LibraryState) -> String {
     .into_iter()
     .filter(|filter| *filter)
     .count();
-    let total = library.total_items();
-    let label = if library.loading && total == 0 {
-        "Loading…".to_string()
-    } else if total == 0 {
-        "No items".to_string()
-    } else if library.items.len() < total {
-        format!(
-            "{} of {}",
-            library.items.len(),
-            super::count_label(total, "item")
-        )
-    } else {
-        super::count_label(total, "item")
-    };
     if filtered > 0 {
-        format!("{label} · {filtered} filter(s)")
+        parts.push(format!("{filtered} filter(s)"));
+    }
+    parts.join(" · ")
+}
+
+fn runtime_label(ms: i64) -> String {
+    let minutes = ms / 60_000;
+    if minutes >= 24 * 60 {
+        format!("{} d {} h", minutes / (24 * 60), minutes % (24 * 60) / 60)
+    } else if minutes >= 60 {
+        format!("{} h {} min", minutes / 60, minutes % 60)
     } else {
-        label
+        format!("{minutes} min")
+    }
+}
+
+/// The two maintenance filters, surfaced with their counts. A clean library never opens it.
+fn attention_panel(library: &LibraryState, t: &tok::Theme) -> El {
+    let bar = row()
+        .key("library-attention-panel")
+        .w_full()
+        .px(theme::gutter())
+        .pb(10.0)
+        .gap(8.0)
+        .items_center()
+        .flex_wrap()
+        .child(
+            text("Needs attention")
+                .font(type_::caption())
+                .color(t.text_secondary),
+        );
+    let bar = bar
+        .children(library.missing_total.map(|missing| {
+            toolbar_button(
+                &format!("Missing {missing}"),
+                "attention-missing",
+                library.missing_only,
+                t,
+                |s: &mut State| s.toggle_library_missing(),
+            )
+        }))
+        .children(library.unaired_total.map(|unaired| {
+            toolbar_button(
+                &format!("Unaired {unaired}"),
+                "attention-unaired",
+                library.unaired_only,
+                t,
+                |s: &mut State| s.toggle_library_unaired(),
+            )
+        }));
+    bar.child(
+        text("Missing files and episodes that have not aired.")
+            .font(type_::caption())
+            .color(t.text_secondary),
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use jellyfin_api::Item;
+
+    fn movie(name: &str, minutes: i64) -> Item {
+        Item {
+            id: name.to_lowercase(),
+            name: name.into(),
+            kind: "Movie".into(),
+            run_time_ticks: Some(minutes * 60_000 * jellyfin_api::TICKS_PER_MS),
+            ..Item::default()
+        }
+    }
+
+    #[test]
+    fn the_header_counts_only_what_the_server_answered() {
+        let mut library = LibraryState::new("m".into(), "Movies".into(), Some("movies".into()));
+        library.items = vec![movie("One", 60), movie("Two", 60)];
+        library.total = 120;
+        library.unwatched_total = Some(47);
+        library.missing_total = Some(2);
+        // A partial library has no runtime sum; the count still reads honestly.
+        assert_eq!(
+            library_summary(&library),
+            "2 of 120 items · 47 unwatched · 2 missing"
+        );
+        library.items = (0..120).map(|i| movie(&format!("Film {i}"), 1)).collect();
+        assert_eq!(
+            library_summary(&library),
+            "120 items · 47 unwatched · 2 missing · 2 h 0 min"
+        );
+    }
+
+    #[test]
+    fn a_filtered_view_does_not_restate_its_own_filter() {
+        let mut library = LibraryState::new("m".into(), "Movies".into(), Some("movies".into()));
+        library.items = vec![movie("One", 90)];
+        library.total = 1;
+        library.unwatched = true;
+        library.unwatched_total = Some(1);
+        library.missing_only = true;
+        library.missing_total = Some(1);
+        assert_eq!(
+            library_summary(&library),
+            "1 item · 1 h 30 min · 2 filter(s)"
+        );
+    }
+
+    #[test]
+    fn runtime_reads_in_days_hours_and_minutes() {
+        assert_eq!(runtime_label(45 * 60_000), "45 min");
+        assert_eq!(runtime_label(2 * 60 * 60_000 + 20 * 60_000), "2 h 20 min");
+        assert_eq!(
+            runtime_label(3 * 24 * 60 * 60_000 + 5 * 60 * 60_000),
+            "3 d 5 h"
+        );
     }
 }
