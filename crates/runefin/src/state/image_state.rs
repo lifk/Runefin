@@ -34,16 +34,15 @@ impl State {
         self.image_cache.as_ref()?;
         let client = self.client()?;
         let item = self
-            .home_data
-            .resume
-            .iter()
-            .chain(
+            .hero_item()
+            .filter(|item| item.image_tag(ImageKind::Backdrop).is_some())
+            .or_else(|| {
                 self.home_data
                     .latest
                     .iter()
-                    .flat_map(|rail| rail.items.iter()),
-            )
-            .find(|item| item.image_tag(ImageKind::Backdrop).is_some())?;
+                    .flat_map(|rail| rail.items.iter())
+                    .find(|item| item.image_tag(ImageKind::Backdrop).is_some())
+            })?;
         let tag = item.image_tag(ImageKind::Backdrop)?;
         let request = self.image_request(
             &client,

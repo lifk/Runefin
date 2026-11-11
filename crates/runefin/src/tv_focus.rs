@@ -129,8 +129,14 @@ fn adjacent(
     }
     let zone = &zones[target];
     // Entering a rail from a vertical list starts at its first item: the list's row number is
-    // not a column position. Rail-to-rail moves still keep the column.
-    let at = if zones[zi].columns == 1 && zone.columns == 0 {
+    // not a column position. A move into the hero always lands on its primary decision, not on
+    // whichever decision happens to sit at the rail's column. Rail-to-rail moves keep the
+    // column.
+    let hero = zone
+        .keys
+        .first()
+        .is_some_and(|key| key.starts_with("home-hero"));
+    let at = if hero || (zones[zi].columns == 1 && zone.columns == 0) {
         0
     } else {
         idx.min(zone.keys.len().saturating_sub(1))
@@ -215,6 +221,14 @@ fn home_zones(s: &State) -> Vec<Zone> {
     let mut zones = vec![sidebar(s)];
     let visible =
         |items: &[jellyfin_api::Item]| items.iter().any(|item| !s.is_home_hidden(&item.id));
+    // The optional compact hero sits above the first rail: its two decisions are one zone.
+    if s.home_hero && s.hero_item().is_some() {
+        zones.push(Zone {
+            keys: vec!["home-hero-play".into(), "home-hero-open".into()],
+            columns: 0,
+            parent: Some(0),
+        });
+    }
     if visible(&s.home_data.resume) {
         zones.push(Zone {
             keys: s
@@ -784,6 +798,52 @@ mod tests {
         // Down switches to the next lane.
         let down = step(&state, Some(first), TvAction::Down).expect("a lane below");
         assert!(down.starts_with("rail-next-up-"), "{down}");
+    }
+
+    #[test]
+    fn the_compact_hero_is_one_zone_above_the_rails() {
+        let mut state = home();
+        state.home_hero = true;
+        assert!(contains(&state, "home-hero-play"));
+        assert!(contains(&state, "home-hero-open"));
+        assert_eq!(
+            step(&state, Some("home-hero-play"), TvAction::Right).as_deref(),
+            Some("home-hero-open")
+        );
+        assert_eq!(
+            step(&state, Some("home-hero-play"), TvAction::Left).as_deref(),
+            Some("nav-home")
+        );
+        assert_eq!(
+            step(&state, Some("nav-home"), TvAction::Right).as_deref(),
+            Some("home-hero-play")
+        );
+        assert_eq!(
+            step(&state, Some("home-hero-play"), TvAction::Down).as_deref(),
+            Some("rail-continue-watching-quiet-floor")
+        );
+        // Up from any rail lands on the hero's primary decision, not on Details.
+        assert_eq!(
+            step(&state, Some("rail-continue-watching-service"), TvAction::Up).as_deref(),
+            Some("home-hero-play")
+        );
+        // Off is the default: the sidebar's Right reaches the first rail directly.
+        state.home_hero = false;
+        assert!(!contains(&state, "home-hero-play"));
+        assert_eq!(
+            step(&state, Some("nav-home"), TvAction::Right).as_deref(),
+            Some("rail-continue-watching-quiet-floor")
+        );
+    }
+
+    #[test]
+    fn the_hero_skips_a_hidden_first_entry() {
+        let mut state = home();
+        state.home_hero = true;
+        let first = state.home_data.resume[0].id.clone();
+        state.hide_from_home(first);
+        assert!(state.hero_item().is_some());
+        assert!(contains(&state, "home-hero-play"));
     }
 
     #[test]

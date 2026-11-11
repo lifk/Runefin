@@ -116,6 +116,13 @@ scrolls. A rail hidden with “Not interested” is removed. Empty rails are sup
 momentum-scrolled, snapped to card boundaries. Every card in a rail asks for its poster when the
 rail is built, not when it first scrolls into view, so swiping a rail never uncovers empty boxes.
 
+**Compact hero (optional, off by default).** Settings → Interface adds one 180 pt card above
+Continue Watching with the first visible Continue Watching entry: its own backdrop, *Featured*,
+the series name, `S2E04 · Overtime · 12 min left`, and **Resume** / **Details**. It is the first
+focus on Home while it is on, sits above the rails in the focus order (Up from any rail reaches
+Resume), and is skipped when Continue Watching is empty or its entry is hidden. It never borrows
+another title's backdrop, and it never grows to a full-height billboard.
+
 **Library.** Toolbar (sort, facets — Unwatched, Favourites, Genre — Filters, Select, grid/list,
 letter rail when sorted by name) over a virtualized
 grid, 100 items per fetch, one page prefetched. **Filters** opens the full sheet: both facets,

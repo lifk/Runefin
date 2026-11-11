@@ -1429,7 +1429,7 @@ fn content(s: &State, t: &tok::Theme) -> El {
             .px(theme::gutter())
             .pb(if s.in_app_minimized { 124.0 } else { 32.0 })
             .gap(theme::RAIL_GAP)
-            .children((s.home_hero && !s.home_data.resume.is_empty()).then(|| home_hero(s, t)))
+            .children(s.home_hero.then(|| home_hero(s, t)).flatten())
             .child(rails(s, t))
     };
 
@@ -1499,11 +1499,12 @@ fn ambient(s: &State, t: &tok::Theme) -> El {
 }
 
 /// Optional compact hero: one film at a time, 180 points tall, with its backdrop and one
-/// action. It is off by default so the rails stay the first thing on screen.
-fn home_hero(s: &State, t: &tok::Theme) -> El {
-    let item = &s.home_data.resume[0];
+/// action. It is off by default so the rails stay the first thing on screen. The subject is the
+/// first Continue Watching entry the reader has not hidden.
+fn home_hero(s: &State, t: &tok::Theme) -> Option<El> {
+    let item = s.hero_item()?;
     let image = s
-        .home_backdrop_key()
+        .hero_backdrop_key()
         .and_then(|key| poster_layers(s, &key, SurfaceFit::Fill))
         .unwrap_or_else(|| el().w_full().h_full().fill(t.card));
     let title = item
@@ -1511,94 +1512,108 @@ fn home_hero(s: &State, t: &tok::Theme) -> El {
         .as_deref()
         .unwrap_or(&item.name)
         .to_string();
-    let subtitle = crate::home::resume_subtitle(item);
+    // An episode's name is the useful subject; a film's title is already the heading.
+    let subtitle = match item.episode_label() {
+        Some(label) => {
+            let left = crate::home::remaining(item)
+                .map(|minutes| format!(" · {minutes} min left"))
+                .unwrap_or_default();
+            format!("{label} · {}{left}", item.name)
+        }
+        None => crate::home::resume_subtitle(item),
+    };
     let id = item.series_id.clone().unwrap_or_else(|| item.id.clone());
     let play = item.clone();
-    el().key("home-hero")
-        .w_full()
-        .h(180.0)
-        .radius(14.0)
-        .clip_rounded(14.0)
-        .fill(t.card)
-        .surface_sheen()
-        .outline(1.0, 0.0, t.card_border)
-        .shadow(1.0, 2.0, t.shadow)
-        .shadow(8.0, 24.0, t.shadow_soft)
-        .child(
-            el().absolute(0.0, 0.0)
-                .w_full()
-                .h_full()
-                .opacity(0.55)
-                .child(image),
-        )
-        .child(el().absolute(0.0, 0.0).w_full().h_full().linear_gradient(
-            std::f32::consts::FRAC_PI_2,
-            [
-                (0.0, t.bg.alpha(0.95)),
-                (0.55, t.bg.alpha(0.55)),
-                (1.0, t.bg.alpha(0.20)),
-            ],
-        ))
-        .child(
-            col()
-                .absolute(0.0, 0.0)
-                .w_full()
-                .h_full()
-                .padding(22.0)
-                .justify_center()
-                .gap(8.0)
-                .items_start()
-                .child(
-                    text("Featured")
-                        .font(type_::caption())
-                        .color(tok::accent(0, true)),
-                )
-                .child(theme::readable_text(title, type_::section(), t.text).key("home-hero-title"))
-                .child(
-                    theme::readable_text(subtitle, type_::meta(), t.text_secondary)
-                        .key("home-hero-subtitle"),
-                )
-                .child(
-                    row()
-                        .gap(8.0)
-                        .child(
-                            el().key("home-hero-play")
-                                .role("button")
-                                .h(36.0)
-                                .px(16.0)
-                                .radius(9.0)
-                                .center()
-                                .fill(tok::accent(0, true))
-                                .gradient(Color::WHITE.alpha(0.14), Color::TRANSPARENT)
-                                .shadow(1.0, 2.0, Color::BLACK.alpha(0.30))
-                                .shadow(4.0, 12.0, tok::accent(0, true).alpha(0.35))
-                                .hover(t.hover)
-                                .focusable(true)
-                                .focus_visual(2.0)
-                                .cursor(rune::Cursor::Pointer)
-                                .child(text("Resume").font(type_::label()).color(t.bg))
-                                .on_press(move |s: &mut State| s.play_episode(play.clone())),
-                        )
-                        .child(
-                            el().key("home-hero-open")
-                                .role("button")
-                                .h(36.0)
-                                .px(14.0)
-                                .radius(9.0)
-                                .center()
-                                .fill(t.card)
-                                .gradient(Color::WHITE.alpha(0.055), Color::TRANSPARENT)
-                                .shadow(1.0, 2.0, Color::BLACK.alpha(0.30))
-                                .shadow(2.0, 6.0, Color::BLACK.alpha(0.18))
-                                .hover(t.hover)
-                                .focusable(true)
-                                .focus_visual(2.0)
-                                .cursor(rune::Cursor::Pointer)
-                                .child(text("Details").font(type_::label()).color(t.text))
-                                .on_press(move |s: &mut State| s.open_detail(id.clone())),
-                        ),
-                ),
-        )
+    Some(
+        el().key("home-hero")
+            .w_full()
+            .h(180.0)
+            .radius(14.0)
+            .clip_rounded(14.0)
+            .fill(t.card)
+            .surface_sheen()
+            .outline(1.0, 0.0, t.card_border)
+            .shadow(1.0, 2.0, t.shadow)
+            .shadow(8.0, 24.0, t.shadow_soft)
+            .child(
+                el().absolute(0.0, 0.0)
+                    .w_full()
+                    .h_full()
+                    .opacity(0.55)
+                    .child(image),
+            )
+            .child(el().absolute(0.0, 0.0).w_full().h_full().linear_gradient(
+                std::f32::consts::FRAC_PI_2,
+                [
+                    (0.0, t.bg.alpha(0.95)),
+                    (0.55, t.bg.alpha(0.55)),
+                    (1.0, t.bg.alpha(0.20)),
+                ],
+            ))
+            .child(
+                col()
+                    .absolute(0.0, 0.0)
+                    .w_full()
+                    .h_full()
+                    .padding(22.0)
+                    .justify_center()
+                    .gap(8.0)
+                    .items_start()
+                    .child(
+                        text("Featured")
+                            .font(type_::caption())
+                            .color(tok::accent(0, true)),
+                    )
+                    .child(
+                        theme::readable_text(title, type_::section(), t.text)
+                            .key("home-hero-title"),
+                    )
+                    .child(
+                        theme::readable_text(subtitle, type_::meta(), t.text_secondary)
+                            .key("home-hero-subtitle"),
+                    )
+                    .child(
+                        row()
+                            .gap(8.0)
+                            .child(
+                                el().key("home-hero-play")
+                                    .role("button")
+                                    .h(36.0)
+                                    .px(16.0)
+                                    .radius(9.0)
+                                    .center()
+                                    .fill(tok::accent(0, true))
+                                    .gradient(Color::WHITE.alpha(0.14), Color::TRANSPARENT)
+                                    .shadow(1.0, 2.0, Color::BLACK.alpha(0.30))
+                                    .shadow(4.0, 12.0, tok::accent(0, true).alpha(0.35))
+                                    .hover(t.hover)
+                                    .focusable(true)
+                                    .focus_visual(2.0)
+                                    .cursor(rune::Cursor::Pointer)
+                                    .child(text("Resume").font(type_::label()).color(t.bg))
+                                    .on_press(move |s: &mut State| s.play_episode(play.clone())),
+                            )
+                            .child(
+                                el().key("home-hero-open")
+                                    .role("button")
+                                    .h(36.0)
+                                    .px(14.0)
+                                    .radius(9.0)
+                                    .center()
+                                    .fill(t.card)
+                                    .gradient(Color::WHITE.alpha(0.055), Color::TRANSPARENT)
+                                    .shadow(1.0, 2.0, Color::BLACK.alpha(0.30))
+                                    .shadow(2.0, 6.0, Color::BLACK.alpha(0.18))
+                                    .hover(t.hover)
+                                    .focusable(true)
+                                    .focus_visual(2.0)
+                                    .cursor(rune::Cursor::Pointer)
+                                    .child(text("Details").font(type_::label()).color(t.text))
+                                    .on_press(move |s: &mut State| s.open_detail(id.clone())),
+                            ),
+                    ),
+            ),
+    )
 }
 
 fn rails(s: &State, t: &tok::Theme) -> El {

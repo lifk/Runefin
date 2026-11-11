@@ -69,6 +69,10 @@ web wrapper and does not embed a second render stack.
 - **See all** on Continue Watching, Next Up and Recently Played opens a full grid; a Continue
   Watching card has a hover **Remove** action with Undo.
 - Collections rail so box sets are reachable without opening a library.
+- **Compact Home hero** (Settings → Interface, off by default): one 180 pt card above Continue
+  Watching with the first visible entry's own backdrop, `S2E04 · Overtime · 12 min left`, and
+  Resume / Details. It takes the first focus while it is on, Up from any rail reaches it, and it
+  skips hidden or empty entries rather than borrowing another title's art.
 - Full-bleed ambient backdrop, item logo when the server has one, otherwise the title.
 - Poster art is fetched for **every card in a rail** when Home loads, not just the first
   screenful; rails never uncover empty boxes until a click.
@@ -430,7 +434,7 @@ keys the player already uses.
 ```sh
 cargo test -p jellyfin-api        # 45 API tests, no network
 cargo test -p seerr-api           # 25 Seerr API tests, no network
-cargo test -p runefin             # 343 app tests (22 ignored), headless
+cargo test -p runefin             # 347 app tests (22 ignored), headless
 scripts/check.sh                  # fmt, clippy, all three suites, release build
 scripts/snapshots.sh              # the committed views, in place
 JELLYFIN_URL=... JELLYFIN_USER_ID=... JELLYFIN_TOKEN=... \

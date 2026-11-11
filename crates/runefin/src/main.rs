@@ -1214,6 +1214,7 @@ fn main() {
                 s.light_theme = true;
                 crate::theme::set_light(true);
             }),
+            #[cfg(debug_assertions)]
             ("home-hero", |s| {
                 s.step = Step::Ready {
                     server_name: "example".into(),
@@ -1222,6 +1223,18 @@ fn main() {
                 s.home_data = demo::home();
                 s.home_loaded = true;
                 s.home_hero = true;
+                if let Some(item) = s.home_data.resume.first_mut() {
+                    item.backdrop_image_tags = Some(vec!["demo-backdrop".into()]);
+                }
+                let backdrop = {
+                    let cache = s
+                        .image_cache
+                        .get_or_insert_with(|| rune::ImageCache::new(std::sync::Arc::new(|| {})));
+                    demo::still(cache)
+                };
+                if let Some(key) = s.hero_backdrop_key() {
+                    s.images.insert(key, backdrop);
+                }
             }),
             ("home-contract", |s| {
                 s.step = Step::Ready {
@@ -6426,6 +6439,47 @@ mod tests {
         for key in ["home-hero", "home-hero-title", "home-hero-play"] {
             assert!(rt.find(key).is_some(), "{key}");
         }
+    }
+
+    #[test]
+    fn the_hero_backdrop_follows_the_visible_entry() {
+        let mut state = home_state();
+        state.home_hero = true;
+        let first = state.home_data.resume[0].id.clone();
+        let second = state.home_data.resume[1].id.clone();
+        state.home_data.resume[0].backdrop_image_tags = Some(vec!["one".into()]);
+        state.home_data.resume[1].backdrop_image_tags = Some(vec!["two".into()]);
+        let key = state
+            .hero_backdrop_key()
+            .expect("the first entry's backdrop");
+        assert!(key.contains(&first), "{key}");
+        state.hide_from_home(first.clone());
+        let key = state
+            .hero_backdrop_key()
+            .expect("the next entry's backdrop");
+        assert!(key.contains(&second), "{key}");
+        assert!(
+            !key.contains(&first),
+            "the hidden entry's art is gone: {key}"
+        );
+        // The page's ambient art follows the same entry, so the hero is never over a stranger.
+        let ambient = state.home_backdrop_key().expect("ambient art");
+        assert_eq!(ambient, key);
+    }
+
+    #[test]
+    fn the_compact_hero_takes_the_first_focus_when_it_is_on() {
+        let mut state = home_state();
+        state.big_screen = true;
+        state.home_hero = true;
+        assert_eq!(state.take_focus_key().as_deref(), Some("home-hero-play"));
+        // Off by default: the first Continue Watching card stays the first focus.
+        let mut state = home_state();
+        state.big_screen = true;
+        assert_eq!(
+            state.take_focus_key().as_deref(),
+            Some("rail-continue-watching-quiet-floor")
+        );
     }
 
     #[test]

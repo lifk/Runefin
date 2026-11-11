@@ -1242,6 +1242,15 @@ impl State {
         self.hidden_home.contains(item_id)
     }
 
+    /// The compact hero's subject: the first Continue Watching entry that is not hidden.
+    /// `None` means there is nothing to feature, whatever the setting says.
+    pub fn hero_item(&self) -> Option<&jellyfin_api::Item> {
+        self.home_data
+            .resume
+            .iter()
+            .find(|item| !self.is_home_hidden(&item.id))
+    }
+
     pub fn hide_from_home(&mut self, item_id: String) {
         if !self.hidden_home.insert(item_id.clone()) {
             return;
@@ -2923,6 +2932,9 @@ impl State {
             });
         }
         let key = match &self.route {
+            Route::Home if self.home_hero && self.hero_item().is_some() => {
+                Some("home-hero-play".into())
+            }
             Route::Home => self
                 .home_data
                 .resume
@@ -3810,18 +3822,31 @@ impl State {
 
     /// The backdrop behind Home: the newest item that actually has one. It is deliberately one
     /// image, not a rotating hero, so the page stays quiet and cheap.
+    /// The hero's own backdrop. It must not borrow another film's art just because that film
+    /// has one: a title over the wrong picture is worse than a plain card.
+    pub fn hero_backdrop_key(&self) -> Option<String> {
+        let item = self.hero_item()?;
+        let tag = item.image_tag(ImageKind::Backdrop)?;
+        Some(crate::image::key(
+            &self.config.server_url,
+            &item.id,
+            "Backdrop",
+            Some(tag),
+            HOME_BACKDROP_WIDTH,
+        ))
+    }
+
     pub fn home_backdrop_key(&self) -> Option<String> {
         let item = self
-            .home_data
-            .resume
-            .iter()
-            .chain(
+            .hero_item()
+            .filter(|item| item.image_tag(ImageKind::Backdrop).is_some())
+            .or_else(|| {
                 self.home_data
                     .latest
                     .iter()
-                    .flat_map(|rail| rail.items.iter()),
-            )
-            .find(|item| item.image_tag(ImageKind::Backdrop).is_some())?;
+                    .flat_map(|rail| rail.items.iter())
+                    .find(|item| item.image_tag(ImageKind::Backdrop).is_some())
+            })?;
         let tag = item.image_tag(ImageKind::Backdrop)?;
         Some(crate::image::key(
             &self.config.server_url,
