@@ -18,7 +18,8 @@ use crate::detail::{DetailPage, DetailState, EpisodesPage};
 use crate::handoff::PlaybackHandle;
 use crate::home::{HomeData, HomeLoad};
 use crate::library::{
-    LibraryCounts, LibraryPage, LibraryRequest, LibraryState, SortMode, ViewMode,
+    LibraryCounts, LibraryFacets, LibraryFilter, LibraryPage, LibraryRequest, LibraryState,
+    SortMode, ViewMode,
 };
 use crate::net::{Failure, Msg, ReportKind, Session, Stage, Worker};
 use crate::search::SearchLoad;
@@ -378,6 +379,7 @@ pub struct State {
     pub library_page: Latest<LibraryPage>,
     /// Header counts for the current view: unwatched, missing and unaired.
     library_counts: Latest<LibraryCounts>,
+    library_facets: Latest<LibraryFacets>,
     library_genres: Latest<Result<Vec<Item>, String>>,
     pub detail: Option<DetailState>,
     pub person: Option<PersonPage>,
@@ -798,6 +800,7 @@ impl State {
             playlist_remove_load: Latest::default(),
             library_page: Latest::default(),
             library_counts: Latest::default(),
+            library_facets: Latest::default(),
             library_genres: Latest::default(),
             detail: None,
             person: None,
@@ -1781,6 +1784,7 @@ impl State {
         self.home_collections.set_waker(waker.clone());
         self.library_page.set_waker(waker.clone());
         self.library_counts.set_waker(waker.clone());
+        self.library_facets.set_waker(waker.clone());
         self.library_genres.set_waker(waker.clone());
         self.person_latest.set_waker(waker.clone());
         self.seerr_person_load.set_waker(waker.clone());
@@ -2030,6 +2034,14 @@ impl State {
         }
         if let Some(page) = self.library_page.take() {
             self.apply_library_page(page);
+            changed = true;
+        }
+        if let Some(facets) = self.library_facets.take() {
+            if let Some(library) = &mut self.library {
+                library.studios = facets.studios;
+                library.tags = facets.tags;
+                library.facets_loading = false;
+            }
             changed = true;
         }
         if let Some(counts) = self.library_counts.take() {
@@ -2554,6 +2566,7 @@ impl State {
         self.library_selected.clear();
         self.library_page.cancel();
         self.library_counts.cancel();
+        self.library_facets.cancel();
         self.library_genres.cancel();
         self.detail_page.cancel();
         self.detail_episodes.cancel();
@@ -3408,12 +3421,17 @@ impl State {
 
     pub fn toggle_library_filters(&mut self) {
         let mut fetch = None;
+        let mut facets = false;
         if let Some(library) = &mut self.library {
             library.filters_open = !library.filters_open;
             if library.filters_open && library.genres.is_empty() && !library.genres_loading {
                 library.genres_loading = true;
                 fetch = Some(library.id.clone());
             }
+            facets = library.filters_open && library.studios.is_empty() && library.tags.is_empty();
+        }
+        if facets {
+            self.load_library_facets();
         }
         if let Some(parent) = fetch
             && parent != "__watchlist__"
@@ -3498,6 +3516,9 @@ impl State {
             library.unwatched = false;
             library.favorites = false;
             library.genre = None;
+            library.studio = None;
+            library.tag = None;
+            library.series_status = None;
             library.letter = None;
             library.year = None;
             library.min_rating = None;
@@ -3513,6 +3534,146 @@ impl State {
         self.library_search = rune::TextEdit::new("");
         self.load_library_page(true);
         self.pending_scroll = Some(0.0);
+    }
+
+    /// Remove one chip: only that field resets, then the first page reloads once.
+    pub fn clear_library_filter(&mut self, filter: LibraryFilter) {
+        let mut reload = true;
+        match &mut self.library {
+            Some(library) => {
+                match filter {
+                    LibraryFilter::Unwatched => library.unwatched = false,
+                    LibraryFilter::Favorites => library.favorites = false,
+                    LibraryFilter::Genre => library.genre = None,
+                    LibraryFilter::Studio => library.studio = None,
+                    LibraryFilter::Tag => library.tag = None,
+                    LibraryFilter::Status => library.series_status = None,
+                    LibraryFilter::Year => library.year = None,
+                    LibraryFilter::Rating => library.min_rating = None,
+                    LibraryFilter::Audio => library.audio_language = None,
+                    LibraryFilter::Subtitles => library.subtitle_language = None,
+                    LibraryFilter::HasSubtitles => library.has_subtitles = false,
+                    LibraryFilter::FourK => library.only_4k = false,
+                    LibraryFilter::Missing => library.missing_only = false,
+                    LibraryFilter::Unaired => library.unaired_only = false,
+                    LibraryFilter::Letter => library.letter = None,
+                    LibraryFilter::Search => {
+                        library.search = None;
+                        self.library_search = rune::TextEdit::new("");
+                        self.library_search_due = None;
+                    }
+                }
+                library.set_scroll_y(0.0);
+            }
+            None => reload = false,
+        }
+        if reload {
+            self.load_library_page(true);
+            self.pending_scroll = Some(0.0);
+        }
+    }
+
+    fn load_library_facets(&mut self) {
+        let Some(client) = self.client() else {
+            return;
+        };
+        let (parent, types) = match &mut self.library {
+            Some(library) => {
+                if library.facets_loading {
+                    return;
+                }
+                library.facets_loading = true;
+                (library.id.clone(), library.query().include_types.join(","))
+            }
+            None => return,
+        };
+        self.library_facets.request((), move |_| {
+            let studios = client.studios(200).unwrap_or_default();
+            let parent = (parent != "__watchlist__").then_some(parent.as_str());
+            let tags = client
+                .item_filters(parent, &types)
+                .map(|filters| filters.tags)
+                .unwrap_or_default();
+            LibraryFacets { studios, tags }
+        });
+    }
+
+    pub fn toggle_library_studios(&mut self) {
+        let mut fetch = false;
+        if let Some(library) = &mut self.library {
+            library.studios_open = !library.studios_open;
+            if library.studios_open {
+                library.tags_open = false;
+                fetch = library.studios.is_empty();
+            }
+        }
+        if fetch {
+            self.load_library_facets();
+        }
+    }
+
+    pub fn toggle_library_tags(&mut self) {
+        let mut fetch = false;
+        if let Some(library) = &mut self.library {
+            library.tags_open = !library.tags_open;
+            if library.tags_open {
+                library.studios_open = false;
+                fetch = library.tags.is_empty();
+            }
+        }
+        if fetch {
+            self.load_library_facets();
+        }
+    }
+
+    pub fn select_library_studio(&mut self, studio: Option<(String, String)>) {
+        let changed = match &mut self.library {
+            Some(library) => {
+                library.studio = studio;
+                library.set_scroll_y(0.0);
+                true
+            }
+            None => false,
+        };
+        if changed {
+            self.load_library_page(true);
+            self.pending_scroll = Some(0.0);
+        }
+    }
+
+    pub fn select_library_tag(&mut self, tag: Option<String>) {
+        let changed = match &mut self.library {
+            Some(library) => {
+                library.tag = tag;
+                library.set_scroll_y(0.0);
+                true
+            }
+            None => false,
+        };
+        if changed {
+            self.load_library_page(true);
+            self.pending_scroll = Some(0.0);
+        }
+    }
+
+    /// Any → Continuing → Ended → any. Only meaningful for a series library.
+    pub fn cycle_library_status(&mut self) {
+        let changed = match &mut self.library {
+            Some(library) => {
+                library.series_status = match library.series_status.as_deref() {
+                    None => Some("Continuing".into()),
+                    Some("Continuing") => Some("Ended".into()),
+                    Some(_) => None,
+                };
+                library.set_scroll_y(0.0);
+                true
+            }
+            None => false,
+        };
+        if changed {
+            self.load_library_page(true);
+            self.pending_scroll = Some(0.0);
+        }
     }
 
     /// The letter rail: pressing the selected letter clears it.
@@ -4208,6 +4369,7 @@ mod tests {
             playlist_remove_load: Latest::default(),
             library_page: Latest::default(),
             library_counts: Latest::default(),
+            library_facets: Latest::default(),
             library_genres: Latest::default(),
             detail: None,
             person: None,

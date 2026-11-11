@@ -133,7 +133,9 @@ neither. Past 720 points of scroll a **↑ Top** pill returns to the first row t
 scroll request as reopening the library. In name order the first visible row's letter sticks
 to the top-left while its group scrolls under it; other sorts have no letters. **Filters** opens the full sheet: both facets,
 every sort (Name, Added, Rating, Played, Release, Runtime, Plays, Random), the direction, genre
-chips, year, minimum rating, audio/subtitle language, “has subtitles” and “4K only”. **Select**
+chips, year, minimum rating, audio/subtitle language, “has subtitles”, “4K only”, **studio**,
+**tag** and, for a series library, **Continuing/Ended**. Every active filter is a removable chip
+above the grid, plus **Clear all**; the Filters button counts them. **Select**
 turns the cards into checkboxes with a bulk bar (Mark watched, Clear, Done); no card opens while
 it is on. Capability badges (4K, HDR, CC) come from `MediaSources/MediaStreams` on the page
 request, so they are facts about the file, not guesses from the title.

@@ -89,6 +89,22 @@ fn deep_library_filters_go_on_the_wire() {
 }
 
 #[test]
+fn studio_tag_and_series_status_filters_go_on_the_wire() {
+    let q = ItemQuery {
+        include_types: vec!["Movie", "Series"],
+        recursive: true,
+        studio_ids: vec!["studio-1".into(), "studio-2".into()],
+        tags: vec!["noir".into()],
+        series_status: Some("Continuing".into()),
+        ..ItemQuery::default()
+    }
+    .to_query();
+    assert!(q.contains("studioIds=studio-1%2Cstudio-2"), "{q}");
+    assert!(q.contains("tags=noir"), "{q}");
+    assert!(q.contains("seriesStatus=Continuing"), "{q}");
+}
+
+#[test]
 fn a_recently_played_query_filters_and_sorts_by_date_played() {
     let q = ItemQuery {
         include_types: vec!["Movie", "Episode"],

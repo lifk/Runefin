@@ -78,6 +78,35 @@ pub struct LibraryPage {
     pub error: Option<String>,
 }
 
+/// The studio and tag vocabulary for the filters panel, fetched once per library.
+#[derive(Debug, Clone, Default)]
+pub struct LibraryFacets {
+    pub studios: Vec<Item>,
+    pub tags: Vec<String>,
+}
+
+/// One removable filter. The chips above the grid and `Clear all` use these, so a control can
+/// be removed without clearing the other eleven.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LibraryFilter {
+    Unwatched,
+    Favorites,
+    Genre,
+    Studio,
+    Tag,
+    Status,
+    Year,
+    Rating,
+    Audio,
+    Subtitles,
+    HasSubtitles,
+    FourK,
+    Missing,
+    Unaired,
+    Letter,
+    Search,
+}
+
 /// The header's counts, with the same filters as the visible page. Each is the server's
 /// `TotalRecordCount` for a one-item query, so it is exact without loading the library.
 #[derive(Debug, Clone, Copy, Default)]
@@ -111,6 +140,18 @@ pub struct LibraryState {
     pub favorites: bool,
     /// The selected genre id and name.
     pub genre: Option<(String, String)>,
+    /// The selected studio id and name.
+    pub studio: Option<(String, String)>,
+    /// One free-form tag.
+    pub tag: Option<String>,
+    /// `Continuing` or `Ended` for a series library.
+    pub series_status: Option<String>,
+    /// The studio and tag vocabulary for the filters panel.
+    pub studios: Vec<Item>,
+    pub tags: Vec<String>,
+    pub studios_open: bool,
+    pub tags_open: bool,
+    pub facets_loading: bool,
     /// Genres offered by this library, once fetched.
     pub genres: Vec<Item>,
     pub genres_loading: bool,
@@ -160,6 +201,14 @@ impl LibraryState {
             unwatched: false,
             favorites: false,
             genre: None,
+            studio: None,
+            tag: None,
+            series_status: None,
+            studios: Vec::new(),
+            tags: Vec::new(),
+            studios_open: false,
+            tags_open: false,
+            facets_loading: false,
             genres: Vec::new(),
             genres_loading: false,
             genres_open: false,
@@ -220,6 +269,14 @@ impl LibraryState {
                 .map(|(id, _)| id.clone())
                 .into_iter()
                 .collect();
+            query.studio_ids = self
+                .studio
+                .as_ref()
+                .map(|(id, _)| id.clone())
+                .into_iter()
+                .collect();
+            query.tags = self.tag.clone().into_iter().collect();
+            query.series_status = self.series_status.clone();
             query.name_starts_with = self.letter.clone();
             query.years = self.year.into_iter().collect();
             query.min_community_rating = self.min_rating.map(f64::from);
@@ -252,6 +309,14 @@ impl LibraryState {
             .map(|(id, _)| id.clone())
             .into_iter()
             .collect();
+        query.studio_ids = self
+            .studio
+            .as_ref()
+            .map(|(id, _)| id.clone())
+            .into_iter()
+            .collect();
+        query.tags = self.tag.clone().into_iter().collect();
+        query.series_status = self.series_status.clone();
         query.name_starts_with = self.letter.clone();
         query.years = self.year.into_iter().collect();
         query.min_community_rating = self.min_rating.map(f64::from);
@@ -279,6 +344,9 @@ impl LibraryState {
         self.unwatched.hash(&mut hasher);
         self.favorites.hash(&mut hasher);
         self.genre.hash(&mut hasher);
+        self.studio.hash(&mut hasher);
+        self.tag.hash(&mut hasher);
+        self.series_status.hash(&mut hasher);
         self.year.hash(&mut hasher);
         self.min_rating.hash(&mut hasher);
         self.audio_language.hash(&mut hasher);
@@ -301,6 +369,60 @@ impl LibraryState {
         }
         self.columns = columns;
         true
+    }
+
+    /// Every filter that is on, with the label its chip shows. Order follows the toolbar.
+    pub fn active_filters(&self) -> Vec<(LibraryFilter, String)> {
+        let mut active = Vec::new();
+        if self.unwatched {
+            active.push((LibraryFilter::Unwatched, "Unwatched".to_string()));
+        }
+        if self.favorites {
+            active.push((LibraryFilter::Favorites, "Favourites".to_string()));
+        }
+        if let Some((_, name)) = &self.genre {
+            active.push((LibraryFilter::Genre, format!("Genre: {name}")));
+        }
+        if let Some((_, name)) = &self.studio {
+            active.push((LibraryFilter::Studio, format!("Studio: {name}")));
+        }
+        if let Some(tag) = &self.tag {
+            active.push((LibraryFilter::Tag, format!("Tag: {tag}")));
+        }
+        if let Some(status) = &self.series_status {
+            active.push((LibraryFilter::Status, status.clone()));
+        }
+        if let Some(year) = self.year {
+            active.push((LibraryFilter::Year, year.to_string()));
+        }
+        if let Some(rating) = self.min_rating {
+            active.push((LibraryFilter::Rating, format!("{rating}+ rating")));
+        }
+        if let Some(code) = &self.audio_language {
+            active.push((LibraryFilter::Audio, format!("Audio {code}")));
+        }
+        if let Some(code) = &self.subtitle_language {
+            active.push((LibraryFilter::Subtitles, format!("Subs {code}")));
+        }
+        if self.has_subtitles {
+            active.push((LibraryFilter::HasSubtitles, "Has subtitles".to_string()));
+        }
+        if self.only_4k {
+            active.push((LibraryFilter::FourK, "4K".to_string()));
+        }
+        if self.missing_only {
+            active.push((LibraryFilter::Missing, "Missing".to_string()));
+        }
+        if self.unaired_only {
+            active.push((LibraryFilter::Unaired, "Unaired".to_string()));
+        }
+        if let Some(letter) = &self.letter {
+            active.push((LibraryFilter::Letter, format!("Starts with {letter}")));
+        }
+        if self.search.is_some() {
+            active.push((LibraryFilter::Search, "Search".to_string()));
+        }
+        active
     }
 
     pub fn total_items(&self) -> usize {
@@ -342,6 +464,41 @@ mod tests {
         assert!(query.contains("filters=IsUnplayed%2CIsFavorite"));
         assert!(query.contains("genreIds=genre-drama"));
         assert!(query.contains("nameStartsWith=S"));
+    }
+
+    #[test]
+    fn studio_tag_and_status_reach_the_query() {
+        let mut library = LibraryState::new("m".into(), "Movies".into(), Some("movies".into()));
+        library.studio = Some(("studio-9".into(), "DNA Films".into()));
+        library.tag = Some("noir".into());
+        library.series_status = Some("Continuing".into());
+        let query = library.query().to_query();
+        assert!(query.contains("studioIds=studio-9"), "{query}");
+        assert!(query.contains("tags=noir"), "{query}");
+        assert!(query.contains("seriesStatus=Continuing"), "{query}");
+    }
+
+    #[test]
+    fn active_filters_name_each_choice_in_toolbar_order() {
+        let mut library = LibraryState::new("m".into(), "Movies".into(), Some("movies".into()));
+        library.unwatched = true;
+        library.genre = Some(("g".into(), "Drama".into()));
+        library.studio = Some(("s".into(), "DNA Films".into()));
+        library.tag = Some("noir".into());
+        library.series_status = Some("Ended".into());
+        library.year = Some(2024);
+        let active = library.active_filters();
+        assert_eq!(
+            active,
+            vec![
+                (LibraryFilter::Unwatched, "Unwatched".into()),
+                (LibraryFilter::Genre, "Genre: Drama".into()),
+                (LibraryFilter::Studio, "Studio: DNA Films".into()),
+                (LibraryFilter::Tag, "Tag: noir".into()),
+                (LibraryFilter::Status, "Ended".into()),
+                (LibraryFilter::Year, "2024".into()),
+            ]
+        );
     }
 
     #[test]

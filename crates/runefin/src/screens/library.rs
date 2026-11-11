@@ -91,6 +91,7 @@ fn library_content(s: &State, library: &LibraryState, t: &tok::Theme) -> El {
         .fill(t.bg)
         .child(header)
         .child(library_toolbar(s, library, t))
+        .children(active_filter_chips(library, t))
         .children((s.library_selecting).then(|| bulk_bar(s, t)))
         .children((library.attention_open).then(|| attention_panel(library, t)))
         .children((library.genres_open).then(|| genres_panel(library, t)))
@@ -366,7 +367,10 @@ fn library_toolbar(s: &State, library: &LibraryState, t: &tok::Theme) -> El {
                 |s: &mut State| s.toggle_library_genres(),
             ))
             .child(toolbar_button(
-                "Filters",
+                &match library.active_filters().len() {
+                    0 => "Filters".to_string(),
+                    count => format!("Filters {count}"),
+                },
                 "library-filters",
                 library.filters_open,
                 t,
@@ -615,8 +619,44 @@ fn filters_panel(s: &State, library: &LibraryState, t: &tok::Theme) -> El {
             library.unaired_only,
             t,
             |s: &mut State| s.toggle_library_unaired(),
+        ))
+        .children(
+            (library.collection_type.as_deref() == Some("tvshows")).then(|| {
+                toolbar_button(
+                    &library.series_status.as_ref().map_or_else(
+                        || "Status: any".to_string(),
+                        |status| format!("Status: {status}"),
+                    ),
+                    "filter-status",
+                    library.series_status.is_some(),
+                    t,
+                    |s: &mut State| s.cycle_library_status(),
+                )
+            }),
+        )
+        .child(toolbar_button(
+            &library
+                .studio
+                .as_ref()
+                .map_or_else(|| "Studio: any".to_string(), |(_, name)| name.clone()),
+            "filter-studios",
+            library.studio.is_some() || library.studios_open,
+            t,
+            |s: &mut State| s.toggle_library_studios(),
+        ))
+        .child(toolbar_button(
+            &library
+                .tag
+                .as_ref()
+                .map_or_else(|| "Tag: any".to_string(), |tag| tag.clone()),
+            "filter-tags",
+            library.tag.is_some() || library.tags_open,
+            t,
+            |s: &mut State| s.toggle_library_tags(),
         ));
     panel = panel.child(deep);
+    panel = panel.children((library.studios_open).then(|| studio_panel(library, t)));
+    panel = panel.children((library.tags_open).then(|| tag_panel(library, t)));
     if !library.genres.is_empty() {
         let mut genres = row().w_full().gap(8.0).scroll_x().scroll_edge_fade(16.0);
         for genre in &library.genres {
@@ -674,6 +714,138 @@ fn filters_panel(s: &State, library: &LibraryState, t: &tok::Theme) -> El {
             .font(type_::caption())
             .color(t.text_secondary),
     )
+}
+
+/// The removable chips above the grid. Each one removes only its own filter, so a reader can
+/// loosen a search without rebuilding it.
+fn active_filter_chips(library: &LibraryState, t: &tok::Theme) -> Option<El> {
+    let active = library.active_filters();
+    if active.is_empty() {
+        return None;
+    }
+    let mut bar = row()
+        .key("active-filters")
+        .w_full()
+        .px(theme::gutter())
+        .pb(8.0)
+        .gap(6.0)
+        .items_center()
+        .flex_wrap()
+        .child(
+            text(format!("{} filters", active.len()))
+                .font(type_::caption())
+                .color(t.text_secondary),
+        );
+    for (filter, label) in active {
+        bar = bar.child(
+            el().key(format!("active-filter-{filter:?}"))
+                .role("button")
+                .h(28.0)
+                .px(10.0)
+                .radius(7.0)
+                .center()
+                .fill(t.card)
+                .outline(1.0, 0.0, t.card_border)
+                .hover(t.hover)
+                .motion(motion::SNAPPY)
+                .focusable(true)
+                .focus_visual(2.0)
+                .press_scale(0.96)
+                .cursor(rune::Cursor::Pointer)
+                .label(format!("Remove {label}"))
+                .child(
+                    text(format!("{label} ×"))
+                        .font(type_::caption())
+                        .color(t.text),
+                )
+                .on_press(move |s: &mut State| s.clear_library_filter(filter)),
+        );
+    }
+    Some(bar.child(toolbar_button(
+        "Clear all",
+        "active-filters-clear",
+        false,
+        t,
+        |s: &mut State| s.clear_library_filters(),
+    )))
+}
+
+/// The studio rail inside the filters sheet. The server has hundreds; the list is capped and
+/// scrolls sideways, with "Any" first so the choice is reversible.
+fn studio_panel(library: &LibraryState, t: &tok::Theme) -> El {
+    let mut rail = row()
+        .key("library-studios-panel")
+        .w_full()
+        .h(34.0)
+        .gap(8.0)
+        .scroll_x()
+        .scroll_edge_fade(16.0);
+    rail = rail.child(genre_chip(
+        "Any studio",
+        "studio-any",
+        library.studio.is_none(),
+        t,
+        |s: &mut State| s.select_library_studio(None),
+    ));
+    if library.studios.is_empty() && library.facets_loading {
+        return rail.child(
+            text("Loading studios…")
+                .font(type_::caption())
+                .color(t.text_secondary),
+        );
+    }
+    for studio in library.studios.iter().take(200) {
+        let id = studio.id.clone();
+        let name = studio.name.clone();
+        let selected = library
+            .studio
+            .as_ref()
+            .is_some_and(|(chosen, _)| chosen == &studio.id);
+        rail = rail.child(genre_chip(
+            &studio.name,
+            &format!("studio-{}", studio.id),
+            selected,
+            t,
+            move |s: &mut State| s.select_library_studio(Some((id.clone(), name.clone()))),
+        ));
+    }
+    rail
+}
+
+/// The tag rail, same shape as studios. Tags are free-form server strings.
+fn tag_panel(library: &LibraryState, t: &tok::Theme) -> El {
+    let mut rail = row()
+        .key("library-tags-panel")
+        .w_full()
+        .h(34.0)
+        .gap(8.0)
+        .scroll_x()
+        .scroll_edge_fade(16.0);
+    rail = rail.child(genre_chip(
+        "Any tag",
+        "tag-any",
+        library.tag.is_none(),
+        t,
+        |s: &mut State| s.select_library_tag(None),
+    ));
+    if library.tags.is_empty() && library.facets_loading {
+        return rail.child(
+            text("Loading tags…")
+                .font(type_::caption())
+                .color(t.text_secondary),
+        );
+    }
+    for (index, tag) in library.tags.iter().take(200).enumerate() {
+        let value = tag.clone();
+        rail = rail.child(genre_chip(
+            tag,
+            &format!("tag-{index}"),
+            library.tag.as_deref() == Some(tag.as_str()),
+            t,
+            move |s: &mut State| s.select_library_tag(Some(value.clone())),
+        ));
+    }
+    rail
 }
 
 fn genres_panel(library: &LibraryState, t: &tok::Theme) -> El {
@@ -1332,27 +1504,7 @@ fn library_summary(library: &LibraryState) -> String {
     {
         parts.push(runtime_label(runtime));
     }
-    let filtered = [
-        library.unwatched,
-        library.favorites,
-        library.genre.is_some(),
-        library.year.is_some(),
-        library.min_rating.is_some(),
-        library.audio_language.is_some(),
-        library.subtitle_language.is_some(),
-        library.has_subtitles,
-        library.only_4k,
-        library.missing_only,
-        library.unaired_only,
-        library.letter.is_some(),
-        library.search.is_some(),
-    ]
-    .into_iter()
-    .filter(|filter| *filter)
-    .count();
-    if filtered > 0 {
-        parts.push(format!("{filtered} filter(s)"));
-    }
+    // The chips row above the grid already says how many filters are on and names each one.
     parts.join(" · ")
 }
 
@@ -1451,10 +1603,7 @@ mod tests {
         library.unwatched_total = Some(1);
         library.missing_only = true;
         library.missing_total = Some(1);
-        assert_eq!(
-            library_summary(&library),
-            "1 item · 1 h 30 min · 2 filter(s)"
-        );
+        assert_eq!(library_summary(&library), "1 item · 1 h 30 min");
     }
 
     #[test]

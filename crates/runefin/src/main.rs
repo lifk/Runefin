@@ -1305,6 +1305,29 @@ fn main() {
                 s.library = Some(library);
             }),
             #[cfg(debug_assertions)]
+            ("library-filters", |s| {
+                demo::signed_in(s);
+                let mut library = demo::library(60);
+                library.collection_type = Some("tvshows".into());
+                library.unwatched = true;
+                library.studio = Some(("studio-1".into(), "DNA Films".into()));
+                library.tag = Some("noir".into());
+                library.series_status = Some("Ended".into());
+                library.filters_open = true;
+                library.studios_open = true;
+                library.studios = vec![
+                    demo::studio("studio-1", "DNA Films"),
+                    demo::studio("studio-2", "A24"),
+                    demo::studio("studio-3", "Studio Ghibli"),
+                    demo::studio("studio-4", "Nippon TV"),
+                ];
+                library.tags = vec!["noir".into(), "outbreak".into(), "survival horror".into()];
+                s.route = Route::Library {
+                    id: library.id.clone(),
+                };
+                s.library = Some(library);
+            }),
+            #[cfg(debug_assertions)]
             ("library-attention", |s| {
                 demo::signed_in(s);
                 let mut library = demo::library(60);
@@ -6534,6 +6557,58 @@ mod tests {
                 .as_ref()
                 .is_some_and(|library| library.scroll_y() == 0.0)
         );
+    }
+
+    #[test]
+    fn the_library_chips_clear_one_filter_at_a_time() {
+        let env = Env {
+            system_dark: true,
+            scale: 1.5,
+        };
+        let mut state = library_state(12);
+        if let Some(library) = &mut state.library {
+            library.collection_type = Some("tvshows".into());
+            library.unwatched = true;
+            library.studio = Some(("studio-9".into(), "DNA Films".into()));
+            library.tag = Some("noir".into());
+            library.series_status = Some("Ended".into());
+            library.year = Some(2024);
+            library.filters_open = true;
+            library.studios_open = true;
+            library.studios = vec![demo::studio("studio-9", "DNA Films")];
+            library.tags = vec!["noir".into(), "outbreak".into()];
+        }
+        let mut rt = Runtime::new(state, view, (1280.0, 800.0), env);
+        rt.frame(0.0);
+        for key in [
+            "active-filter-Unwatched",
+            "active-filter-Studio",
+            "active-filter-Tag",
+            "active-filter-Status",
+            "active-filter-Year",
+            "active-filters-clear",
+            "filter-status",
+            "filter-studios",
+            "filter-tags",
+            "library-studios-panel",
+            "studio-any",
+        ] {
+            assert!(rt.find(key).is_some(), "{key}");
+        }
+        // One chip removes one filter and leaves the rest.
+        rt.state
+            .clear_library_filter(crate::library::LibraryFilter::Studio);
+        assert!(
+            rt.state
+                .library
+                .as_ref()
+                .is_some_and(|library| library.studio.is_none())
+        );
+        assert_eq!(rt.state.take_pending_scroll(), Some(0.0));
+        rt.update(|_, tx| tx.settle());
+        rt.frame(0.016);
+        assert!(rt.find("active-filter-Studio").is_none());
+        assert!(rt.find("active-filter-Tag").is_some());
     }
 
     #[test]

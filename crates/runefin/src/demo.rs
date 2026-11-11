@@ -707,6 +707,17 @@ pub fn contrast_backdrop(cache: &rune::ImageCache) -> rune::Image {
     contrast_pixels(cache, 1280, 720)
 }
 
+/// One studio for the library filter fixtures.
+#[cfg(any(test, debug_assertions))]
+pub fn studio(id: &str, name: &str) -> Item {
+    Item {
+        id: id.into(),
+        name: name.into(),
+        kind: "Studio".into(),
+        ..Item::default()
+    }
+}
+
 /// A Shows library: series cards, no streams on the page, so the header offers a server-side
 /// episode shuffle instead of "Play all".
 #[cfg(any(test, debug_assertions))]

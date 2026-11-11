@@ -713,6 +713,34 @@ impl Client {
         Ok(self.get::<ItemsResult>(&path)?.items)
     }
 
+    /// `GET /Studios`: the studios present on the server, alphabetically. The library filter
+    /// uses their ids; the server ANDs nothing, so one id is enough for one choice.
+    pub fn studios(&self, limit: u32) -> Result<Vec<Item>> {
+        let path = format!(
+            "/Studios?userId={}&sortBy=SortName&limit={limit}",
+            urlencode(self.user()?)
+        );
+        Ok(self.get::<ItemsResult>(&path)?.items)
+    }
+
+    /// `GET /Items/Filters2`: the tag vocabulary a filter can offer. Genres already come from
+    /// `/Genres`; only the tag list is read here.
+    pub fn item_filters(
+        &self,
+        parent_id: Option<&str>,
+        include_types: &str,
+    ) -> Result<ItemFilters> {
+        let mut path = format!(
+            "/Items/Filters2?userId={}&includeItemTypes={}",
+            urlencode(self.user()?),
+            urlencode(include_types)
+        );
+        if let Some(parent) = parent_id {
+            path.push_str(&format!("&parentId={}", urlencode(parent)));
+        }
+        self.get(&path)
+    }
+
     /// The movies and shows a person appears in. `personIds` is the server's own credit query,
     /// not a name search, so it includes roles the index does not put in the text field.
     pub fn person_items(&self, person_id: &str, limit: u32) -> Result<Vec<Item>> {
@@ -1398,6 +1426,14 @@ struct OpenLiveStream {
     media_source: Option<LiveSource>,
 }
 
+/// The slice of `Filters2` this app reads. Unknown fields are ignored by serde.
+#[derive(Debug, Clone, Default, serde::Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct ItemFilters {
+    #[serde(default)]
+    pub tags: Vec<String>,
+}
+
 /// The subset of `/Users/{id}/Items` this app uses. Built with methods so screens stay readable.
 #[derive(Debug, Clone, Default)]
 pub struct ItemQuery {
@@ -1430,6 +1466,12 @@ pub struct ItemQuery {
     pub is_4k: bool,
     pub missing_only: bool,
     pub unaired_only: bool,
+    /// Studio ids, combined with OR by the server.
+    pub studio_ids: Vec<String>,
+    /// Free-form tags, combined with OR by the server.
+    pub tags: Vec<String>,
+    /// `Continuing` or `Ended` for series.
+    pub series_status: Option<String>,
     /// Extra `/Items` fields (for example `Chapters`) appended after `UserData`.
     pub extra_fields: Option<String>,
 }
@@ -1509,6 +1551,15 @@ impl ItemQuery {
         }
         if self.unaired_only {
             filters.push("IsUnaired");
+        }
+        if !self.studio_ids.is_empty() {
+            push("studioIds", &self.studio_ids.join(","));
+        }
+        if !self.tags.is_empty() {
+            push("tags", &self.tags.join(","));
+        }
+        if let Some(status) = &self.series_status {
+            push("seriesStatus", status);
         }
         if !self.genre_ids.is_empty() {
             push("genreIds", &self.genre_ids.join(","));

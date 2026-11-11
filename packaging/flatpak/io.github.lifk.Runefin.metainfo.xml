@@ -42,6 +42,15 @@
   </screenshots>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.1.28" date="2026-11-11">
+      <description>
+        <p>
+          The library filter sheet adds studio, tag and, for series, Continuing/Ended. Filters
+          are now removable chips above the grid with Clear all, and the Filters button counts
+          the active ones. Studio and tag lists come from the server once per library.
+        </p>
+      </description>
+    </release>
     <release version="0.1.27" date="2026-11-11">
       <description>
         <p>
