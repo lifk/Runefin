@@ -188,6 +188,9 @@ pub struct Item {
         Option<std::collections::HashMap<String, std::collections::HashMap<String, TrickplayInfo>>>,
     /// Files and streams, when the request includes `fields=MediaSources`.
     pub media_sources: Vec<MediaSource>,
+    /// How many special features the item has, when the request includes
+    /// `fields=SpecialFeatureCount`.
+    pub special_feature_count: Option<i32>,
     /// `TvChannel`: the dial number the server or tuner assigned.
     pub channel_number: Option<String>,
     /// Trailers hosted by a provider (Jellyfin stores YouTube URLs here).

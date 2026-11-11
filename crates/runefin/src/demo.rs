@@ -1510,6 +1510,8 @@ fn library_items(count: usize) -> Vec<Item> {
             // watched state only make that test clone more.
             official_rating: (count <= 500).then(|| "PG-13".into()),
             run_time_ticks: (count <= 500).then(|| 10_000 * 60_000 * (90 + index as i64)),
+            // A few cards carry special features so the extras badge is in the snapshots.
+            special_feature_count: (count <= 500 && index % 10 == 0).then_some(2),
             date_created: (count <= 500).then(|| days_ago(index % 40 + 1)),
             user_data: (count <= 500).then(|| UserData {
                 played: index % 3 == 2,

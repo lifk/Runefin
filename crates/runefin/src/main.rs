@@ -217,6 +217,12 @@ fn setup(s: &mut State, waker: rune::Waker) {
 fn poll(s: &mut State, _clock: f64, tx: &mut Tx) -> bool {
     let started = std::time::Instant::now();
     let mut changed = s.poll();
+    if s.poll_hover_preview() {
+        changed = true;
+    }
+    if s.hover_preview.is_some() {
+        tx.wake_after(std::time::Duration::from_millis(120));
+    }
     if let Some(key) = s.take_focus_key() {
         s.note_focus(key.clone());
         tx.focus_key(key);
@@ -1303,6 +1309,41 @@ fn main() {
                     id: library.id.clone(),
                 };
                 s.library = Some(library);
+            }),
+            #[cfg(debug_assertions)]
+            ("library-hover", |s| {
+                demo::signed_in(s);
+                let library = demo::library(60);
+                s.route = Route::Library {
+                    id: library.id.clone(),
+                };
+                s.library = Some(library);
+                s.hover_preview_enabled = true;
+                let mut item = s
+                    .library
+                    .as_ref()
+                    .and_then(|library| library.items.first())
+                    .cloned()
+                    .expect("a first film");
+                item.trickplay = Some(demo::trickplay_manifest());
+                item.run_time_ticks = Some(45 * 60_000 * jellyfin_api::TICKS_PER_MS);
+                let key = s.trickplay_key(&item, 20_000).expect("a tile");
+                let sprite = {
+                    let cache = s
+                        .image_cache
+                        .get_or_insert_with(|| rune::ImageCache::new(std::sync::Arc::new(|| {})));
+                    demo::trickplay_sprite(cache)
+                };
+                s.images.insert(key.clone(), sprite);
+                s.hover_preview = Some(crate::state::HoverPreview {
+                    item_id: item.id.clone(),
+                    since: std::time::Instant::now(),
+                    item: Some(item),
+                    requested: true,
+                    tile: Some(key),
+                    frame_ms: 20_000,
+                    tile_at: None,
+                });
             }),
             #[cfg(debug_assertions)]
             ("library-filters", |s| {
@@ -6557,6 +6598,77 @@ mod tests {
                 .as_ref()
                 .is_some_and(|library| library.scroll_y() == 0.0)
         );
+    }
+
+    #[test]
+    fn hover_previews_are_opt_in_and_never_start_while_off() {
+        let mut state = home_state();
+        assert!(!state.hover_preview_enabled);
+        state.start_hover_preview("film-000".into());
+        assert!(
+            state.hover_preview.is_none(),
+            "a preview must never surprise: off means off"
+        );
+        state.toggle_hover_preview();
+        state.start_hover_preview("film-000".into());
+        assert_eq!(
+            state.hover_preview.as_ref().map(|p| p.item_id.as_str()),
+            Some("film-000")
+        );
+        state.stop_hover_preview();
+        assert!(state.hover_preview.is_none());
+    }
+
+    #[test]
+    fn a_rested_hover_draws_a_silent_preview() {
+        let env = Env {
+            system_dark: true,
+            scale: 1.5,
+        };
+        let mut state = library_state(12);
+        state.hover_preview_enabled = true;
+        let mut item = demo::library(1).items.remove(0);
+        item.id = "film-000".into();
+        item.run_time_ticks = Some(45 * 60_000 * jellyfin_api::TICKS_PER_MS);
+        item.trickplay = Some(demo::trickplay_manifest());
+        let key = state.trickplay_key(&item, 20_000).expect("a tile");
+        let sprite = {
+            let cache = state
+                .image_cache
+                .get_or_insert_with(|| rune::ImageCache::new(std::sync::Arc::new(|| {})));
+            demo::trickplay_sprite(cache)
+        };
+        state.images.insert(key.clone(), sprite);
+        state.hover_preview = Some(crate::state::HoverPreview {
+            item_id: "film-000".into(),
+            since: std::time::Instant::now(),
+            item: Some(item),
+            requested: true,
+            tile: Some(key),
+            frame_ms: 20_000,
+            tile_at: None,
+        });
+        let mut rt = Runtime::new(state, view, (1280.0, 800.0), env);
+        rt.frame(0.0);
+        assert!(rt.find("hover-preview-film-000").is_some());
+        // The preview is silent by construction: there is no player in this state at all.
+        assert!(rt.state.in_app.is_none());
+    }
+
+    #[test]
+    fn a_card_with_extras_carries_the_badge() {
+        let env = Env {
+            system_dark: true,
+            scale: 1.5,
+        };
+        let mut state = library_state(12);
+        if let Some(library) = &mut state.library {
+            library.items[0].special_feature_count = Some(2);
+        }
+        let mut rt = Runtime::new(state, view, (1280.0, 800.0), env);
+        rt.frame(0.0);
+        assert!(rt.find("badge-extras-film-000").is_some());
+        assert!(rt.find("badge-extras-film-001").is_none());
     }
 
     #[test]

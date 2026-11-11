@@ -357,3 +357,16 @@ fn a_report_serialises_with_jellyfin_field_names() {
     assert!(json.contains("\"PlayMethod\":\"Transcode\""));
     assert!(json.contains("\"PlaySessionId\":\"session-1\""));
 }
+
+#[test]
+fn the_special_feature_count_is_read_when_the_field_is_asked_for() {
+    let item: Item = serde_json::from_str(
+        r#"{"Id":"m1","Name":"With Extras","Type":"Movie","SpecialFeatureCount":3}"#,
+    )
+    .expect("an item");
+    assert_eq!(item.special_feature_count, Some(3));
+    // Omitted by default, and that is not an error or a zero.
+    let plain: Item =
+        serde_json::from_str(r#"{"Id":"m2","Name":"No Extras","Type":"Movie"}"#).expect("an item");
+    assert_eq!(plain.special_feature_count, None);
+}

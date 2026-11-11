@@ -131,6 +131,9 @@ pub struct Config {
     pub shortcuts: Option<KeyBindings>,
     #[serde(default)]
     pub home_hero: Option<bool>,
+    /// Opt-in trickplay previews on a poster hover. Off by default; always silent.
+    #[serde(default)]
+    pub hover_preview: Option<bool>,
     #[serde(default)]
     pub light_theme: Option<bool>,
     /// `"big-screen"` for the 10-foot layout; absent or `"desktop"` is the desk UI.

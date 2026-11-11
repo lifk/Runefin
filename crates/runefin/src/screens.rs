@@ -2551,6 +2551,60 @@ pub(super) fn card(item: &Item, rail: &str, s: &State, t: &tok::Theme) -> El {
                 .outline(2.0, -1.0, rune::Color::WHITE.alpha(0.62))
                 .group_opacity(0.0, 1.0),
         );
+    // The silent hover preview: a trickplay frame from the item, drawn over its poster once
+    // the pointer has rested. It is opt-in and has no audio track at all.
+    if s.hover_preview_enabled
+        && let Some(preview) = s.hover_preview.as_ref()
+        && preview.item_id == item.id
+        && let Some(key) = preview.tile.as_deref()
+        && let Some(image) = s.images.get(key)
+        && let Some(manifest) = preview.item.as_ref()
+        && let Some((_, info)) = manifest.trickplay_manifest()
+    {
+        let frame_ms = preview.frame_ms;
+        let (column, row) = info.cell_of(info.thumbnail_at(frame_ms));
+        let scale = CARD_W / info.width.max(1) as f32;
+        let sprite_width = info.width.max(1) as f32 * info.tile_width.max(1) as f32 * scale;
+        let sprite_height = info.height.max(1) as f32 * info.tile_height.max(1) as f32 * scale;
+        poster_box = poster_box
+            .child(
+                el().absolute(
+                    -(column as f32) * info.width.max(1) as f32 * scale,
+                    -(row as f32) * info.height.max(1) as f32 * scale,
+                )
+                .w(sprite_width)
+                .h(sprite_height)
+                .inert()
+                .pixels_fit(image.pixels(), SurfaceFit::Fill),
+            )
+            .child(
+                el().key(format!("hover-preview-{}", item.id))
+                    .inert()
+                    .absolute(8.0, CARD_H - 30.0)
+                    .h(20.0)
+                    .px(7.0)
+                    .radius(6.0)
+                    .center()
+                    .fill(rune::Color::BLACK.alpha(0.68))
+                    .child(
+                        text(format!(
+                            "PREVIEW · {}",
+                            crate::detail::format_time(frame_ms)
+                        ))
+                        .font(type_::mono_caption())
+                        .color(rune::Color::WHITE.alpha(0.92)),
+                    ),
+            );
+    }
+    let hover_id = item.id.clone();
+    poster_box = poster_box.on_hover_change(move |s: &mut State, inside, tx: &mut rune::Tx| {
+        if inside {
+            s.start_hover_preview(hover_id.clone());
+        } else {
+            s.stop_hover_preview();
+        }
+        tx.settle();
+    });
     // A play button over the poster, on hover: the fastest path from a card to the film.
     // Containers (a Series) have no stream of their own, so they keep the plain card.
     if crate::state::is_playable(item) {
@@ -2716,6 +2770,36 @@ pub(super) fn card(item: &Item, rail: &str, s: &State, t: &tok::Theme) -> El {
         if on {
             labels.push((label, key));
         }
+    }
+    let extras = item.special_feature_count.unwrap_or(0);
+    if extras > 0 {
+        // Extras sit at the top-left: the capability tray is top-right and the play puck is
+        // bottom-right, so the corners never argue.
+        poster_box = poster_box.child(
+            el().key(format!("badge-extras-{}", item.id))
+                .role("img")
+                .absolute(8.0, 8.0)
+                .h(20.0)
+                .px(7.0)
+                .radius(6.0)
+                .center()
+                .fill(rune::Color::BLACK.alpha(0.62))
+                .outline(1.0, 0.0, rune::Color::WHITE.alpha(0.10))
+                .shadow(1.0, 2.0, rune::Color::BLACK.alpha(0.30))
+                .label(format!(
+                    "{extras} extra{}",
+                    if extras == 1 { "" } else { "s" }
+                ))
+                .child(
+                    text(if extras > 1 {
+                        format!("+{extras} EXTRA")
+                    } else {
+                        "EXTRA".to_string()
+                    })
+                    .font(type_::mono_caption())
+                    .color(rune::Color::WHITE.alpha(0.92)),
+                ),
+        );
     }
     if !labels.is_empty() {
         // One tray, not four floating pills: the poster shows through the gaps of separate

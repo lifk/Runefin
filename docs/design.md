@@ -123,6 +123,14 @@ focus on Home while it is on, sits above the rails in the focus order (Up from a
 Resume), and is skipped when Continue Watching is empty or its entry is hidden. It never borrows
 another title's backdrop, and it never grows to a full-height billboard.
 
+**Hover preview (optional, off by default).** Settings → Interface turns on silent trickplay
+previews: after the pointer rests on a poster for 1.1 s, the card shows that item's own
+trickplay frames through the middle 76 % of its runtime, one every ~750 ms, with a `PREVIEW`
+badge and timestamp. It fetches one manifest and one sprite tile, keeps only the current tile,
+and stops the moment the pointer leaves. There is no audio track and no second player, so a
+preview cannot make sound or play the wrong stream; an item without trickplay simply does not
+preview.
+
 **Library.** Toolbar (sort, facets — Unwatched, Favourites, Genre — Filters, Select, grid/list,
 letter rail when sorted by name) over a virtualized
 grid, 100 items per fetch, one page prefetched. The heading carries a summary from the server's
@@ -137,7 +145,9 @@ chips, year, minimum rating, audio/subtitle language, “has subtitles”, “4K
 **tag** and, for a series library, **Continuing/Ended**. Every active filter is a removable chip
 above the grid, plus **Clear all**; the Filters button counts them. **Select**
 turns the cards into checkboxes with a bulk bar (Mark watched, Clear, Done); no card opens while
-it is on. Capability badges (4K, HDR, CC) come from `MediaSources/MediaStreams` on the page
+it is on. Capability badges (4K, HDR, CC) come from `MediaSources/MediaStreams` on the page, and an
+`EXTRA` badge from `SpecialFeatureCount`, so a disc's special features are visible before the
+detail page
 request, so they are facts about the file, not guesses from the title.
 
 **Watchlist.** The sidebar's Watchlist is the server's favourite flag as one cross-library page

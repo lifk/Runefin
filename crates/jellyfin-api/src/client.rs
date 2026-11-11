@@ -366,6 +366,16 @@ impl Client {
         self.get(&path)
     }
 
+    /// `GET /Items/{id}?fields=Trickplay` for a hover preview: the manifest without the
+    /// media sources and chapters the player asks for.
+    pub fn trickplay_item(&self, id: &str) -> Result<Item> {
+        self.get(&format!(
+            "/Items/{}?userId={}&fields=Trickplay",
+            urlencode(id),
+            urlencode(self.user()?)
+        ))
+    }
+
     /// `POST /Items/{id}/PlaybackInfo`: the direct-play-first negotiation.
     pub fn playback_info(
         &self,

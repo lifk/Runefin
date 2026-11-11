@@ -42,6 +42,17 @@
   </screenshots>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.1.30" date="2026-11-11">
+      <description>
+        <p>
+          Cards carry an EXTRA badge when the item has special features, read from the
+          server's SpecialFeatureCount field. And optional silent hover previews: after a
+          second on a poster, the card cycles the item's own trickplay frames through the
+          middle of its runtime with a PREVIEW timestamp. Off by default, no audio and no
+          second player, and it keeps only one tile in memory.
+        </p>
+      </description>
+    </release>
     <release version="0.1.28" date="2026-11-11">
       <description>
         <p>

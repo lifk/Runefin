@@ -337,6 +337,21 @@ struct FocusLayers {
     queue: bool,
 }
 
+/// A poster hover preview. Trickplay frames are silent by construction: there is no audio
+/// track to forget to mute, and no second pipeline to fail.
+#[derive(Debug, Clone)]
+pub struct HoverPreview {
+    pub item_id: String,
+    pub since: std::time::Instant,
+    /// The item with its trickplay manifest, once the hover request answered.
+    pub item: Option<Item>,
+    pub requested: bool,
+    /// The current sprite tile and the position it shows.
+    pub tile: Option<String>,
+    pub frame_ms: i64,
+    pub tile_at: Option<std::time::Instant>,
+}
+
 pub struct State {
     pub config: Config,
     pub server: TextEdit,
@@ -380,6 +395,7 @@ pub struct State {
     /// Header counts for the current view: unwatched, missing and unaired.
     library_counts: Latest<LibraryCounts>,
     library_facets: Latest<LibraryFacets>,
+    hover_preview_load: Latest<(String, Option<Item>)>,
     library_genres: Latest<Result<Vec<Item>, String>>,
     pub detail: Option<DetailState>,
     pub person: Option<PersonPage>,
@@ -699,6 +715,9 @@ pub struct State {
     pub spoiler_guard: bool,
     pub saved_views: Vec<crate::config::SavedView>,
     pub home_hero: bool,
+    /// Opt-in trickplay previews while the pointer rests on a poster.
+    pub hover_preview_enabled: bool,
+    pub hover_preview: Option<HoverPreview>,
     pub light_theme: bool,
     /// The running interface mode. The saved choice is `config.ui_mode`; a change needs a
     /// restart because the layout scale is fixed at window creation.
@@ -801,6 +820,7 @@ impl State {
             library_page: Latest::default(),
             library_counts: Latest::default(),
             library_facets: Latest::default(),
+            hover_preview_load: Latest::default(),
             library_genres: Latest::default(),
             detail: None,
             person: None,
@@ -1043,6 +1063,8 @@ impl State {
             spoiler_guard: true,
             saved_views: Vec::new(),
             home_hero: false,
+            hover_preview_enabled: false,
+            hover_preview: None,
             light_theme: false,
             big_screen,
             ui_mode_restart: false,
@@ -1103,6 +1125,7 @@ impl State {
         state.spoiler_guard = state.config.spoiler_guard.unwrap_or(true);
         state.saved_views = state.config.saved_views.clone().unwrap_or_default();
         state.home_hero = state.config.home_hero.unwrap_or(false);
+        state.hover_preview_enabled = state.config.hover_preview.unwrap_or(false);
         state.light_theme = state.config.light_theme.unwrap_or(false);
         crate::theme::set_light(state.light_theme);
         state.text_scale = match state.config.text_scale.unwrap_or(1.0) {
@@ -1727,6 +1750,7 @@ impl State {
         self.config.spoiler_guard = Some(self.spoiler_guard);
         self.config.saved_views = Some(self.saved_views.clone());
         self.config.home_hero = Some(self.home_hero);
+        self.config.hover_preview = Some(self.hover_preview_enabled);
         self.config.light_theme = Some(self.light_theme);
         self.config.high_contrast = Some(self.high_contrast);
         self.config.text_scale = Some(self.text_scale);
@@ -1785,6 +1809,7 @@ impl State {
         self.library_page.set_waker(waker.clone());
         self.library_counts.set_waker(waker.clone());
         self.library_facets.set_waker(waker.clone());
+        self.hover_preview_load.set_waker(waker.clone());
         self.library_genres.set_waker(waker.clone());
         self.person_latest.set_waker(waker.clone());
         self.seerr_person_load.set_waker(waker.clone());
@@ -2034,6 +2059,13 @@ impl State {
         }
         if let Some(page) = self.library_page.take() {
             self.apply_library_page(page);
+            changed = true;
+        }
+        if let Some((id, item)) = self.hover_preview_load.take()
+            && let Some(preview) = &mut self.hover_preview
+            && preview.item_id == id
+        {
+            preview.item = item;
             changed = true;
         }
         if let Some(facets) = self.library_facets.take() {
@@ -3245,6 +3277,137 @@ impl State {
         self.home_hero = !self.home_hero;
     }
 
+    pub fn toggle_hover_preview(&mut self) {
+        self.hover_preview_enabled = !self.hover_preview_enabled;
+        if !self.hover_preview_enabled {
+            self.stop_hover_preview();
+        }
+    }
+
+    /// The pointer entered a poster. Nothing is fetched or drawn for the first second: a
+    /// preview that starts while the pointer crosses a rail would be a strobe.
+    pub fn start_hover_preview(&mut self, item_id: String) {
+        if !self.hover_preview_enabled {
+            return;
+        }
+        if self
+            .hover_preview
+            .as_ref()
+            .is_some_and(|preview| preview.item_id == item_id)
+        {
+            return;
+        }
+        self.stop_hover_preview();
+        self.hover_preview = Some(HoverPreview {
+            item_id,
+            since: std::time::Instant::now(),
+            item: None,
+            requested: false,
+            tile: None,
+            frame_ms: 0,
+            tile_at: None,
+        });
+    }
+
+    pub fn stop_hover_preview(&mut self) {
+        let Some(preview) = self.hover_preview.take() else {
+            return;
+        };
+        self.hover_preview_load.cancel();
+        if let Some(key) = preview.tile {
+            self.forget_image(&key);
+        }
+    }
+
+    fn forget_image(&mut self, key: &str) {
+        self.images.remove(key);
+        self.placeholders.remove(key);
+        self.image_fades.remove(key);
+        self.image_order.retain(|old| old != key);
+        self.requested_images.remove(key);
+    }
+
+    /// Fetch the manifest once, then one tile at a time. Returns true when the drawn frame
+    /// changed. Called from `main::poll`, which owns the wake lane.
+    pub fn poll_hover_preview(&mut self) -> bool {
+        let Some(preview) = &self.hover_preview else {
+            return false;
+        };
+        let elapsed = preview.since.elapsed();
+        let requested = preview.requested;
+        let item = preview.item.clone();
+        let tile_at = preview.tile_at;
+        let item_id = preview.item_id.clone();
+        if !self.hover_preview_enabled {
+            self.stop_hover_preview();
+            return true;
+        }
+        if elapsed < std::time::Duration::from_millis(1_100) {
+            return false;
+        }
+        let Some(item) = item else {
+            if !requested && let Some(client) = self.client() {
+                if let Some(preview) = &mut self.hover_preview {
+                    preview.requested = true;
+                }
+                self.hover_preview_load.request(item_id.clone(), move |id| {
+                    (id.clone(), client.trickplay_item(&id).ok())
+                });
+            }
+            return false;
+        };
+        if tile_at.is_some_and(|at| at.elapsed() < std::time::Duration::from_millis(750)) {
+            return false;
+        }
+        let runtime = item.runtime_ms().unwrap_or(0);
+        if runtime <= 0 {
+            return false;
+        }
+        // Loop through the middle 76 % of the item at 1.2× real time: enough motion to read,
+        // never a spoiler for the last act.
+        let started = (elapsed.as_secs_f32() - 1.1).max(0.0);
+        let phase = (started * 0.02).rem_euclid(1.0);
+        let ms = (runtime as f32 * 0.12 + runtime as f32 * 0.76 * phase) as i64;
+        let Some(key) = self.ensure_hover_tile(&item, ms) else {
+            return false;
+        };
+        // Keep the previous frame until the next one is decoded; a blank poster every 750 ms
+        // would be worse than no preview.
+        if !self.images.contains_key(&key) {
+            return false;
+        }
+        let old = self.hover_preview.as_ref().and_then(|p| p.tile.clone());
+        if let Some(preview) = &mut self.hover_preview {
+            preview.tile = Some(key.clone());
+            preview.frame_ms = ms;
+            preview.tile_at = Some(std::time::Instant::now());
+        }
+        if let Some(old) = old
+            && old != key
+        {
+            self.forget_image(&old);
+        }
+        true
+    }
+
+    fn ensure_hover_tile(&mut self, item: &Item, ms: i64) -> Option<String> {
+        let (width, info) = item.trickplay_manifest()?;
+        let key = self.trickplay_key(item, ms)?;
+        if !self.images.contains_key(&key) && !self.requested_images.contains(&key) {
+            let client = self.client()?;
+            let tile = info.tile_of(info.thumbnail_at(ms));
+            if let Some(url) = client.trickplay_url(&item.id, width, tile) {
+                self.send_images(vec![(
+                    key.clone(),
+                    url,
+                    None,
+                    crate::net::ImagePriority::Low,
+                )]);
+            }
+        }
+        Some(key)
+    }
+
     pub fn export_history(&mut self) {
         if self.history.is_empty() {
             self.show_toast("There is no history to export.");
@@ -4370,6 +4533,7 @@ mod tests {
             library_page: Latest::default(),
             library_counts: Latest::default(),
             library_facets: Latest::default(),
+            hover_preview_load: Latest::default(),
             library_genres: Latest::default(),
             detail: None,
             person: None,
@@ -4601,6 +4765,8 @@ mod tests {
             spoiler_guard: true,
             saved_views: Vec::new(),
             home_hero: false,
+            hover_preview_enabled: false,
+            hover_preview: None,
             light_theme: false,
             big_screen: false,
             ui_mode_restart: false,

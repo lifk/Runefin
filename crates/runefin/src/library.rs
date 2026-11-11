@@ -261,7 +261,8 @@ impl LibraryState {
             query.include_types = vec!["Movie", "Series", "Episode", "BoxSet"];
             query.sort_by = Some(self.sort.sort_by());
             query.descending = !self.ascending;
-            query.extra_fields = Some("MediaSources,MediaStreams,DateCreated".into());
+            query.extra_fields =
+                Some("MediaSources,MediaStreams,DateCreated,SpecialFeatureCount".into());
             query.unwatched_only = self.unwatched;
             query.genre_ids = self
                 .genre
@@ -329,7 +330,8 @@ impl LibraryState {
         query.search = self.search.clone();
         // Capability badges need the streams; without this the server omits them and every
         // card would look SDR and subtitle-less.
-        query.extra_fields = Some("MediaSources,MediaStreams,DateCreated".into());
+        query.extra_fields =
+            Some("MediaSources,MediaStreams,DateCreated,SpecialFeatureCount".into());
         query
     }
 

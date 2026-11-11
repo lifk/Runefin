@@ -93,13 +93,18 @@ web wrapper and does not embed a second render stack.
   missing, unaired, **studio**, **tag**, and **Continuing/Ended** for series; the button counts
   the active ones.
 - Every active filter is a removable chip above the grid, with **Clear all**.
+- Optional **hover preview** (Settings → Interface, off by default): after 1.1 s on a poster,
+  its silent trickplay frames cycle with a `PREVIEW` timestamp. No audio and no player; a title
+  without trickplay simply does not preview.
 - Header summary from exact server counts: `60 items · 11 unwatched · 2 missing · 4 d 23 h`
   (runtime only when every item is loaded).
 - **Attention** chip and panel when the library has missing or unaired items, with both counts;
   one click applies that filter (also in the Filters sheet).
 - **↑ Top** pill past 720 points of scroll, and a sticky letter band that names the first
   visible row while a name-sorted grid or list scrolls.
-- Grid/list toggle; card shows poster, watched badge and resume progress.
+- Grid/list toggle; card shows poster, watched badge and resume progress, capability badges
+  (4K/HDR/CC/5.1/Atmos/VERS/NEW) and an `EXTRA` badge when the item has special features
+  (`SpecialFeatureCount`).
 - Quick play puck on hover; it does **not** navigate. Right-click or **Menu / ⇧F10** opens the
   item menu (watch state, favourite, resume removal, add to playlist/collection, Play on…).
 - Playlist editing: remove entries, move them up/down, or drag a poster to move it by whole rows.
@@ -444,7 +449,7 @@ keys the player already uses.
 ```sh
 cargo test -p jellyfin-api        # 45 API tests, no network
 cargo test -p seerr-api           # 25 Seerr API tests, no network
-cargo test -p runefin             # 355 app tests (22 ignored), headless
+cargo test -p runefin             # 358 app tests (22 ignored), headless
 scripts/check.sh                  # fmt, clippy, all three suites, release build
 scripts/snapshots.sh              # the committed views, in place
 JELLYFIN_URL=... JELLYFIN_USER_ID=... JELLYFIN_TOKEN=... \

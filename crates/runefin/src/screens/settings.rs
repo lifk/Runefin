@@ -376,6 +376,12 @@ pub(super) fn settings_screen(s: &State) -> El {
             (|s: &mut State| s.toggle_home_hero()) as fn(&mut State),
         ),
         (
+            "setting-hover-preview",
+            "Hover previews",
+            if s.hover_preview_enabled { "On" } else { "Off" }.to_string(),
+            (|s: &mut State| s.toggle_hover_preview()) as fn(&mut State),
+        ),
+        (
             "setting-spoiler-guard",
             "Spoiler guard",
             if s.spoiler_guard { "On" } else { "Off" }.to_string(),
@@ -480,6 +486,7 @@ pub(super) fn settings_screen(s: &State) -> El {
                 | "setting-light-theme"
                 | "setting-text-scale"
                 | "setting-home-hero"
+                | "setting-hover-preview"
                 | "setting-reduce-motion"
         );
         let target = if listening_row {
