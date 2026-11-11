@@ -914,6 +914,7 @@ fn shelf_screen(s: &State, shelf: crate::state::HomeShelf) -> El {
                 .h_full()
                 .padding(theme::gutter())
                 .gap(18.0)
+                .focus_group()
                 .child(
                     row()
                         .w_full()
@@ -2124,6 +2125,7 @@ pub(super) fn card_menu(s: &State) -> El {
         .padding(6.0)
         .gap(2.0)
         .radius(10.0)
+        .focus_group()
         .child(
             text(menu.item.name.clone())
                 .font(type_::caption())
@@ -2319,6 +2321,7 @@ pub(super) fn card_menu(s: &State) -> El {
 fn cast_picker(s: &State, t: &tok::Theme) -> El {
     let mut panel = col()
         .key("cast-picker")
+        .focus_group()
         .w(380.0)
         .padding(16.0)
         .gap(6.0)

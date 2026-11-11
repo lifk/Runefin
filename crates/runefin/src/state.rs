@@ -326,6 +326,7 @@ struct FocusLayers {
     cast_picker: bool,
     preplay: bool,
     still_watching: bool,
+    resume_conflict: bool,
     quality: bool,
     sleep: bool,
     goto: bool,
@@ -3250,6 +3251,14 @@ impl State {
                 return Some("still-watching-continue".into());
             }
             self.focus_first = true;
+        }
+        let resume_conflict = self.resume_conflict.is_some();
+        if resume_conflict != self.focus_layers.resume_conflict {
+            self.focus_layers.resume_conflict = resume_conflict;
+            if resume_conflict {
+                return Some("resume-conflict-local".into());
+            }
+            return self.in_app_focus("in-app-seek");
         }
         let quality = self.in_app_quality_open;
         if quality != self.focus_layers.quality {

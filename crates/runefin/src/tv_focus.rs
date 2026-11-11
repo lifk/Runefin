@@ -175,6 +175,9 @@ fn zones(s: &State) -> (Vec<Zone>, bool) {
     if s.in_app.is_some() {
         return (in_app_zones(s), false);
     }
+    if s.shelf.is_some() {
+        return (shelf_zones(s), true);
+    }
     match &s.route {
         Route::Home => (home_zones(s), true),
         Route::Library { .. } => (library_zones(s), true),
@@ -514,6 +517,40 @@ fn filters_zones(s: &State, library: &crate::library::LibraryState) -> Vec<Zone>
 }
 
 const ZONE_LIBRARY_BACK: &str = "library-back";
+
+fn shelf_zones(s: &State) -> Vec<Zone> {
+    let Some(shelf) = s.shelf else {
+        return Vec::new();
+    };
+    let items: &[jellyfin_api::Item] = match shelf {
+        crate::state::HomeShelf::ContinueWatching => &s.home_data.resume,
+        crate::state::HomeShelf::NextUp => &s.home_data.next_up,
+        crate::state::HomeShelf::RecentlyPlayed => &s.home_data.recently_played,
+    };
+    let card_w = crate::theme::CARD_W + crate::theme::CARD_GAP;
+    let width = s.window_size.0.max(900.0) - crate::theme::SIDEBAR_W - 2.0 * crate::theme::gutter();
+    let columns = ((width / card_w).floor() as usize).clamp(2, 12);
+    let cards: Vec<String> = items
+        .iter()
+        .map(|item| format!("shelf-{}", item.series_id.as_deref().unwrap_or(&item.id)))
+        .collect();
+    let mut zones = vec![
+        sidebar(s),
+        Zone {
+            keys: vec!["shelf-back".into()],
+            columns: 1,
+            parent: Some(0),
+        },
+    ];
+    if !cards.is_empty() {
+        zones.push(Zone {
+            keys: cards,
+            columns,
+            parent: Some(0),
+        });
+    }
+    zones
+}
 
 fn detail_zones(s: &State) -> Vec<Zone> {
     let Some(detail) = &s.detail else {
@@ -1028,6 +1065,27 @@ fn seerr_detail_zones(s: &State) -> Vec<Zone> {
 fn in_app_zones(s: &State) -> Vec<Zone> {
     if !s.osd_visible {
         return Vec::new();
+    }
+    // The interruption cards are the screen while they are up.
+    if s.still_watching_open {
+        return vec![Zone {
+            keys: vec![
+                "still-watching-continue".into(),
+                "still-watching-stop".into(),
+            ],
+            columns: 0,
+            parent: None,
+        }];
+    }
+    if s.resume_conflict.is_some() {
+        return vec![Zone {
+            keys: vec![
+                "resume-conflict-local".into(),
+                "resume-conflict-server".into(),
+            ],
+            columns: 0,
+            parent: None,
+        }];
     }
     // The queue is a grid of rows, each with reorder and remove buttons: four keys per row.
     if s.in_app_queue_open {

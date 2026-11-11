@@ -133,6 +133,7 @@ fn preplay_sheet(s: &State, detail: &DetailState, t: &tok::Theme) -> El {
         .padding(18.0)
         .gap(10.0)
         .radius(14.0)
+        .focus_group()
         .child(
             text(format!("Play {}", detail.item.name))
                 .font(type_::section())
@@ -351,13 +352,23 @@ pub(super) fn playlist_create_modal(s: &State, item: &Item, t: &tok::Theme) -> E
         .single_line()
         .w_full()
         .on_edit(|s: &mut State| &mut s.playlist_new_name)
-        .on_submit(|s: &mut State, _tx| s.create_playlist_with_detail());
+        .on_submit(|s: &mut State, _tx| s.create_playlist_with_detail())
+        .on_input_key(|s: &mut State, key: &rune::KeyEvent, tx: &mut rune::Tx| {
+            // The field owns the arrow keys; Down is how a remote reaches Create.
+            if s.big_screen && key.key == rune::Key::Down {
+                s.note_focus("playlist-create-submit".into());
+                tx.focus_key("playlist-create-submit".to_string());
+                return true;
+            }
+            false
+        });
     let panel = col()
         .key("playlist-create")
         .w(400.0)
         .padding(18.0)
         .gap(10.0)
         .radius(14.0)
+        .focus_group()
         .fill(t.card)
         .outline(1.0, 0.0, t.card_border)
         .shadow(0.0, 18.0, Color::BLACK.alpha(0.5))
@@ -425,6 +436,7 @@ pub(super) fn playlist_create_modal(s: &State, item: &Item, t: &tok::Theme) -> E
 pub(super) fn playlist_picker(s: &State, item: &Item, t: &tok::Theme) -> El {
     let mut panel = col()
         .key("playlist-picker")
+        .focus_group()
         .w(360.0)
         .padding(16.0)
         .gap(6.0)
@@ -559,6 +571,7 @@ pub(super) fn playlist_picker(s: &State, item: &Item, t: &tok::Theme) -> El {
 pub(super) fn collection_picker(s: &State, item: Option<&Item>, t: &tok::Theme) -> El {
     let mut panel = col()
         .key("collection-picker")
+        .focus_group()
         .w(380.0)
         .padding(16.0)
         .gap(6.0)

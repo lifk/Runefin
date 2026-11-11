@@ -7812,6 +7812,108 @@ mod tv_reach_tests {
     }
 
     #[test]
+    fn every_card_menu_control_is_reachable() {
+        let mut state = base();
+        state.card_menu = Some(crate::state::CardMenu {
+            item: demo::movie_detail().item,
+            x: 80.0,
+            y: 80.0,
+        });
+        check_in("card menu", state, "card-menu");
+    }
+
+    #[test]
+    fn every_preplay_control_is_reachable() {
+        let mut state = base();
+        state.route = Route::Detail {
+            id: "metropolis".into(),
+        };
+        state.detail = Some(demo::movie_detail());
+        state.preplay_open = true;
+        check_in("preplay sheet", state, "preplay-sheet");
+    }
+
+    #[test]
+    fn every_playlist_picker_control_is_reachable() {
+        let mut state = base();
+        state.route = Route::Detail {
+            id: "metropolis".into(),
+        };
+        state.detail = Some(demo::movie_detail());
+        state.playlists = demo::playlists();
+        state.playlist_picker_open = true;
+        check_in("playlist picker", state, "playlist-picker");
+    }
+
+    #[test]
+    fn every_collection_picker_control_is_reachable() {
+        let mut state = base();
+        state.collection_choices = demo::library(3).items;
+        state.collection_picker_open = true;
+        check_in("collection picker", state, "collection-picker");
+    }
+
+    #[test]
+    fn every_cast_picker_control_is_reachable() {
+        let mut state = base();
+        state.cast_sessions = demo::sessions();
+        state.cast_picker_open = true;
+        check_in("cast picker", state, "cast-picker");
+    }
+
+    #[test]
+    fn every_new_playlist_control_is_reachable() {
+        let mut state = base();
+        state.route = Route::Detail {
+            id: "metropolis".into(),
+        };
+        state.detail = Some(demo::movie_detail());
+        state.playlist_create_open = true;
+        check_in("new playlist", state, "playlist-create");
+    }
+
+    #[test]
+    fn every_still_watching_control_is_reachable() {
+        let mut state = base();
+        state.in_app = Some(demo::in_app());
+        state.still_watching_open = true;
+        state.still_watching_countdown = 42;
+        check_in("still watching", state, "still-watching");
+    }
+
+    #[test]
+    fn every_resume_conflict_control_is_reachable() {
+        let mut state = base();
+        state.in_app = Some(demo::in_app());
+        state.resume_conflict = Some((60_000, 5_000));
+        check_in("resume conflict", state, "resume-conflict");
+    }
+
+    #[test]
+    fn every_shortcut_sheet_control_is_reachable() {
+        let mut state = base();
+        state.shortcuts_open = true;
+        check_in("shortcut sheet", state, "shortcut-sheet");
+    }
+
+    #[test]
+    fn every_subtitle_search_control_is_reachable() {
+        let mut state = base();
+        state.step = state::Step::Ready {
+            server_name: "example".into(),
+        };
+        super::in_app_subtitle_search_scene(&mut state);
+        check_in("subtitle search", state, "in-app-subtitle-search");
+    }
+
+    #[test]
+    fn every_shelf_control_is_reachable() {
+        let mut state = base();
+        state.shelf = Some(state::HomeShelf::ContinueWatching);
+        check_in("shelf", state, "shelf-screen");
+    }
+
+    #[test]
     fn every_home_control_is_reachable() {
         check("home", base());
     }
