@@ -164,13 +164,18 @@ fn body(s: &State, person: &PersonPage, t: &tok::Theme) -> El {
                 )
                 .child(
                     el().w_full().scroll_x().scroll_edge_fade(28.0).child(
-                        row().gap(theme::CARD_GAP).focus_group().children(
-                            person
-                                .items
-                                .iter()
-                                .take(5)
-                                .map(|item| super::card(item, "person-known", s, t)),
-                        ),
+                        row()
+                            .px(6.0)
+                            .py(6.0)
+                            .gap(theme::CARD_GAP)
+                            .focus_group()
+                            .children(
+                                person
+                                    .items
+                                    .iter()
+                                    .take(5)
+                                    .map(|item| super::card(item, "person-known", s, t)),
+                            ),
                     ),
                 );
         }

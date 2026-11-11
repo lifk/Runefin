@@ -579,7 +579,7 @@ fn card_section(
         .child(text(title).font(type_::section()).color(t.text))
         .child(
             el().w_full().scroll_x().scroll_edge_fade(28.0).child(
-                row().gap(CARD_GAP).focus_group().children(
+                row().px(6.0).py(6.0).gap(CARD_GAP).focus_group().children(
                     items
                         .iter()
                         .take(20)

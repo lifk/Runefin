@@ -219,12 +219,12 @@ impl SurfaceStyle for El {
 
 /// A soft halo behind a poster card, faded in by the card's hover group (pointer or focus).
 pub fn card_glow(w: f32, h: f32) -> El {
-    el().absolute(-10.0, -10.0)
-        .w(w + 20.0)
-        .h(h + 20.0)
-        .radius(18.0)
-        .fill(Color::WHITE.alpha(0.20))
-        .blur(20.0)
+    el().absolute(-5.0, -5.0)
+        .w(w + 10.0)
+        .h(h + 10.0)
+        .radius(14.0)
+        .fill(Color::WHITE.alpha(0.22))
+        .blur(10.0)
         .group_opacity(0.0, 1.0)
 }
 

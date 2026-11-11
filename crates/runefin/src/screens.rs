@@ -1774,6 +1774,8 @@ fn rail(
     col().key(key).w_full().gap(12.0).child(header).child(
         el().w_full().scroll_x().scroll_edge_fade(28.0).child(
             row()
+                .px(6.0)
+                .py(6.0)
                 .gap(CARD_GAP)
                 .focus_group()
                 .children(items.iter().map(|item| card(item, key, s, t))),
@@ -2040,13 +2042,18 @@ fn resume_rail(key: &str, items: &[Item], s: &State, t: &tok::Theme) -> El {
                 .scroll_x()
                 .scroll_edge_fade(28.0)
                 .child(
-                    row().gap(theme::CARD_GAP).focus_group().children(
-                        items
-                            .iter()
-                            .filter(|item| !s.is_home_hidden(&item.id))
-                            .enumerate()
-                            .map(|(index, item)| resume_card(item, s, t, index == 0)),
-                    ),
+                    row()
+                        .px(6.0)
+                        .py(6.0)
+                        .gap(theme::CARD_GAP)
+                        .focus_group()
+                        .children(
+                            items
+                                .iter()
+                                .filter(|item| !s.is_home_hidden(&item.id))
+                                .enumerate()
+                                .map(|(index, item)| resume_card(item, s, t, index == 0)),
+                        ),
                 ),
         )
 }
