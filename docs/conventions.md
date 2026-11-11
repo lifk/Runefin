@@ -36,6 +36,9 @@ exist because Rune's author enforces the same ones upstream.
   network. Its ignored `tests/live.rs` is read-only and opt-in with `SEERR_URL`/`SEERR_API_KEY`.
 - `cargo test -p runefin`: `Runtime` drives real input through the real layout and springs at a
   fixed step. Assert on `rt.state`, `rt.find(key)` and `rt.presented(key)` — not on colours.
+- `tv_reach_tests` walks every screen and player layer with the D-pad and fails if any visible
+  focusable is unreachable from the first focus (`crates/runefin/src/tv_reach.rs`). A new screen
+  or panel gets a case there; a panel passes its layer key as the scope.
 - Anything needing a server is mocked at the `Client` boundary. No default test hits the network;
   the ignored `tests/live.rs` checks are opt-in and run only when their `JELLYFIN_*` or `SEERR_*`
   variables are set.

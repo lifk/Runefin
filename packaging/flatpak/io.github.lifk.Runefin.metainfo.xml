@@ -42,6 +42,18 @@
   </screenshots>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.1.32" date="2026-11-11">
+      <description>
+        <p>
+          Controller reachability is now a test: every screen and player layer is walked with the
+          D-pad and every visible control must be reachable from the first focus. The test found
+          and fixed real dead ends — Settings opened on a key that was never drawn, the library
+          toolbar and filter sheet, search's sidebar and See all, Live TV's toolbar and row
+          buttons, the detail version/tech/IMDb controls, and the player's Back, seek buttons and
+          queue.
+        </p>
+      </description>
+    </release>
     <release version="0.1.31" date="2026-11-11">
       <description>
         <p>

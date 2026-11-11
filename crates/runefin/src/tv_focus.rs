@@ -237,6 +237,7 @@ fn home_zones(s: &State) -> Vec<Zone> {
                 .iter()
                 .filter(|item| !s.is_home_hidden(&item.id))
                 .map(|item| item_key("rail-continue-watching", item))
+                .chain(std::iter::once("rail-continue-watching-all".to_string()))
                 .collect(),
             columns: 0,
             parent: Some(0),
@@ -250,6 +251,7 @@ fn home_zones(s: &State) -> Vec<Zone> {
                 .iter()
                 .filter(|item| !s.is_home_hidden(&item.id))
                 .map(|item| item_key("rail-next-up", item))
+                .chain(std::iter::once("rail-next-up-all".to_string()))
                 .collect(),
             columns: 0,
             parent: Some(0),
@@ -280,6 +282,7 @@ fn home_zones(s: &State) -> Vec<Zone> {
                 .iter()
                 .filter(|item| !s.is_home_hidden(&item.id))
                 .map(|item| item_key(&format!("rail-recent-{index}"), item))
+                .chain(std::iter::once(format!("rail-recent-{index}-all")))
                 .collect(),
             columns: 0,
             parent: Some(0),
@@ -293,6 +296,7 @@ fn home_zones(s: &State) -> Vec<Zone> {
                 .iter()
                 .filter(|item| !s.is_home_hidden(&item.id))
                 .map(|item| item_key("rail-recently-played", item))
+                .chain(std::iter::once("rail-recently-played-all".to_string()))
                 .collect(),
             columns: 0,
             parent: Some(0),
@@ -314,9 +318,44 @@ fn home_zones(s: &State) -> Vec<Zone> {
 }
 
 fn library_zones(s: &State) -> Vec<Zone> {
+    let sidebar = sidebar(s);
     let Some(library) = &s.library else {
-        return vec![sidebar(s)];
+        return vec![sidebar];
     };
+    let playlist = library.collection_type.as_deref() == Some("playlists");
+    let tv = library.collection_type.as_deref() == Some("tvshows");
+    let playable = library.items.iter().any(crate::state::is_playable);
+    let mut header = vec![ZONE_LIBRARY_BACK.to_string()];
+    if !playlist {
+        if !tv && playable {
+            header.push("library-play-all".into());
+        }
+        if tv || playable {
+            header.push("library-shuffle".into());
+        }
+    }
+    let mut toolbar = vec!["library-search".to_string()];
+    toolbar.extend(
+        ["sort-name", "sort-added", "sort-rating", "sort-direction"]
+            .into_iter()
+            .map(String::from),
+    );
+    if playlist {
+        toolbar.push("playlist-edit".into());
+    } else {
+        toolbar.extend(
+            [
+                "filter-unwatched",
+                "filter-favorites",
+                "library-genres",
+                "library-filters",
+                "library-select",
+            ]
+            .into_iter()
+            .map(String::from),
+        );
+    }
+    toolbar.extend(["view-grid", "view-list"].into_iter().map(String::from));
     let grid = library.view == crate::library::ViewMode::Grid;
     let keys = library
         .items
@@ -329,15 +368,152 @@ fn library_zones(s: &State) -> Vec<Zone> {
             }
         })
         .collect();
-    vec![
-        sidebar(s),
+    let mut zones = vec![
+        sidebar,
         Zone {
-            keys,
-            columns: if grid { library.columns.max(1) } else { 1 },
+            keys: header,
+            columns: 0,
             parent: Some(0),
         },
-    ]
+        Zone {
+            keys: toolbar,
+            columns: 0,
+            parent: Some(0),
+        },
+    ];
+    if library.filters_open {
+        zones.extend(filters_zones(s, library));
+    } else if library.genres_open {
+        let mut genre_keys = vec!["genre-all".to_string()];
+        genre_keys.extend(
+            library
+                .genres
+                .iter()
+                .map(|genre| format!("genre-{}", genre.id)),
+        );
+        zones.push(Zone {
+            keys: genre_keys,
+            columns: 0,
+            parent: Some(0),
+        });
+    }
+    zones.push(Zone {
+        keys,
+        columns: if grid { library.columns.max(1) } else { 1 },
+        parent: Some(0),
+    });
+    zones
 }
+
+/// The inline filter sheet as rows, so Up/Down walk it and the page scrolls to each row.
+fn filters_zones(s: &State, library: &crate::library::LibraryState) -> Vec<Zone> {
+    let filtered = library.unwatched
+        || library.favorites
+        || library.genre.is_some()
+        || library.letter.is_some();
+    let mut filters = vec!["filters-unwatched".to_string(), "filters-favorites".into()];
+    if filtered {
+        filters.push("filters-clear".into());
+    }
+    let sorts = [
+        "filters-sort-name",
+        "filters-sort-added",
+        "filters-sort-rating",
+        "filters-sort-played",
+        "filters-sort-release",
+        "filters-sort-runtime",
+        "filters-sort-plays",
+        "filters-sort-random",
+        "filters-sort-direction",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
+    let mut saved = Vec::new();
+    for (index, _) in s.saved_views.iter().enumerate() {
+        saved.push(format!("saved-view-{index}"));
+        saved.push(format!("saved-view-delete-{index}"));
+    }
+    saved.push("saved-view-save".into());
+    let mut deep = vec![
+        "filter-year-down".to_string(),
+        "filter-year-up".into(),
+        "filter-rating".into(),
+        "filter-audio-language".into(),
+        "filter-subtitle-language".into(),
+        "filter-has-subtitles".into(),
+        "filter-4k".into(),
+        "filter-missing".into(),
+        "filter-unaired".into(),
+    ];
+    if library.collection_type.as_deref() == Some("tvshows") {
+        deep.push("filter-status".into());
+    }
+    deep.push("filter-studios".into());
+    deep.push("filter-tags".into());
+    let mut zones = vec![
+        Zone {
+            keys: filters,
+            columns: 0,
+            parent: Some(0),
+        },
+        Zone {
+            keys: sorts,
+            columns: 0,
+            parent: Some(0),
+        },
+    ];
+    if !saved.is_empty() {
+        zones.push(Zone {
+            keys: saved,
+            columns: 0,
+            parent: Some(0),
+        });
+    }
+    zones.push(Zone {
+        keys: deep,
+        columns: 0,
+        parent: Some(0),
+    });
+    if !library.genres.is_empty() {
+        zones.push(Zone {
+            keys: library
+                .genres
+                .iter()
+                .map(|genre| format!("filter-genre-{}", genre.id))
+                .collect(),
+            columns: 0,
+            parent: Some(0),
+        });
+    }
+    if library.studios_open {
+        let mut studios = vec!["studio-any".to_string()];
+        studios.extend(
+            library
+                .studios
+                .iter()
+                .take(200)
+                .map(|studio| format!("studio-{}", studio.id)),
+        );
+        zones.push(Zone {
+            keys: studios,
+            columns: 0,
+            parent: Some(0),
+        });
+    }
+    if library.tags_open {
+        let mut tags = vec!["tag-any".to_string()];
+        tags.extend((0..library.tags.len().min(200)).map(|index| format!("tag-{index}")));
+        zones.push(Zone {
+            keys: tags,
+            columns: 0,
+            parent: Some(0),
+        });
+    }
+    zones
+}
+
+const ZONE_LIBRARY_BACK: &str = "library-back";
 
 fn detail_zones(s: &State) -> Vec<Zone> {
     let Some(detail) = &s.detail else {
@@ -394,6 +570,7 @@ fn detail_zones(s: &State) -> Vec<Zone> {
     actions.push("detail-played".into());
     if !is_boxset && crate::state::is_playable(&detail.item) {
         actions.push("detail-playlist".into());
+        actions.push("detail-collection-add".into());
     }
 
     let mut zones = vec![
@@ -408,6 +585,33 @@ fn detail_zones(s: &State) -> Vec<Zone> {
             parent: Some(0),
         },
     ];
+    // The hero's own facts: the version chips, the technical-details toggle and the IMDb
+    // fallback link. They sit under the actions and above the first rail.
+    let mut facts = Vec::new();
+    if detail.item.media_sources.len() > 1 {
+        facts.extend(
+            detail
+                .item
+                .media_sources
+                .iter()
+                .map(|source| format!("detail-version-{}", source.id)),
+        );
+    }
+    if crate::detail::technical_line(&detail.item).is_some() {
+        facts.push("detail-tech-toggle".into());
+    }
+    if detail.item.provider_ids.contains_key("Imdb")
+        && !detail.item.provider_ids.contains_key("Tmdb")
+    {
+        facts.push("detail-imdb-link".into());
+    }
+    if !facts.is_empty() {
+        zones.push(Zone {
+            keys: facts,
+            columns: 0,
+            parent: Some(0),
+        });
+    }
     // Below the actions the page runs: Next up (when the server has one), the season chips,
     // the episode controls and list, then collections, cast, extras and similar titles.
     if detail.next_up.is_some() {
@@ -512,18 +716,35 @@ fn detail_zones(s: &State) -> Vec<Zone> {
 
 fn search_zones(s: &State) -> Vec<Zone> {
     let results = &s.search.results;
-    let mut zones = vec![Zone {
-        keys: vec!["search-input".into()],
-        columns: 1,
-        parent: None,
-    }];
-    let rail = |prefix: &str, items: &[jellyfin_api::Item]| Zone {
-        keys: items
+    let mut zones = vec![
+        sidebar(s),
+        Zone {
+            keys: vec!["search-input".into()],
+            columns: 1,
+            parent: Some(0),
+        },
+    ];
+    let rail = |prefix: &str, items: &[jellyfin_api::Item]| {
+        // Mirror the screen: six cards while collapsed, every card when expanded, plus the
+        // header's See all / Show less. A zone that names an undrawn card strands the router.
+        let shown = if s.is_search_expanded(prefix) {
+            items.len()
+        } else {
+            items.len().min(6)
+        };
+        let mut keys: Vec<String> = items
             .iter()
+            .take(shown)
             .map(|item| format!("{prefix}-{}", item.id))
-            .collect(),
-        columns: 0,
-        parent: Some(0),
+            .collect();
+        if items.len() > 6 {
+            keys.push(format!("{prefix}-all"));
+        }
+        Zone {
+            keys,
+            columns: 0,
+            parent: Some(0),
+        }
     };
     if !results.movies.is_empty() {
         zones.push(rail("search-movies", &results.movies));
@@ -656,23 +877,49 @@ fn seerr_zones(s: &State) -> Vec<Zone> {
 }
 
 fn live_zones(s: &State) -> Vec<Zone> {
-    let mut zones = vec![sidebar(s)];
-    let keys: Vec<String> = s
-        .live
-        .channels
-        .iter()
-        .map(|channel| {
-            if s.live.guide_open {
-                format!("live-guide-row-{}", channel.id)
-            } else {
-                format!("live-channel-{}", channel.id)
-            }
-        })
-        .collect();
-    if !keys.is_empty() {
+    let mut zones = vec![
+        sidebar(s),
+        Zone {
+            keys: [
+                "live-guide-window",
+                "live-guide-toggle",
+                "live-favorites",
+                "live-refresh",
+            ]
+            .into_iter()
+            .map(String::from)
+            .collect(),
+            columns: 0,
+            parent: Some(0),
+        },
+    ];
+    if s.live.guide_open {
+        let keys: Vec<String> = s
+            .live
+            .channels
+            .iter()
+            .map(|channel| format!("live-guide-row-{}", channel.id))
+            .collect();
+        if !keys.is_empty() {
+            zones.push(Zone {
+                keys,
+                columns: 1,
+                parent: Some(0),
+            });
+        }
+        return zones;
+    }
+    // One row per channel: the card itself, its reminder (when there is a next program) and
+    // its favourite toggle.
+    for channel in &s.live.channels {
+        let mut keys = vec![format!("live-channel-{}", channel.id)];
+        if s.live.next.contains_key(&channel.id) {
+            keys.push(format!("live-remind-{}", channel.id));
+        }
+        keys.push(format!("live-favorite-{}", channel.id));
         zones.push(Zone {
             keys,
-            columns: 1,
+            columns: 0,
             parent: Some(0),
         });
     }
@@ -782,6 +1029,24 @@ fn in_app_zones(s: &State) -> Vec<Zone> {
     if !s.osd_visible {
         return Vec::new();
     }
+    // The queue is a grid of rows, each with reorder and remove buttons: four keys per row.
+    if s.in_app_queue_open {
+        let mut keys = Vec::new();
+        for at in 0..s.queue.len().min(12) {
+            keys.push(format!("in-app-queue-{at}"));
+            keys.push(format!("queue-up-{at}"));
+            keys.push(format!("queue-down-{at}"));
+            keys.push(format!("queue-remove-{at}"));
+        }
+        if !s.queue.is_empty() {
+            keys.push("queue-save-playlist".into());
+        }
+        return vec![Zone {
+            keys,
+            columns: 4,
+            parent: None,
+        }];
+    }
     // The end-of-episode card replaces the transport: its three decisions are the screen.
     if s.in_app_hover.is_none()
         && s.next_up_eligible()
@@ -800,13 +1065,47 @@ fn in_app_zones(s: &State) -> Vec<Zone> {
     }
     // A live stream has no timeline: the transport is the whole OSD.
     let live = s.in_app.as_ref().is_some_and(|session| session.live);
+    let mut zones = vec![
+        // The top bar's Back belongs to the remote too, not only to B.
+        Zone {
+            keys: vec!["in-app-stop".into()],
+            columns: 1,
+            parent: None,
+        },
+        Zone {
+            keys: if live {
+                vec!["in-app-pause".into()]
+            } else {
+                vec![
+                    "in-app-back-10".into(),
+                    "in-app-pause".into(),
+                    "in-app-forward-10".into(),
+                ]
+            },
+            columns: 0,
+            parent: None,
+        },
+    ];
+    if !live {
+        zones.push(Zone {
+            keys: vec!["in-app-seek".into()],
+            columns: 1,
+            parent: None,
+        });
+        if s.offered_in_app_segment().is_some() {
+            zones.push(Zone {
+                keys: vec!["in-app-skip-segment".into()],
+                columns: 1,
+                parent: None,
+            });
+        }
+    }
     let mut control_keys: Vec<String> = Vec::new();
     if s.queue.len() > 1 {
         control_keys.push("in-app-queue".into());
     }
     control_keys.extend(
         [
-            "in-app-pause",
             "in-app-volume-slider",
             "in-app-mute",
             "in-app-fullscreen",
@@ -815,22 +1114,12 @@ fn in_app_zones(s: &State) -> Vec<Zone> {
         .into_iter()
         .map(String::from),
     );
-    let controls = Zone {
+    zones.push(Zone {
         keys: control_keys,
         columns: 0,
-        parent: (!live).then_some(0),
-    };
-    if live {
-        return vec![controls];
-    }
-    vec![
-        Zone {
-            keys: vec!["in-app-seek".into()],
-            columns: 1,
-            parent: None,
-        },
-        controls,
-    ]
+        parent: None,
+    });
+    zones
 }
 
 #[cfg(test)]
@@ -969,13 +1258,17 @@ mod tests {
             step(&state, Some("detail-play"), TvAction::Up).as_deref(),
             Some("detail-back")
         );
-        // Next up sits directly under the actions, then the season chips and the episode list.
+        // The hero's facts come first, then Next up, the season chips and the episode list.
         assert!(contains(&state, "detail-next-up-card"));
         assert!(contains(&state, "detail-play-season"));
         assert!(contains(&state, "detail-shuffle-season"));
         assert!(contains(&state, "detail-season-watched"));
         assert_eq!(
             step(&state, Some("detail-play"), TvAction::Down).as_deref(),
+            Some("detail-imdb-link")
+        );
+        assert_eq!(
+            step(&state, Some("detail-imdb-link"), TvAction::Down).as_deref(),
             Some("detail-next-up-card")
         );
         let season =
@@ -1006,7 +1299,9 @@ mod tests {
         detail.item.people = crate::demo::detail().item.people;
         state.detail = Some(detail);
         state.detail_extras = crate::demo::extras();
-        let cast = step(&state, Some("detail-play"), TvAction::Down).expect("the cast is below");
+        let fact = step(&state, Some("detail-play"), TvAction::Down).expect("the version chips");
+        assert!(fact.starts_with("detail-version-"), "{fact}");
+        let cast = step(&state, Some(&fact), TvAction::Down).expect("the cast is below");
         assert!(cast.starts_with("detail-cast-"), "{cast}");
         // Right walks the cast rail; Down leaves it for the extras.
         let next_cast = step(&state, Some(&cast), TvAction::Right).expect("another cast member");
@@ -1184,8 +1479,10 @@ mod tests {
         state.in_app = Some(session);
         state.osd_visible = true;
         assert!(!contains(&state, "in-app-seek"));
+        // A live transport has one control; the bottom row is one Down away.
+        assert_eq!(step(&state, Some("in-app-pause"), TvAction::Right), None);
         assert_eq!(
-            step(&state, Some("in-app-pause"), TvAction::Right).as_deref(),
+            step(&state, Some("in-app-pause"), TvAction::Down).as_deref(),
             Some("in-app-volume-slider")
         );
     }
@@ -1197,15 +1494,19 @@ mod tests {
         state.osd_visible = true;
         assert_eq!(
             step(&state, Some("in-app-seek"), TvAction::Down).as_deref(),
-            Some("in-app-pause")
+            Some("in-app-volume-slider")
         );
         assert_eq!(
             step(&state, Some("in-app-pause"), TvAction::Up).as_deref(),
-            Some("in-app-seek")
+            Some("in-app-stop")
+        );
+        assert_eq!(
+            step(&state, Some("in-app-seek"), TvAction::Up).as_deref(),
+            Some("in-app-back-10")
         );
         assert_eq!(
             step(&state, Some("in-app-pause"), TvAction::Right).as_deref(),
-            Some("in-app-volume-slider")
+            Some("in-app-forward-10")
         );
     }
 }

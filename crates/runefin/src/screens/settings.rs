@@ -11,6 +11,24 @@ use crate::state::State;
 
 use super::sidebar;
 
+/// Text fields keep Left/Right for their caret, but on a TV Up/Down must leave the field for
+/// the form. Rune's input consumes all four arrows; this hands Up/Down back to the tab chain.
+fn arrows_leave(input: El) -> El {
+    input.on_input_key(|s: &mut State, key: &rune::KeyEvent, tx: &mut rune::Tx| {
+        if s.big_screen && matches!(key.key, rune::Key::Up | rune::Key::Down) {
+            tx.send_key(rune::KeyEvent {
+                key: rune::Key::Tab,
+                mods: rune::Mods {
+                    shift: key.key == rune::Key::Up,
+                    ..Default::default()
+                },
+            });
+            return true;
+        }
+        false
+    })
+}
+
 fn stepper_button(label: &str, key: &str, t: &tok::Theme, on: impl Fn(&mut State) + 'static) -> El {
     el().key(key)
         .role("button")
@@ -118,7 +136,7 @@ pub(super) fn settings_screen(s: &State) -> El {
                     inset: false,
                     ..rune::Shadow::default()
                 })
-                .child(
+                .child(arrows_leave(
                     text_input(&s.settings_query, type_::body())
                         .key("settings-search")
                         .label("Search settings")
@@ -128,7 +146,7 @@ pub(super) fn settings_screen(s: &State) -> El {
                         .w_full()
                         .on_edit(|s: &mut State| &mut s.settings_query)
                         .color(t.text),
-                ),
+                )),
         )
         .child(
             row()
@@ -142,25 +160,25 @@ pub(super) fn settings_screen(s: &State) -> El {
                             "Appearance",
                             "settings-jump-appearance",
                             "settings-section-appearance",
-                            "setting-ui-mode",
+                            "setting-ui-mode-value",
                         ),
                         (
                             "Playback",
                             "settings-jump-playback",
                             "settings-section-playback",
-                            "setting-autoplay",
+                            "setting-autoplay-value",
                         ),
                         (
                             "Subtitles",
                             "settings-jump-subtitles",
                             "settings-section-subtitles",
-                            "setting-subtitle-mode",
+                            "setting-subtitle-mode-value",
                         ),
                         (
                             "Keyboard",
                             "settings-jump-keyboard",
                             "settings-section-keyboard",
-                            "setting-key-play-/-pause",
+                            "setting-key-change-play-/-pause",
                         ),
                         (
                             "Metadata",
@@ -184,7 +202,7 @@ pub(super) fn settings_screen(s: &State) -> El {
                             "History",
                             "settings-jump-history",
                             "settings-section-history",
-                            "settings-history",
+                            "settings-history-export",
                         ),
                         (
                             "Account",
@@ -858,15 +876,17 @@ pub(super) fn settings_screen(s: &State) -> El {
         )
         .child(keyboard);
 
-    let key_input = text_input(&s.omdb_key, type_::body())
-        .key("setting-omdb-key")
-        .label("OMDb API key")
-        .role("textbox")
-        .single_line()
-        .secure()
-        .w_full()
-        .on_edit(|s: &mut State| &mut s.omdb_key)
-        .color(t.text);
+    let key_input = arrows_leave(
+        text_input(&s.omdb_key, type_::body())
+            .key("setting-omdb-key")
+            .label("OMDb API key")
+            .role("textbox")
+            .single_line()
+            .secure()
+            .w_full()
+            .on_edit(|s: &mut State| &mut s.omdb_key)
+            .color(t.text),
+    );
     let metadata = col()
         .key("settings-metadata")
         .w_full()
@@ -976,18 +996,20 @@ pub(super) fn settings_screen(s: &State) -> El {
         } else {
             "Not connected. Seerr is optional.".to_string()
         };
-        let url_input = text_input(&s.seerr.url, type_::body())
-            .key("setting-seerr-url")
-            .label("Seerr server")
-            .role("textbox")
-            .single_line()
-            .w_full()
-            .on_edit(|s: &mut State| &mut s.seerr.url)
-            .color(t.text);
+        let url_input = arrows_leave(
+            text_input(&s.seerr.url, type_::body())
+                .key("setting-seerr-url")
+                .label("Seerr server")
+                .role("textbox")
+                .single_line()
+                .w_full()
+                .on_edit(|s: &mut State| &mut s.seerr.url)
+                .color(t.text),
+        );
         // A secure field draws one bullet per character, and the platform text overlay is not
         // clipped by the box: a 68-character key ran past the card. Show a fixed mask until
         // the reader clicks it, then hand over to the real field.
-        let key_input = if s.seerr.key.focused {
+        let key_input = arrows_leave(if s.seerr.key.focused {
             text_input(&s.seerr.key, type_::body())
                 .key("setting-seerr-key-input")
                 .label("Seerr API key")
@@ -1012,15 +1034,17 @@ pub(super) fn settings_screen(s: &State) -> El {
                 .label("Seerr API key")
                 .on_press(|s: &mut State| s.seerr.key.focused = true)
                 .child(text(label).font(type_::body()).color(t.text_secondary))
-        };
-        let user_input = text_input(&s.seerr.user, type_::body())
-            .key("setting-seerr-user")
-            .label("Seerr user id")
-            .role("textbox")
-            .single_line()
-            .w_full()
-            .on_edit(|s: &mut State| &mut s.seerr.user)
-            .color(t.text);
+        });
+        let user_input = arrows_leave(
+            text_input(&s.seerr.user, type_::body())
+                .key("setting-seerr-user")
+                .label("Seerr user id")
+                .role("textbox")
+                .single_line()
+                .w_full()
+                .on_edit(|s: &mut State| &mut s.seerr.user)
+                .color(t.text),
+        );
         let seerr = col()
             .key("settings-seerr")
             .w_full()

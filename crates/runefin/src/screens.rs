@@ -1015,37 +1015,42 @@ pub(super) fn sidebar(s: &State, t: &tok::Theme) -> El {
             logo
         }
     };
-    let toggle = el()
-        .key("sidebar-toggle")
-        .role("button")
-        .w(28.0)
-        .h(28.0)
-        .radius(7.0)
-        .center()
-        .fill(t.card)
-        .hover(t.hover)
-        .motion(motion::SNAPPY)
-        .focusable(true)
-        .focus_visual(2.0)
-        .press_scale(0.94)
-        .help(if collapsed {
-            "Expand sidebar"
-        } else {
-            "Collapse sidebar"
-        })
-        .child(
-            icon(
-                if collapsed {
-                    &theme::icon::CHEVRON_RIGHT
-                } else {
-                    &theme::icon::CHEVRON_LEFT
-                },
-                14.0,
+    // A TV opens on the full sidebar and has no pointer to change that; the chevron would be
+    // an unreachable control.
+    let toggle = if s.big_screen {
+        el()
+    } else {
+        el().key("sidebar-toggle")
+            .role("button")
+            .w(28.0)
+            .h(28.0)
+            .radius(7.0)
+            .center()
+            .fill(t.card)
+            .hover(t.hover)
+            .motion(motion::SNAPPY)
+            .focusable(true)
+            .focus_visual(2.0)
+            .press_scale(0.94)
+            .help(if collapsed {
+                "Expand sidebar"
+            } else {
+                "Collapse sidebar"
+            })
+            .child(
+                icon(
+                    if collapsed {
+                        &theme::icon::CHEVRON_RIGHT
+                    } else {
+                        &theme::icon::CHEVRON_LEFT
+                    },
+                    14.0,
+                )
+                .color(t.text_secondary),
             )
-            .color(t.text_secondary),
-        )
-        .cursor(rune::Cursor::Pointer)
-        .on_press(|s: &mut State| s.toggle_sidebar());
+            .cursor(rune::Cursor::Pointer)
+            .on_press(|s: &mut State| s.toggle_sidebar())
+    };
     // Collapsed, the mark is the expand control and sits on the nav column's centre line: a
     // row with the chevron would push it left of every icon below it.
     let header = if collapsed {
@@ -1874,28 +1879,32 @@ fn resume_card(item: &Item, s: &State, t: &tok::Theme, highlight: bool) -> El {
                         .truncate(),
                 ),
         );
-    let remove_id = item.id.clone();
-    art = art.child(
-        el().key(format!("resume-remove-{remove_id}"))
-            .role("button")
-            .absolute(RESUME_W - 34.0, 8.0)
-            .w(24.0)
-            .h(24.0)
-            .radius(12.0)
-            .center()
-            .fill(rune::Color::BLACK.alpha(0.55))
-            .hover(rune::Color::WHITE.alpha(0.18))
-            .motion(motion::SNAPPY)
-            .focusable(true)
-            .focus_visual(2.0)
-            .press_scale(0.92)
-            .group_opacity(0.0, 1.0)
-            .label("Remove from Continue Watching")
-            .help("Remove from Continue Watching")
-            .cursor(rune::Cursor::Pointer)
-            .child(text("×").font(type_::label()).color(rune::Color::WHITE))
-            .on_press(move |s: &mut State| s.remove_from_resume(&remove_id)),
-    );
+    if !s.big_screen {
+        // Pointer-only: the remote removes a card from its menu instead, so a focused card
+        // must not grow an × the arrows cannot reach.
+        let remove_id = item.id.clone();
+        art = art.child(
+            el().key(format!("resume-remove-{remove_id}"))
+                .role("button")
+                .absolute(RESUME_W - 34.0, 8.0)
+                .w(24.0)
+                .h(24.0)
+                .radius(12.0)
+                .center()
+                .fill(rune::Color::BLACK.alpha(0.55))
+                .hover(rune::Color::WHITE.alpha(0.18))
+                .motion(motion::SNAPPY)
+                .focusable(true)
+                .focus_visual(2.0)
+                .press_scale(0.92)
+                .group_opacity(0.0, 1.0)
+                .label("Remove from Continue Watching")
+                .help("Remove from Continue Watching")
+                .cursor(rune::Cursor::Pointer)
+                .child(text("×").font(type_::label()).color(rune::Color::WHITE))
+                .on_press(move |s: &mut State| s.remove_from_resume(&remove_id)),
+        );
+    }
     if watched > 0.0 {
         let filled = RESUME_W * watched;
         art = art.child(
@@ -2607,7 +2616,7 @@ pub(super) fn card(item: &Item, rail: &str, s: &State, t: &tok::Theme) -> El {
     });
     // A play button over the poster, on hover: the fastest path from a card to the film.
     // Containers (a Series) have no stream of their own, so they keep the plain card.
-    if crate::state::is_playable(item) {
+    if crate::state::is_playable(item) && !s.big_screen {
         let episode = item.clone();
         poster_box = poster_box.child(
             el().key(format!("play-{}", item.id))

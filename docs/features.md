@@ -48,7 +48,9 @@ web wrapper and does not embed a second render stack.
   fullscreen on launch and initial focus on each screen's first item. It launches at 16:9 even
   when the desk window was 1280×800, so a compositor that keeps the window cannot letterbox the
   picture. A mode change takes effect at restart and the Settings row says so.
-- **Remote reach**: on a big screen the zones cover the whole page — a detail's collections,
+- **Remote reach** is tested: every screen and player layer is walked with the D-pad and every
+  visible control must be reachable from the first focus. On a big screen the zones cover the
+  whole page — a detail's collections,
   cast, extras and *More like this* below the episode list; the player's gear sheet and each
   panel. Back from a player panel returns to the gear row that opened it. Settings index chips
   put the selector in the section they jump to, and vertical moves glide the page.
@@ -455,7 +457,7 @@ keys the player already uses.
 ```sh
 cargo test -p jellyfin-api        # 45 API tests, no network
 cargo test -p seerr-api           # 25 Seerr API tests, no network
-cargo test -p runefin             # 363 app tests (22 ignored), headless
+cargo test -p runefin             # 384 app tests (22 ignored), headless
 scripts/check.sh                  # fmt, clippy, all three suites, release build
 scripts/snapshots.sh              # the committed views, in place
 JELLYFIN_URL=... JELLYFIN_USER_ID=... JELLYFIN_TOKEN=... \

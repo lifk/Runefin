@@ -291,6 +291,24 @@ fn library_toolbar(s: &State, library: &LibraryState, t: &tok::Theme) -> El {
                         .w_full()
                         .on_edit(|s: &mut State| &mut s.library_search)
                         .on_input_change(|s: &mut State, _| s.library_search_changed())
+                        .on_input_key(|s: &mut State, key: &rune::KeyEvent, tx: &mut rune::Tx| {
+                            if !s.big_screen {
+                                return false;
+                            }
+                            let action = match key.key {
+                                rune::Key::Up => crate::tv_input::TvAction::Up,
+                                rune::Key::Down => crate::tv_input::TvAction::Down,
+                                _ => return false,
+                            };
+                            // The field owns every arrow; on a TV Up/Down must leave it.
+                            if let Some(target) =
+                                crate::tv_focus::step(s, Some("library-search"), action)
+                            {
+                                s.note_focus(target.clone());
+                                tx.focus_key(target);
+                            }
+                            true
+                        })
                         .color(t.text),
                 ),
         );
@@ -422,6 +440,7 @@ fn filters_panel(s: &State, library: &LibraryState, t: &tok::Theme) -> El {
     let max_height = (s.window_size.1 - 240.0).clamp(220.0, 520.0);
     let mut panel = col()
         .key("library-filters-panel")
+        .focus_group()
         .w_full()
         .max_h(max_height)
         .px(theme::gutter())
@@ -483,7 +502,7 @@ fn filters_panel(s: &State, library: &LibraryState, t: &tok::Theme) -> El {
     ] {
         sorts = sorts.child(toolbar_button(
             sort.label(),
-            &format!("sort-{}", sort.label().to_lowercase()),
+            &format!("filters-sort-{}", sort.label().to_lowercase()),
             library.sort == sort,
             t,
             move |s: &mut State| s.set_sort(sort),
@@ -495,7 +514,7 @@ fn filters_panel(s: &State, library: &LibraryState, t: &tok::Theme) -> El {
         } else {
             "Descending"
         },
-        "sort-direction",
+        "filters-sort-direction",
         false,
         t,
         |s: &mut State| s.toggle_sort_direction(),
@@ -851,6 +870,7 @@ fn tag_panel(library: &LibraryState, t: &tok::Theme) -> El {
 fn genres_panel(library: &LibraryState, t: &tok::Theme) -> El {
     let mut rail = row()
         .key("library-genres-panel")
+        .focus_group()
         .w_full()
         .h(36.0)
         .px(theme::gutter())

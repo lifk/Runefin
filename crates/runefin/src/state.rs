@@ -2963,6 +2963,10 @@ impl State {
             self.focus_first = true;
         }
         if let Some(key) = self.layer_focus_key() {
+            // The layer owns the screen now; a still-armed route or OSD focus must not steal it
+            // back on the next poll.
+            self.focus_first = false;
+            self.osd_focus_pending = false;
             return Some(key);
         }
         if self.in_app_next_focus > 0 {
@@ -3046,18 +3050,20 @@ impl State {
             }
             Route::Search { .. } => Some("search-input".into()),
             Route::Remote => Some("remote-refresh".into()),
-            Route::Settings => Some("setting-ui-mode".into()),
+            Route::Settings => Some("setting-ui-mode-value".into()),
             Route::Seerr => Some("seerr-tab-discover".into()),
             Route::SeerrDetail { .. } => self
                 .seerr
                 .detail
                 .as_ref()
                 .map(|_| "seerr-detail-back".into()),
-            Route::LiveTv => self
-                .live
-                .channels
-                .first()
-                .map(|channel| format!("live-channel-{}", channel.id)),
+            Route::LiveTv => self.live.channels.first().map(|channel| {
+                if self.live.guide_open {
+                    format!("live-guide-row-{}", channel.id)
+                } else {
+                    format!("live-channel-{}", channel.id)
+                }
+            }),
         };
         if key.is_some() {
             self.focus_first = false;

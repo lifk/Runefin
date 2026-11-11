@@ -36,6 +36,8 @@ mod theme;
 mod trailer;
 mod tv_focus;
 mod tv_input;
+#[cfg(test)]
+mod tv_reach;
 
 use rune::{AppSpec, Cx, El, Key, KeyEvent, TextEdit, Tx};
 
@@ -325,14 +327,31 @@ fn tv_key(s: &mut State, key: &KeyEvent, tx: &mut Tx) -> bool {
     // Settings is a vertical form with dozens of control keys; Up/Down follow the page's tab
     // order instead of a hand-kept key list. Left/Right stay with the focused control.
     if s.big_screen && matches!(s.route, Route::Settings) {
-        tx.send_key(KeyEvent {
-            key: Key::Tab,
-            mods: rune::Mods {
-                shift: matches!(action, tv_input::TvAction::Up),
-                ..rune::Mods::default()
-            },
+        let on_sidebar = focused.as_deref().is_some_and(|key| {
+            key.starts_with("nav-") || key.starts_with("library-") || key.starts_with("playlist-")
         });
-        return true;
+        if on_sidebar {
+            // The sidebar is its own focus group: Up/Down rove it, Right enters the form.
+            if matches!(action, tv_input::TvAction::Right) {
+                s.note_focus("setting-ui-mode-value".into());
+                tx.focus_key("setting-ui-mode-value".to_string());
+                return true;
+            }
+            return false;
+        }
+        // The long form reads top to bottom: Up/Down walk its tab order. Left/Right stay with
+        // the control so a row of buttons (Seerr, storage) roves inside its focus group.
+        if matches!(action, tv_input::TvAction::Up | tv_input::TvAction::Down) {
+            tx.send_key(KeyEvent {
+                key: Key::Tab,
+                mods: rune::Mods {
+                    shift: matches!(action, tv_input::TvAction::Up),
+                    ..rune::Mods::default()
+                },
+            });
+            return true;
+        }
+        return false;
     }
     // The router steps between zones, clamps at the edges and asks Rune to focus the key it
     // chose. A modal, menu or scrollbar has focus: its directions are Rune's, not the zones'.
@@ -721,6 +740,7 @@ fn in_app_osd_scene(s: &mut State) {
     demo::signed_in(s);
     s.in_app = Some(demo::in_app());
     // The real launch path asks for the timeline once the chrome appears.
+    s.osd_visible = false;
     s.show_in_app_osd();
     s.focus_first = false;
     s.focused_key = Some("in-app-seek".into());
@@ -2993,7 +3013,10 @@ mod tests {
         );
 
         state.route = Route::Settings;
-        assert_eq!(state.take_focus_key().as_deref(), Some("setting-ui-mode"));
+        assert_eq!(
+            state.take_focus_key().as_deref(),
+            Some("setting-ui-mode-value")
+        );
 
         state.route = Route::Person { id: "p".into() };
         assert!(
@@ -4643,13 +4666,20 @@ mod tests {
             mods: Default::default(),
         });
         rt.frame(0.048);
-        assert_eq!(rt.focused_key().as_deref(), Some("detail-next-up-card"));
+        assert_eq!(rt.focused_key().as_deref(), Some("detail-imdb-link"));
 
         rt.key(KeyEvent {
             key: Key::Down,
             mods: Default::default(),
         });
         rt.frame(0.064);
+        assert_eq!(rt.focused_key().as_deref(), Some("detail-next-up-card"));
+
+        rt.key(KeyEvent {
+            key: Key::Down,
+            mods: Default::default(),
+        });
+        rt.frame(0.080);
         let season = rt.focused_key().expect("the season chips");
         assert!(season.starts_with("season-"), "{season}");
 
@@ -4657,7 +4687,7 @@ mod tests {
             key: Key::Down,
             mods: Default::default(),
         });
-        rt.frame(0.080);
+        rt.frame(0.096);
         assert_eq!(rt.focused_key().as_deref(), Some("detail-play-season"));
     }
 
@@ -4751,7 +4781,7 @@ mod tests {
         rt.frame(0.048);
         assert_eq!(
             rt.focused_key().as_deref(),
-            Some("setting-subtitle-mode"),
+            Some("setting-subtitle-mode-value"),
             "the chip puts the selector in the section it jumps to"
         );
     }
@@ -6233,9 +6263,9 @@ mod tests {
             "library-filters-panel",
             "filters-unwatched",
             "filters-favorites",
-            "sort-played",
-            "sort-random",
-            "sort-direction",
+            "filters-sort-played",
+            "filters-sort-random",
+            "filters-sort-direction",
         ] {
             assert!(rt.find(key).is_some(), "{key} is on screen");
         }
@@ -7758,5 +7788,249 @@ mod tests {
         measure("search::load", &mut || {
             crate::search::load(&client, "the", None).expect("search");
         });
+    }
+}
+
+#[cfg(test)]
+mod tv_reach_tests {
+    use super::*;
+
+    fn base() -> State {
+        let mut state = State::from_config(config::Config::fresh());
+        crate::demo::signed_in(&mut state);
+        state.big_screen = true;
+        state
+    }
+
+    fn check(name: &str, state: State) {
+        crate::tv_reach::assert_reachable(name, state, (1280.0, 720.0));
+    }
+
+    /// A panel case: only the controls inside that layer are the screen while it is open.
+    fn check_in(name: &str, state: State, scope: &str) {
+        crate::tv_reach::assert_reachable_in(name, state, (1280.0, 720.0), Some(scope));
+    }
+
+    #[test]
+    fn every_home_control_is_reachable() {
+        check("home", base());
+    }
+
+    #[test]
+    fn every_compact_hero_control_is_reachable() {
+        let mut state = base();
+        state.home_hero = true;
+        check("home with hero", state);
+    }
+
+    #[test]
+    fn every_library_control_is_reachable() {
+        let mut state = base();
+        let library = demo::library(30);
+        state.route = Route::Library {
+            id: library.id.clone(),
+        };
+        state.library = Some(library);
+        check("library", state);
+    }
+
+    #[test]
+    fn every_library_filter_control_is_reachable() {
+        let mut state = base();
+        let mut library = demo::library(30);
+        library.filters_open = true;
+        library.genres = vec![demo::library(1).items.remove(0)];
+        state.route = Route::Library {
+            id: library.id.clone(),
+        };
+        state.library = Some(library);
+        check_in("library filters", state, "library-filters-panel");
+    }
+
+    #[test]
+    fn every_library_list_control_is_reachable() {
+        let mut state = base();
+        let mut library = demo::library(30);
+        library.view = crate::library::ViewMode::List;
+        state.route = Route::Library {
+            id: library.id.clone(),
+        };
+        state.library = Some(library);
+        check("library list", state);
+    }
+
+    #[test]
+    fn every_expanded_search_control_is_reachable() {
+        let mut state = base();
+        state.route = Route::Search { scope: None };
+        state.search.query = TextEdit::new("quiet-floor");
+        state.search.query.focused = true;
+        state.search.results = demo::search_results();
+        state.toggle_search_expanded("search-movies");
+        check("search expanded", state);
+    }
+
+    #[test]
+    fn every_live_guide_control_is_reachable() {
+        let mut state = base();
+        state.route = Route::LiveTv;
+        state.live.channels = demo::live_channels();
+        state.live.next = demo::live_next();
+        state.live.guide_open = true;
+        check("live guide", state);
+    }
+
+    #[test]
+    fn every_quality_panel_control_is_reachable() {
+        let mut state = base();
+        state.step = state::Step::Ready {
+            server_name: "example".into(),
+        };
+        state.in_app = Some(demo::in_app());
+        state.osd_visible = false;
+        state.show_in_app_osd();
+        state.playback_quality = config::PlaybackQuality::Mbps4;
+        state.in_app_quality_open = true;
+        check_in("quality panel", state, "in-app-quality-panel");
+    }
+
+    #[test]
+    fn every_sleep_panel_control_is_reachable() {
+        let mut state = base();
+        state.step = state::Step::Ready {
+            server_name: "example".into(),
+        };
+        state.in_app = Some(demo::in_app());
+        state.osd_visible = false;
+        state.show_in_app_osd();
+        state.in_app_sleep_open = true;
+        check_in("sleep panel", state, "in-app-sleep-panel");
+    }
+
+    #[test]
+    fn every_goto_panel_control_is_reachable() {
+        let mut state = base();
+        state.step = state::Step::Ready {
+            server_name: "example".into(),
+        };
+        state.in_app = Some(demo::in_app());
+        state.osd_visible = false;
+        state.show_in_app_osd();
+        state.in_app_goto_open = true;
+        check_in("goto panel", state, "in-app-goto-panel");
+    }
+
+    #[test]
+    fn every_audio_panel_control_is_reachable() {
+        let mut state = base();
+        state.step = state::Step::Ready {
+            server_name: "example".into(),
+        };
+        super::in_app_audio_scene(&mut state);
+        check_in("audio panel", state, "in-app-audio-panel");
+    }
+
+    #[test]
+    fn every_chapter_panel_control_is_reachable() {
+        let mut state = base();
+        state.step = state::Step::Ready {
+            server_name: "example".into(),
+        };
+        super::in_app_chapters_scene(&mut state);
+        check_in("chapter panel", state, "in-app-chapter-panel");
+    }
+
+    #[test]
+    fn every_queue_panel_control_is_reachable() {
+        let mut state = base();
+        state.step = state::Step::Ready {
+            server_name: "example".into(),
+        };
+        super::in_app_queue_panel_scene(&mut state);
+        check_in("queue panel", state, "in-app-queue-panel");
+    }
+
+    #[test]
+    fn every_series_detail_control_is_reachable() {
+        let mut state = base();
+        state.route = Route::Detail {
+            id: "quiet-floor".into(),
+        };
+        state.detail = Some(demo::detail());
+        state.detail_extras = demo::extras();
+        check("series detail", state);
+    }
+
+    #[test]
+    fn every_movie_detail_control_is_reachable() {
+        let mut state = base();
+        let mut detail = demo::movie_detail();
+        detail.item.people = demo::detail().item.people;
+        state.route = Route::Detail {
+            id: "metropolis".into(),
+        };
+        state.detail = Some(detail);
+        state.detail_extras = demo::extras();
+        check("movie detail", state);
+    }
+
+    #[test]
+    fn every_settings_control_is_reachable() {
+        let mut state = base();
+        state.route = Route::Settings;
+        check("settings", state);
+    }
+
+    #[test]
+    fn every_search_control_is_reachable() {
+        let mut state = base();
+        state.route = Route::Search { scope: None };
+        state.search.query = TextEdit::new("quiet-floor");
+        state.search.query.focused = true;
+        state.search.results = demo::search_results();
+        check("search", state);
+    }
+
+    #[test]
+    fn every_live_tv_control_is_reachable() {
+        let mut state = base();
+        state.route = Route::LiveTv;
+        state.live.channels = demo::live_channels();
+        state.live.next = demo::live_next();
+        check("live tv", state);
+    }
+
+    #[test]
+    fn every_player_osd_control_is_reachable() {
+        let mut state = base();
+        state.in_app = Some(demo::in_app());
+        state.osd_visible = false;
+        state.show_in_app_osd();
+        check("player osd", state);
+    }
+
+    #[test]
+    fn every_player_gear_control_is_reachable() {
+        let mut state = base();
+        state.step = state::Step::Ready {
+            server_name: "example".into(),
+        };
+        state.in_app = Some(demo::in_app());
+        state.osd_visible = true;
+        state.in_app_gear_open = true;
+        check_in("player gear", state, "in-app-gear-menu");
+    }
+
+    #[test]
+    fn every_subtitle_panel_control_is_reachable() {
+        let mut state = base();
+        state.step = state::Step::Ready {
+            server_name: "example".into(),
+        };
+        state.in_app = Some(demo::in_app());
+        state.osd_visible = true;
+        state.in_app_subtitles.tracks = demo::subtitle_tracks();
+        state.in_app_subtitles.open = true;
+        check_in("subtitle panel", state, "in-app-subtitle-panel");
     }
 }
