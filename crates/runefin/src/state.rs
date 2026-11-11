@@ -2933,7 +2933,13 @@ impl State {
                 .detail
                 .as_ref()
                 .filter(|detail| !detail.loading && !detail.item.id.is_empty())
-                .map(|_| "detail-play".into()),
+                .map(|detail| {
+                    if detail.item.kind == "BoxSet" {
+                        "detail-play-all".into()
+                    } else {
+                        "detail-play".into()
+                    }
+                }),
             Route::Person { .. } | Route::SeerrPerson { .. } => {
                 self.person.as_ref().map(|_| "person-back".into())
             }

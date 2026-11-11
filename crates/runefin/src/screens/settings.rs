@@ -2,6 +2,7 @@
 
 use rune::tok::{self, motion};
 
+use crate::theme::FocusVisual;
 use crate::theme::{self, type_};
 use rune::{Color, El, col, el, row, text, text_input};
 
@@ -20,7 +21,7 @@ fn stepper_button(label: &str, key: &str, t: &tok::Theme, on: impl Fn(&mut State
         .hover(t.hover)
         .motion(motion::SNAPPY)
         .focusable(true)
-        .focus_ring(theme::focus_width(), 2.0, theme::ring())
+        .focus_visual(2.0)
         .press_scale(0.95)
         .cursor(rune::Cursor::Pointer)
         .on_press(on)
@@ -190,7 +191,7 @@ pub(super) fn settings_screen(s: &State) -> El {
                             .hover(t.hover)
                             .motion(motion::SNAPPY)
                             .focusable(true)
-                            .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                            .focus_visual(2.0)
                             .press_scale(0.96)
                             .child(text(label).font(type_::caption()).color(t.text_secondary))
                             .cursor(rune::Cursor::Pointer)
@@ -500,7 +501,7 @@ pub(super) fn settings_screen(s: &State) -> El {
                 })
                 .motion(motion::SNAPPY)
                 .focusable(true)
-                .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                .focus_visual(2.0)
                 .press_scale(0.97)
                 .cursor(rune::Cursor::Pointer)
                 .child(
@@ -523,7 +524,7 @@ pub(super) fn settings_screen(s: &State) -> El {
                 .hover(t.hover)
                 .motion(motion::SNAPPY)
                 .focusable(true)
-                .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                .focus_visual(2.0)
                 .press_scale(0.97)
                 .child(text(value).font(type_::label()).color(t.text))
                 .child(
@@ -777,7 +778,7 @@ pub(super) fn settings_screen(s: &State) -> El {
                     .hover(t.hover)
                     .motion(motion::SNAPPY)
                     .focusable(true)
-                    .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                    .focus_visual(2.0)
                     .press_scale(0.97)
                     .cursor(rune::Cursor::Pointer)
                     .child(
@@ -812,7 +813,7 @@ pub(super) fn settings_screen(s: &State) -> El {
                 .hover(t.hover)
                 .motion(motion::SNAPPY)
                 .focusable(true)
-                .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                .focus_visual(2.0)
                 .press_scale(0.97)
                 .cursor(rune::Cursor::Pointer)
                 .child(text("Reset shortcuts").font(type_::label()).color(t.text))
@@ -905,7 +906,7 @@ pub(super) fn settings_screen(s: &State) -> El {
                         .hover(t.hover)
                         .motion(motion::SNAPPY)
                         .focusable(true)
-                        .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                        .focus_visual(2.0)
                         .press_scale(0.97)
                         .child(
                             text("Get a key")
@@ -1105,7 +1106,7 @@ pub(super) fn settings_screen(s: &State) -> El {
                             .hover(t.hover)
                             .motion(motion::SNAPPY)
                             .focusable(true)
-                            .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                            .focus_visual(2.0)
                             .press_scale(0.97)
                             .child(text("Test").font(type_::label()).color(t.bg))
                             .cursor(rune::Cursor::Pointer)
@@ -1122,7 +1123,7 @@ pub(super) fn settings_screen(s: &State) -> El {
                             .hover(t.hover)
                             .motion(motion::SNAPPY)
                             .focusable(true)
-                            .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                            .focus_visual(2.0)
                             .press_scale(0.97)
                             .child(text("Clear key").font(type_::label()).color(t.text))
                             .cursor(rune::Cursor::Pointer)
@@ -1139,7 +1140,7 @@ pub(super) fn settings_screen(s: &State) -> El {
                             .hover(t.hover)
                             .motion(motion::SNAPPY)
                             .focusable(true)
-                            .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                            .focus_visual(2.0)
                             .press_scale(0.97)
                             .child(text("Open Discover").font(type_::label()).color(t.text))
                             .cursor(rune::Cursor::Pointer)
@@ -1203,7 +1204,7 @@ pub(super) fn settings_screen(s: &State) -> El {
                         .hover(t.hover)
                         .motion(motion::SNAPPY)
                         .focusable(true)
-                        .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                        .focus_visual(2.0)
                         .press_scale(0.97)
                         .child(
                             text("Clear poster cache")
@@ -1224,7 +1225,7 @@ pub(super) fn settings_screen(s: &State) -> El {
                         .hover(t.hover)
                         .motion(motion::SNAPPY)
                         .focusable(true)
-                        .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                        .focus_visual(2.0)
                         .press_scale(0.97)
                         .child(text("Remote control").font(type_::label()).color(t.text))
                         .cursor(rune::Cursor::Pointer)
@@ -1299,7 +1300,7 @@ pub(super) fn settings_screen(s: &State) -> El {
                         .fill(t.bg)
                         .hover(t.hover)
                         .focusable(true)
-                        .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                        .focus_visual(2.0)
                         .cursor(rune::Cursor::Pointer)
                         .child(
                             text("Export Letterboxd CSV")
@@ -1318,7 +1319,7 @@ pub(super) fn settings_screen(s: &State) -> El {
                         .fill(t.bg)
                         .hover(t.hover)
                         .focusable(true)
-                        .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                        .focus_visual(2.0)
                         .cursor(rune::Cursor::Pointer)
                         .child(text("Clear history").font(type_::label()).color(t.text))
                         .on_press(|s: &mut State| s.clear_history()),
@@ -1346,7 +1347,7 @@ pub(super) fn settings_screen(s: &State) -> El {
                         .hover(t.hover)
                         .motion(motion::SNAPPY)
                         .focusable(true)
-                        .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                        .focus_visual(2.0)
                         .press_scale(0.97)
                         .cursor(rune::Cursor::Pointer)
                         .child(text("Reset preferences").font(type_::label()).color(t.text))
@@ -1363,7 +1364,7 @@ pub(super) fn settings_screen(s: &State) -> El {
                         .hover(t.hover)
                         .motion(motion::SNAPPY)
                         .focusable(true)
-                        .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                        .focus_visual(2.0)
                         .press_scale(0.97)
                         .cursor(rune::Cursor::Pointer)
                         .child(
@@ -1385,7 +1386,7 @@ pub(super) fn settings_screen(s: &State) -> El {
                 .hover(t.hover)
                 .motion(motion::SNAPPY)
                 .focusable(true)
-                .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                .focus_visual(2.0)
                 .press_scale(0.97)
                 .child(
                     text("Sign out")

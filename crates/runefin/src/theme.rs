@@ -164,13 +164,31 @@ pub fn ring() -> Color {
     }
 }
 
+/// The focus treatment on a control. Desktop keeps the accent ring; big screen uses the same
+/// wash the pointer gets, with no ring: a ring around a card or a sidebar row reads as a
+/// selection box, not as focus.
+pub trait FocusVisual {
+    fn focus_visual(self, radius: f32) -> El;
+}
+
+impl FocusVisual for El {
+    fn focus_visual(self, radius: f32) -> El {
+        if is_big_screen() {
+            // Without `no_focus_ring`, Rune falls back to its blue default ring.
+            self.focus_fill(colors().hover).no_focus_ring()
+        } else {
+            self.focus_ring(focus_width(), radius, ring())
+        }
+    }
+}
+
 /// Give a big-screen control the pointer's neutral wash while it holds keyboard focus. Return
 /// activation comes from `rune::set_return_activates`, not from a highlight colour.
 pub fn tv_focus(el: El) -> El {
     if is_big_screen() {
         // The same neutral wash the pointer gets on the desktop, not an accent slab: focus and
-        // selection must not look alike.
-        el.focus_fill(colors().hover)
+        // selection must not look alike. No ring, and none of Rune's blue default either.
+        el.focus_fill(colors().hover).no_focus_ring()
     } else {
         el
     }

@@ -6,6 +6,7 @@ use std::sync::atomic::Ordering;
 use jellyfin_api::Item;
 use rune::tok::{self, motion};
 
+use crate::theme::FocusVisual;
 use crate::theme::{self, type_};
 use rune::{Color, El, GrowthSpec, ScrollSpec, SurfaceFit, col, el, icon, row, text, text_input};
 
@@ -197,7 +198,7 @@ fn play_queue_button(label: &str, key: &str, t: &tok::Theme, shuffle: bool) -> E
         .hover(t.hover)
         .motion(motion::SNAPPY)
         .focusable(true)
-        .focus_ring(theme::focus_width(), 2.0, theme::ring())
+        .focus_visual(2.0)
         .press_scale(0.97)
         .label(label)
         .help(if shuffle {
@@ -225,7 +226,7 @@ fn back_button(t: &tok::Theme) -> El {
         .hover(t.hover)
         .motion(motion::SNAPPY)
         .focusable(true)
-        .focus_ring(theme::focus_width(), 2.0, theme::ring())
+        .focus_visual(2.0)
         .press_scale(0.97)
         .child(text("← Home").font(type_::label()).color(t.text))
         .cursor(rune::Cursor::Pointer)
@@ -632,7 +633,7 @@ fn filters_panel(s: &State, library: &LibraryState, t: &tok::Theme) -> El {
                     .hover(t.hover)
                     .motion(motion::SNAPPY)
                     .focusable(true)
-                    .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                    .focus_visual(2.0)
                     .press_scale(0.97)
                     .cursor(rune::Cursor::Pointer)
                     .child(text(label).font(type_::caption()).color(t.text))
@@ -720,7 +721,7 @@ fn genre_chip(
         .hover(t.hover)
         .motion(motion::SNAPPY)
         .focusable(true)
-        .focus_ring(theme::focus_width(), 2.0, theme::ring())
+        .focus_visual(2.0)
         .press_scale(0.96)
         .child(
             text(label.to_string())
@@ -752,7 +753,7 @@ fn toolbar_button(
         .hover(t.hover)
         .motion(motion::SNAPPY)
         .focusable(true)
-        .focus_ring(theme::focus_width(), 2.0, theme::ring())
+        .focus_visual(2.0)
         .press_scale(0.96)
         .child(
             text(label)
@@ -982,7 +983,7 @@ fn library_list_row(item: &Item, s: &State, t: &tok::Theme) -> El {
             .motion(motion::SNAPPY)
             .role("button")
             .focusable(true)
-            .focus_ring(theme::focus_width(), 2.0, theme::ring())
+            .focus_visual(2.0)
             .press_scale(0.995)
             .cursor(rune::Cursor::Pointer)
             .on_press({
@@ -1062,7 +1063,7 @@ fn letter_rail(library: &LibraryState, t: &tok::Theme) -> El {
                 .hover(t.hover)
                 .motion(motion::SNAPPY)
                 .focusable(true)
-                .focus_ring(theme::focus_width(), 1.0, theme::ring())
+                .focus_visual(1.0)
                 .press_scale(0.94)
                 .child(
                     text(letter.to_string())

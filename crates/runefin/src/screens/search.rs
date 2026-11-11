@@ -3,6 +3,7 @@
 use jellyfin_api::Item;
 use rune::tok::{self, motion};
 
+use crate::theme::FocusVisual;
 use crate::theme::{self, type_};
 use rune::{El, ScrollSpec, col, el, row, text, text_input};
 
@@ -107,7 +108,7 @@ pub(super) fn search_screen(s: &State) -> El {
                         .fill(t.card)
                         .hover(t.hover)
                         .focusable(true)
-                        .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                        .focus_visual(2.0)
                         .press_scale(0.94)
                         .child(text("×").font(type_::label()).color(t.text_secondary))
                         .cursor(rune::Cursor::Pointer)
@@ -136,7 +137,7 @@ pub(super) fn search_screen(s: &State) -> El {
                         .fill(t.card)
                         .hover(t.hover)
                         .focusable(true)
-                        .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                        .focus_visual(2.0)
                         .press_scale(0.97)
                         .child(text("Try again").font(type_::label()).color(t.text))
                         .cursor(rune::Cursor::Pointer)
@@ -197,7 +198,7 @@ pub(super) fn search_screen(s: &State) -> El {
                             .fill(t.card)
                             .hover(t.hover)
                             .focusable(true)
-                            .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                            .focus_visual(2.0)
                             .press_scale(0.97)
                             .child(text(term.clone()).font(type_::label()).color(t.text))
                             .cursor(rune::Cursor::Pointer)
@@ -242,7 +243,7 @@ pub(super) fn search_screen(s: &State) -> El {
                             .fill(t.card)
                             .hover(t.hover)
                             .focusable(true)
-                            .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                            .focus_visual(2.0)
                             .press_scale(0.97)
                             .child(text("Clear search").font(type_::label()).color(t.text))
                             .cursor(rune::Cursor::Pointer)
@@ -258,7 +259,7 @@ pub(super) fn search_screen(s: &State) -> El {
                             .fill(t.card)
                             .hover(t.hover)
                             .focusable(true)
-                            .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                            .focus_visual(2.0)
                             .press_scale(0.97)
                             .child(
                                 text("Search all libraries")
@@ -402,7 +403,7 @@ fn search_hints(s: &State, t: &tok::Theme) -> Option<El> {
                 .hover(t.hover)
                 .motion(motion::SNAPPY)
                 .focusable(true)
-                .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                .focus_visual(2.0)
                 .press_scale(0.97)
                 .cursor(rune::Cursor::Pointer)
                 .child(text(label).font(type_::caption()).color(t.text_secondary))
@@ -452,7 +453,7 @@ fn rail(title: &str, key: &str, items: &[Item], s: &State, t: &tok::Theme) -> El
                 .hover(t.hover)
                 .motion(motion::SNAPPY)
                 .focusable(true)
-                .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                .focus_visual(2.0)
                 .press_scale(0.96)
                 .child(
                     text(if expanded { "Show less" } else { "See all" })
@@ -531,7 +532,7 @@ fn people(items: &[Item], t: &tok::Theme) -> El {
                 .hover(t.hover)
                 .press_scale(0.96)
                 .focusable(true)
-                .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                .focus_visual(2.0)
                 .cursor(rune::Cursor::Pointer)
                 .on_press(move |s: &mut State| {
                     s.open_person(&jellyfin_api::Person {

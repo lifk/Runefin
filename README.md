@@ -32,7 +32,7 @@ everything from a gamepad or an HDMI-CEC remote.
 - **Remote and cast**: open sessions, pause/resume/+30 s/stop, and “Play on…”.
 - **Seerr (optional)**: if you run Jellyseerr/Seerr, Discover and Requests appear for film and
   season requests, request status and download progress.
-- **Big screen**: a 64 pt safe gutter, a type ramp for couch distance, 2 pt neutral focus rings,
+- **Big screen**: a 64 pt safe gutter, a type ramp for couch distance, hover-wash focus,
   D-pad focus zones, gamepad navigation and HDMI-CEC remote support.
 
 The full inventory and the deliberate limits are in [`docs/features.md`](docs/features.md).
@@ -71,8 +71,8 @@ over (`flatpak uninstall --user io.github.lifk.Runefin`); your settings stay in 
 The offline bundle is still attached to every release:
 
 ```sh
-curl -LO https://github.com/lifk/Runefin/releases/latest/download/Runefin-0.1.14-x86_64.flatpak
-flatpak install --user ./Runefin-0.1.14-x86_64.flatpak
+curl -LO https://github.com/lifk/Runefin/releases/latest/download/Runefin-0.1.15-x86_64.flatpak
+flatpak install --user ./Runefin-0.1.15-x86_64.flatpak
 ```
 
 Packaging sources, the repository layout, controller notes and the CEC mapping live in

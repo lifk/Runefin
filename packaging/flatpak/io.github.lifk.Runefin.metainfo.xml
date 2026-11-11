@@ -42,6 +42,15 @@
   </screenshots>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.1.15" date="2026-11-11">
+      <description>
+        <p>
+          Big-screen focus now reads like pointer hover: the neutral wash alone, with no ring
+          around cards, sidebar rows or buttons, and every Detail action, the Next up card and
+          the season controls are reachable.
+        </p>
+      </description>
+    </release>
     <release version="0.1.14" date="2026-11-11">
       <description>
         <p>

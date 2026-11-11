@@ -90,18 +90,19 @@ handles Return as OK; Space stays as a second activation key for the pad.
 
 One system for both modes:
 
-- **Ring**: 2 pt, `t.hover`-neutral edge at 70 % in big screen (was 4 pt solid `#0033CC`). A ring
-  is still needed: a fill alone disappears over a poster.
-- **Fill**: `t.hover`, exactly the desktop hover token, at the element's own radius. Drop
-  `focus_highlight`'s accent wash; it reads as a selection, not focus.
+- **Big screen: the hover wash, no ring.** A focused control gets exactly the pointer's `t.hover`
+  fill and suppresses Rune's default ring (`no_focus_ring`). A ring around a card, a sidebar row
+  or a detail button read as a selection box, not as focus. Desktop keeps its accent
+  `focus_ring`; `theme::FocusVisual` picks the treatment.
+- **Fill**: `t.hover`, exactly the desktop hover token, at the element's own radius.
 - **Selected ≠ focused**: the sidebar's current destination keeps its accent pill; focus adds the
-  neutral wash and ring inside it.
+  neutral wash inside it.
 - **No motion on focus**: no scale, no spring; focus moves must be instant on a TV.
 - **Pressed**: the existing press scale; unchanged.
 - Text colour does not change on focus; contrast must survive a bright poster.
 
-Because focus is not part of the committed snapshots, this needs a new debug scene with focus on
-a card and on a sidebar entry, rendered at 1080p, so the visual contract is reviewable.
+Because focus is not part of the committed snapshots, the focus pair (`focus-card-big`,
+`focus-sidebar-big`) renders at 1080p past the first poll, so the visual contract is reviewable.
 
 ## 6. Work, in slices
 
@@ -181,6 +182,14 @@ poll and the sidebar one walks there with a script.
 Still open: a hardware pass over the zones now that the router actually receives the keys, and a
 decision on whether Settings text fields should let Up/Down leave them (today they keep every
 arrow, as Rune does for inputs).
+
+Sixth pass: big-screen focus is the pointer's `t.hover` wash with no ring at all (Rune's default
+ring is suppressed too), because the 2 pt outline still read as a selection box around cards,
+sidebar rows and buttons; desktop keeps its accent ring. The Detail zones now mirror the whole
+page: every action that is drawn (play options, Start over from the item the primary opens, theme
+audio/video, trailer, Seerr request, collection Play all/Shuffle, favourite, watched, playlist),
+the Next up card, the season chips, and the episode header's Play season / Shuffle / Season
+watched controls. That is what made Start over, Play next, Play season and Shuffle unreachable.
 
 Fourth pass: Seerr's detail page (Back, the action row, the season picker, the cast rail). The
 zones mirror what the page actually draws: only rendered actions take focus (no request button

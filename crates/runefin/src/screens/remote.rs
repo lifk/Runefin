@@ -3,6 +3,7 @@
 use jellyfin_api::SessionInfo;
 use rune::tok::{self, motion};
 
+use crate::theme::FocusVisual;
 use crate::theme::{self, type_};
 use rune::{El, ScrollSpec, col, el, row, text};
 
@@ -42,7 +43,7 @@ pub(super) fn remote_screen(s: &State) -> El {
                         .hover(t.hover)
                         .motion(motion::SNAPPY)
                         .focusable(true)
-                        .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                        .focus_visual(2.0)
                         .press_scale(0.97)
                         .child(text("Refresh").font(type_::label()).color(t.text))
                         .cursor(rune::Cursor::Pointer)
@@ -140,7 +141,7 @@ fn session_row(session: &SessionInfo, t: &tok::Theme) -> El {
                     .fill(if paused { tok::accent(0, true) } else { t.bg })
                     .hover(t.hover)
                     .focusable(true)
-                    .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                    .focus_visual(2.0)
                     .press_scale(0.97)
                     .child(
                         text(if paused { "Resume" } else { "Pause" })
@@ -165,7 +166,7 @@ fn session_row(session: &SessionInfo, t: &tok::Theme) -> El {
                     .fill(t.bg)
                     .hover(t.hover)
                     .focusable(true)
-                    .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                    .focus_visual(2.0)
                     .press_scale(0.97)
                     .child(text("+30s").font(type_::label()).color(t.text))
                     .cursor(rune::Cursor::Pointer)
@@ -181,7 +182,7 @@ fn session_row(session: &SessionInfo, t: &tok::Theme) -> El {
                     .fill(t.bg)
                     .hover(t.hover)
                     .focusable(true)
-                    .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                    .focus_visual(2.0)
                     .press_scale(0.97)
                     .child(text("Stop").font(type_::label()).color(t.text))
                     .cursor(rune::Cursor::Pointer)

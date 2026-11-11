@@ -7,6 +7,7 @@ use rune::tok::{self, motion};
 use rune::{El, ScrollSpec, SurfaceFit, col, el, row, text};
 
 use crate::state::{PersonPage, State};
+use crate::theme::FocusVisual;
 use crate::theme::{self, type_};
 
 pub(super) fn person_screen(s: &State, person: &PersonPage) -> El {
@@ -94,7 +95,7 @@ pub(super) fn person_screen(s: &State, person: &PersonPage) -> El {
                         .hover(t.hover)
                         .motion(motion::SNAPPY)
                         .focusable(true)
-                        .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                        .focus_visual(2.0)
                         .press_scale(0.97)
                         .child(text("← Back").font(type_::label()).color(t.text))
                         .cursor(rune::Cursor::Pointer)
@@ -253,7 +254,7 @@ fn credit_card(s: &State, credit: &seerr_api::Credit, t: &tok::Theme) -> El {
         .press_scale(0.98)
         .hover(t.hover)
         .focusable(true)
-        .focus_ring(theme::focus_width(), 2.0, theme::ring())
+        .focus_visual(2.0)
         .cursor(rune::Cursor::Pointer)
         .on_press(move |s: &mut State| s.open_seerr_detail(media.clone(), tmdb_id))
         .child(

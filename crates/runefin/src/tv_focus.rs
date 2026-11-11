@@ -329,21 +329,58 @@ fn detail_zones(s: &State) -> Vec<Zone> {
     let Some(detail) = &s.detail else {
         return Vec::new();
     };
-    let mut actions = vec!["detail-play".to_string()];
-    let resumable = detail
-        .item
-        .user_data
-        .as_ref()
-        .and_then(|user| user.position_ms())
-        .is_some_and(|position| position > 0);
-    if resumable {
-        actions.push("detail-restart".into());
-    }
-    if !detail.local_trailers.is_empty() || !detail.item.remote_trailers.is_empty() {
-        actions.push("detail-trailer".into());
+    let is_boxset = detail.item.kind == "BoxSet";
+    // Mirror `detail::detail_screen`: a key that is not drawn must never take focus.
+    let mut actions = Vec::new();
+    if !is_boxset {
+        actions.push("detail-play".to_string());
+        if detail.item.media_sources.len() > 1 {
+            actions.push("detail-play-options".into());
+        }
+        if detail
+            .play_target()
+            .and_then(|item| item.user_data.as_ref())
+            .and_then(|user| user.position_ms())
+            .is_some_and(|position| position > 0)
+        {
+            actions.push("detail-restart".into());
+        }
+        if !s.detail_theme_songs.is_empty() {
+            actions.push("detail-theme-audio".into());
+        }
+        if !s.detail_theme_videos.is_empty() {
+            actions.push("detail-theme-video".into());
+        }
+        if !detail.local_trailers.is_empty() || !detail.item.remote_trailers.is_empty() {
+            actions.push("detail-trailer".into());
+        }
+        if detail.item.kind == "Series"
+            && let Some((tmdb, tv)) = &s.seerr.series
+            && detail
+                .item
+                .provider_ids
+                .get("Tmdb")
+                .and_then(|id| id.parse::<u64>().ok())
+                == Some(*tmdb)
+        {
+            let present: std::collections::HashSet<i64> = detail
+                .seasons
+                .iter()
+                .filter_map(|season| season.index_number.map(i64::from))
+                .collect();
+            if !crate::state::missing_seasons(&present, tv).is_empty() {
+                actions.push("detail-seerr-request".into());
+            }
+        }
+    } else if !detail.collection.is_empty() {
+        actions.push("detail-play-all".into());
+        actions.push("detail-shuffle".into());
     }
     actions.push("detail-favorite".into());
     actions.push("detail-played".into());
+    if !is_boxset && crate::state::is_playable(&detail.item) {
+        actions.push("detail-playlist".into());
+    }
 
     let mut zones = vec![
         Zone {
@@ -368,7 +405,26 @@ fn detail_zones(s: &State) -> Vec<Zone> {
             parent: Some(0),
         });
     }
-    if !detail.episodes.is_empty() {
+    if detail.next_up.is_some() {
+        zones.push(Zone {
+            keys: vec!["detail-next-up-card".into()],
+            columns: 1,
+            parent: Some(0),
+        });
+    }
+    if !detail.loading_episodes && !detail.episodes.is_empty() {
+        zones.push(Zone {
+            keys: [
+                "detail-play-season",
+                "detail-shuffle-season",
+                "detail-season-watched",
+            ]
+            .into_iter()
+            .map(String::from)
+            .collect(),
+            columns: 0,
+            parent: Some(0),
+        });
         zones.push(Zone {
             keys: detail
                 .episodes
@@ -773,6 +829,28 @@ mod tests {
             step(&state, Some("detail-play"), TvAction::Up).as_deref(),
             Some("detail-back")
         );
+        // The season chips sit under the actions, then Next up, then the episode controls.
+        assert!(contains(&state, "detail-next-up-card"));
+        assert!(contains(&state, "detail-play-season"));
+        assert!(contains(&state, "detail-shuffle-season"));
+        assert!(contains(&state, "detail-season-watched"));
+        let season = step(&state, Some("detail-play"), TvAction::Down).expect("the season chips");
+        assert!(season.starts_with("season-"), "{season}");
+        assert_eq!(
+            step(&state, Some(&season), TvAction::Down).as_deref(),
+            Some("detail-next-up-card")
+        );
+        assert_eq!(
+            step(&state, Some("detail-next-up-card"), TvAction::Down).as_deref(),
+            Some("detail-play-season")
+        );
+        assert_eq!(
+            step(&state, Some("detail-play-season"), TvAction::Right).as_deref(),
+            Some("detail-shuffle-season")
+        );
+        let episode =
+            step(&state, Some("detail-play-season"), TvAction::Down).expect("the episode list");
+        assert!(episode.starts_with("detail-episode-"), "{episode}");
     }
 
     #[test]

@@ -3,6 +3,7 @@
 
 use rune::tok::{self, motion};
 
+use crate::theme::FocusVisual;
 use crate::theme::{self, type_};
 use rune::{Color, Drag, El, Icon, Phase, SurfaceFit, col, el, icon, row, text, text_input};
 
@@ -300,7 +301,7 @@ fn goto_panel(s: &State, t: &tok::Theme) -> El {
                                 .fill(t.bg)
                                 .hover(t.hover)
                                 .focusable(true)
-                                .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                                .focus_visual(2.0)
                                 .cursor(rune::Cursor::Pointer)
                                 .child(text("Cancel").font(type_::label()).color(t.text))
                                 .on_press(|s: &mut State| s.in_app_goto_open = false),
@@ -315,7 +316,7 @@ fn goto_panel(s: &State, t: &tok::Theme) -> El {
                                 .fill(tok::accent(0, true))
                                 .hover(t.hover)
                                 .focusable(true)
-                                .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                                .focus_visual(2.0)
                                 .cursor(rune::Cursor::Pointer)
                                 .child(text("Go").font(type_::label()).color(t.bg))
                                 .on_press(|s: &mut State| s.submit_in_app_goto()),
@@ -435,7 +436,7 @@ fn sleep_panel(s: &State, t: &tok::Theme) -> El {
                 .hover(t.hover)
                 .motion(motion::SNAPPY)
                 .focusable(true)
-                .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                .focus_visual(2.0)
                 .press_scale(0.98)
                 .child(text(label).font(type_::label()).color(t.text))
                 .cursor(rune::Cursor::Pointer)
@@ -802,7 +803,7 @@ fn cue_box(s: &State, cue: &crate::subtitles::Cue, size: f32, window_h: f32, key
         lines = lines.child(stack.child(text(line.to_string()).font(style).color(color)));
     }
     // ASS rotates and scales the whole cue about its centre. Rune scales uniformly, so a
-    // non-uniform `scx`/`scy` pair keeps its area rather than its exact aspect.
+    // non-uniform `scx`/`scy` pair keeps its area rather than its exact aspect.
     let scale = (cue.scale.0 * cue.scale.1)
         .max(0.01)
         .sqrt()
@@ -943,7 +944,7 @@ fn accent_control(
         .hover(Color::WHITE.alpha(0.18))
         .motion(motion::SNAPPY)
         .focusable(true)
-        .focus_ring(theme::focus_width(), 2.0, theme::ring())
+        .focus_visual(2.0)
         .press_scale(0.96)
         .cursor(rune::Cursor::Pointer)
         .child(text(label).font(type_::label()).color(Color::WHITE))
@@ -1105,7 +1106,7 @@ fn chapter_panel(s: &State, session: &crate::state::InAppSession, t: &tok::Theme
                 .hover(t.hover)
                 .motion(motion::SNAPPY)
                 .focusable(true)
-                .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                .focus_visual(2.0)
                 .press_scale(0.99)
                 .cursor(rune::Cursor::Pointer)
                 .on_press(move |s: &mut State| s.seek_in_app_chapter(at))
@@ -1180,7 +1181,7 @@ fn queue_control(
         .hover(t.hover)
         .motion(motion::SNAPPY)
         .focusable(true)
-        .focus_ring(theme::focus_width(), 2.0, theme::ring())
+        .focus_visual(2.0)
         .press_scale(0.94)
         .child(
             text(label.to_string())
@@ -1238,7 +1239,7 @@ fn queue_panel(s: &State, t: &tok::Theme) -> El {
                 .hover(t.hover)
                 .motion(motion::SNAPPY)
                 .focusable(true)
-                .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                .focus_visual(2.0)
                 .press_scale(0.99)
                 .cursor(rune::Cursor::Pointer)
                 .on_press(move |s: &mut State| s.play_queue_at(at))
@@ -1409,7 +1410,7 @@ fn subtitle_tracks_panel(s: &State, t: &tok::Theme) -> El {
                     .hover(t.hover)
                     .motion(motion::SNAPPY)
                     .focusable(true)
-                    .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                    .focus_visual(2.0)
                     .press_scale(0.98)
                     .cursor(rune::Cursor::Pointer)
                     .on_press(|s: &mut State| s.open_in_app_subtitle_search())
@@ -1515,7 +1516,7 @@ fn subtitle_tracks_panel(s: &State, t: &tok::Theme) -> El {
                 .hover(t.hover)
                 .motion(motion::SNAPPY)
                 .focusable(true)
-                .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                .focus_visual(2.0)
                 .press_scale(0.98)
                 .help("Download a subtitle from the server's providers")
                 .cursor(rune::Cursor::Pointer)
@@ -1562,7 +1563,7 @@ fn subtitle_search_panel(s: &State, t: &tok::Theme) -> El {
                 .hover(t.hover)
                 .motion(motion::SNAPPY)
                 .focusable(true)
-                .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                .focus_visual(2.0)
                 .press_scale(0.96)
                 .cursor(rune::Cursor::Pointer)
                 .on_press(|s: &mut State| s.close_in_app_subtitle_search())
@@ -1607,7 +1608,7 @@ fn subtitle_search_panel(s: &State, t: &tok::Theme) -> El {
                     .hover(t.hover)
                     .motion(motion::SNAPPY)
                     .focusable(true)
-                    .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                    .focus_visual(2.0)
                     .press_scale(0.96)
                     .cursor(rune::Cursor::Pointer)
                     .on_press(move |s: &mut State| {
@@ -1654,7 +1655,7 @@ fn subtitle_search_panel(s: &State, t: &tok::Theme) -> El {
                     .hover(t.hover)
                     .motion(motion::SNAPPY)
                     .focusable(true)
-                    .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                    .focus_visual(2.0)
                     .press_scale(0.97)
                     .cursor(rune::Cursor::Pointer)
                     .on_press(|s: &mut State| {
@@ -1694,7 +1695,7 @@ fn subtitle_search_panel(s: &State, t: &tok::Theme) -> El {
             .hover(t.hover)
             .motion(motion::SNAPPY)
             .focusable(true)
-            .focus_ring(theme::focus_width(), 2.0, theme::ring())
+            .focus_visual(2.0)
             .press_scale(0.99)
             .cursor(rune::Cursor::Pointer)
             .on_press(move |s: &mut State| s.download_in_app_subtitle(id.clone()))
@@ -1763,7 +1764,7 @@ fn choice_row(
         })
         .hover(t.hover)
         .focusable(true)
-        .focus_ring(theme::focus_width(), 2.0, theme::ring())
+        .focus_visual(2.0)
         .press_scale(0.98)
         .cursor(rune::Cursor::Pointer)
         .on_press(on_press)
@@ -1913,7 +1914,7 @@ fn segment_marks(s: &State, session: &crate::state::InAppSession, _t: &tok::Them
                 .radius(2.0)
                 .fill(color)
                 .focusable(true)
-                .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                .focus_visual(2.0)
                 .press_scale(1.0)
                 .cursor(rune::Cursor::Pointer)
                 .label(format!("{label} segment"))
@@ -2335,7 +2336,7 @@ fn volume_slider(s: &State, t: &tok::Theme) -> El {
         // stayed at the vertical centre, and the slider read as tilted.
         .items_center()
         .focusable(true)
-        .focus_ring(theme::focus_width(), 2.0, theme::ring())
+        .focus_visual(2.0)
         .hover(t.hover)
         .cursor(rune::Cursor::Grab)
         .on_drag(|s: &mut State, drag: &mut Drag, _tx| {
@@ -2390,7 +2391,7 @@ fn seek_bar(s: &State, session: &crate::state::InAppSession, progress: f32, t: &
         .w_full()
         .h(24.0)
         .focusable(true)
-        .focus_ring(theme::focus_width(), 12.0, theme::ring())
+        .focus_visual(12.0)
         .cursor(rune::Cursor::Grab)
         .on_layout_tx(|s: &mut State, rect: [f32; 4], _tx: &mut rune::Tx| {
             s.in_app_seek_width = rect[2];
@@ -2691,7 +2692,7 @@ fn gear_row(
         .hover(t.hover)
         .motion(motion::SNAPPY)
         .focusable(true)
-        .focus_ring(theme::focus_width(), 2.0, theme::ring())
+        .focus_visual(2.0)
         .cursor(rune::Cursor::Pointer)
         .press_scale(0.99)
         .on_press(on)
@@ -2905,7 +2906,7 @@ fn transport_primary(glyph: &'static Icon, label: &str, t: &tok::Theme) -> El {
         .hover(t.hover)
         .motion(motion::SNAPPY)
         .focusable(true)
-        .focus_ring(theme::focus_width(), 2.0, theme::ring())
+        .focus_visual(2.0)
         .press_scale(0.94)
         .label(label)
         .help(label)
@@ -2933,7 +2934,7 @@ fn icon_control(
             .hover(t.hover)
             .motion(motion::SNAPPY)
             .focusable(true)
-            .focus_ring(theme::focus_width(), 2.0, theme::ring())
+            .focus_visual(2.0)
             .press_scale(0.94)
             .label(label)
             .help(label)
@@ -2958,7 +2959,7 @@ fn control(label: &str, key: &str, t: &tok::Theme, on: impl Fn(&mut State) + 'st
             .hover(t.hover)
             .motion(motion::SNAPPY)
             .focusable(true)
-            .focus_ring(theme::focus_width(), 2.0, theme::ring())
+            .focus_visual(2.0)
             .press_scale(0.96)
             .child(text(label).font(type_::label()).color(Color::WHITE))
             .cursor(rune::Cursor::Pointer)

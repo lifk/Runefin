@@ -4,6 +4,7 @@
 use jellyfin_api::Item;
 use rune::tok::{self, motion};
 
+use crate::theme::FocusVisual;
 use crate::theme::{self, type_};
 use rune::{
     Color, Cx, El, Icon, ScrollSpec, SurfaceFit, TextEdit, TextStyle, col, el, icon, row, text,
@@ -171,7 +172,7 @@ pub fn view(s: &State, _cx: &mut Cx<State>) -> El {
                                 .hover(theme::colors().hover)
                                 .motion(motion::SNAPPY)
                                 .focusable(true)
-                                .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                                .focus_visual(2.0)
                                 .press_scale(0.96)
                                 .child(
                                     text("Undo")
@@ -237,7 +238,7 @@ fn mini_player(s: &State) -> El {
                 .hover(t.hover)
                 .motion(motion::SNAPPY)
                 .focusable(true)
-                .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                .focus_visual(2.0)
                 .press_scale(0.98)
                 .label("Restore the player")
                 .child(
@@ -330,7 +331,7 @@ fn mini_button(
         .hover(t.hover)
         .motion(motion::SNAPPY)
         .focusable(true)
-        .focus_ring(theme::focus_width(), 2.0, theme::ring())
+        .focus_visual(2.0)
         .press_scale(0.94)
         .cursor(rune::Cursor::Pointer)
         .label(label)
@@ -431,7 +432,7 @@ fn shortcut_overlay(s: &State) -> El {
                         .hover(t.hover)
                         .motion(motion::SNAPPY)
                         .focusable(true)
-                        .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                        .focus_visual(2.0)
                         .press_scale(0.94)
                         .child(
                             text(if s.big_screen { "B / Esc" } else { "Esc" })
@@ -557,7 +558,7 @@ fn connect(s: &State) -> El {
         .center()
         .focusable(true)
         .default_button()
-        .focus_ring(theme::focus_width(), 2.0, theme::ring())
+        .focus_visual(2.0)
         .press_scale(0.97)
         .child(text(label).font(type_::label()).color(t.bg))
         .cursor(rune::Cursor::Pointer)
@@ -609,7 +610,7 @@ fn connect(s: &State) -> El {
                     .hover(t.hover)
                     .motion(motion::SNAPPY)
                     .focusable(true)
-                    .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                    .focus_visual(2.0)
                     .press_scale(0.98)
                     .cursor(rune::Cursor::Pointer)
                     .on_press(move |s: &mut State| s.use_discovered(address.clone()))
@@ -639,7 +640,7 @@ fn connect(s: &State) -> El {
                 .hover(t.hover)
                 .motion(motion::SNAPPY)
                 .focusable(true)
-                .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                .focus_visual(2.0)
                 .press_scale(0.97)
                 .child(
                     text("Use Quick Connect instead")
@@ -752,7 +753,7 @@ fn quick_card(quick: &crate::state::QuickLogin, t: &tok::Theme) -> El {
                 .hover(t.hover)
                 .motion(motion::SNAPPY)
                 .focusable(true)
-                .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                .focus_visual(2.0)
                 .press_scale(0.97)
                 .child(text("Cancel").font(type_::label()).color(t.text))
                 .cursor(rune::Cursor::Pointer)
@@ -773,7 +774,7 @@ fn discover_action(s: &State, t: &tok::Theme) -> El {
         .hover(t.hover)
         .motion(motion::SNAPPY)
         .focusable(true)
-        .focus_ring(theme::focus_width(), 2.0, theme::ring())
+        .focus_visual(2.0)
         .press_scale(0.96)
         .child(
             text(if s.discovering {
@@ -924,7 +925,7 @@ fn shelf_screen(s: &State, shelf: crate::state::HomeShelf) -> El {
                                 .hover(t.hover)
                                 .motion(motion::SNAPPY)
                                 .focusable(true)
-                                .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                                .focus_visual(2.0)
                                 .press_scale(0.97)
                                 .child(text("← Home").font(type_::label()).color(t.text))
                                 .cursor(rune::Cursor::Pointer)
@@ -987,7 +988,7 @@ pub(super) fn sidebar(s: &State, t: &tok::Theme) -> El {
             .center()
             .hover(t.hover)
             .focusable(true)
-            .focus_ring(theme::focus_width(), 2.0, theme::ring())
+            .focus_visual(2.0)
             .press_scale(0.94)
             .cursor(rune::Cursor::Pointer)
             .on_press(|s: &mut State| s.toggle_sidebar())
@@ -1024,7 +1025,7 @@ pub(super) fn sidebar(s: &State, t: &tok::Theme) -> El {
         .hover(t.hover)
         .motion(motion::SNAPPY)
         .focusable(true)
-        .focus_ring(theme::focus_width(), 2.0, theme::ring())
+        .focus_visual(2.0)
         .press_scale(0.94)
         .help(if collapsed {
             "Expand sidebar"
@@ -1327,7 +1328,7 @@ fn nav_item(
         .hover(t.hover)
         .motion(motion::SNAPPY)
         .focusable(true)
-        .focus_ring(theme::focus_width(), 2.0, theme::ring())
+        .focus_visual(2.0)
         .press_scale(0.98)
         .cursor(rune::Cursor::Pointer)
         .label(label.to_string())
@@ -1369,7 +1370,14 @@ fn nav_item(
             t.text_secondary
         }));
     }
-    theme::tv_focus(item)
+    // A selected pill is already accent-filled; a 10% wash disappears into it, so focus lifts
+    // it a little further. This is still a fill, not a ring.
+    let item = theme::tv_focus(item);
+    if selected && theme::is_big_screen() {
+        item.focus_fill(Color::WHITE.alpha(0.20))
+    } else {
+        item
+    }
 }
 
 fn content(s: &State, t: &tok::Theme) -> El {
@@ -1561,7 +1569,7 @@ fn home_hero(s: &State, t: &tok::Theme) -> El {
                                 .shadow(4.0, 12.0, tok::accent(0, true).alpha(0.35))
                                 .hover(t.hover)
                                 .focusable(true)
-                                .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                                .focus_visual(2.0)
                                 .cursor(rune::Cursor::Pointer)
                                 .child(text("Resume").font(type_::label()).color(t.bg))
                                 .on_press(move |s: &mut State| s.play_episode(play.clone())),
@@ -1579,7 +1587,7 @@ fn home_hero(s: &State, t: &tok::Theme) -> El {
                                 .shadow(2.0, 6.0, Color::BLACK.alpha(0.18))
                                 .hover(t.hover)
                                 .focusable(true)
-                                .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                                .focus_visual(2.0)
                                 .cursor(rune::Cursor::Pointer)
                                 .child(text("Details").font(type_::label()).color(t.text))
                                 .on_press(move |s: &mut State| s.open_detail(id.clone())),
@@ -1728,7 +1736,7 @@ fn rail(
                 .hover(t.hover)
                 .motion(motion::SNAPPY)
                 .focusable(true)
-                .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                .focus_visual(2.0)
                 .press_scale(0.96)
                 .child(text("See all").font(type_::label()).color(t.text_secondary))
                 .cursor(rune::Cursor::Pointer)
@@ -1748,7 +1756,7 @@ fn rail(
                 .hover(t.hover)
                 .motion(motion::SNAPPY)
                 .focusable(true)
-                .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                .focus_visual(2.0)
                 .press_scale(0.96)
                 .child(text("See all").font(type_::label()).color(t.text_secondary))
                 .cursor(rune::Cursor::Pointer)
@@ -1856,7 +1864,7 @@ fn resume_card(item: &Item, s: &State, t: &tok::Theme, highlight: bool) -> El {
             .hover(rune::Color::WHITE.alpha(0.18))
             .motion(motion::SNAPPY)
             .focusable(true)
-            .focus_ring(theme::focus_width(), 2.0, theme::ring())
+            .focus_visual(2.0)
             .press_scale(0.92)
             .group_opacity(0.0, 1.0)
             .label("Remove from Continue Watching")
@@ -1893,7 +1901,7 @@ fn resume_card(item: &Item, s: &State, t: &tok::Theme, highlight: bool) -> El {
         .w(RESUME_W)
         .hover_group()
         .focusable(true)
-        .focus_ring(theme::focus_width(), 4.0, theme::ring())
+        .focus_visual(4.0)
         .press_scale(0.985)
         .motion(motion::SNAPPY)
         .cursor(rune::Cursor::Pointer)
@@ -1930,7 +1938,7 @@ fn on_now_rail(s: &State, t: &tok::Theme) -> El {
                 .hover(t.hover)
                 .motion(motion::SNAPPY)
                 .focusable(true)
-                .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                .focus_visual(2.0)
                 .press_scale(0.98)
                 .cursor(rune::Cursor::Pointer)
                 .on_press(move |s: &mut State| s.play_live_channel(play.clone()))
@@ -2007,7 +2015,7 @@ fn resume_rail(key: &str, items: &[Item], s: &State, t: &tok::Theme) -> El {
                         .hover(t.hover)
                         .motion(motion::SNAPPY)
                         .focusable(true)
-                        .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                        .focus_visual(2.0)
                         .press_scale(0.96)
                         .child(text("See all").font(type_::label()).color(t.text_secondary))
                         .cursor(rune::Cursor::Pointer)
@@ -2297,7 +2305,7 @@ fn cast_picker(s: &State, t: &tok::Theme) -> El {
                         .hover(t.hover)
                         .motion(motion::SNAPPY)
                         .focusable(true)
-                        .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                        .focus_visual(2.0)
                         .press_scale(0.96)
                         .child(text("Esc").font(type_::caption()).color(t.text_secondary))
                         .cursor(rune::Cursor::Pointer)
@@ -2355,7 +2363,7 @@ fn cast_picker(s: &State, t: &tok::Theme) -> El {
                 .hover(t.hover)
                 .motion(motion::SNAPPY)
                 .focusable(true)
-                .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                .focus_visual(2.0)
                 .press_scale(0.98)
                 .cursor(rune::Cursor::Pointer)
                 .on_press(move |s: &mut State| s.cast_to_session(id.clone(), target.clone()))
@@ -2403,7 +2411,7 @@ fn menu_row_tx(
             .hover(t.hover)
             .motion(motion::SNAPPY)
             .focusable(true)
-            .focus_ring(theme::focus_width(), 2.0, theme::ring())
+            .focus_visual(2.0)
             .cursor(rune::Cursor::Pointer)
             .press_scale(0.99)
             .on_press_tx(on)
@@ -2430,7 +2438,7 @@ fn menu_row(label: &str, key: &str, t: &tok::Theme, on: impl Fn(&mut State) + 's
             .hover(t.hover)
             .motion(motion::SNAPPY)
             .focusable(true)
-            .focus_ring(theme::focus_width(), 2.0, theme::ring())
+            .focus_visual(2.0)
             .cursor(rune::Cursor::Pointer)
             .press_scale(0.99)
             .on_press(on)
@@ -2514,7 +2522,7 @@ pub(super) fn card(item: &Item, rail: &str, s: &State, t: &tok::Theme) -> El {
                 .hover(t.hover)
                 .motion(motion::SNAPPY)
                 .focusable(true)
-                .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                .focus_visual(2.0)
                 .press_scale(0.94)
                 .cursor(rune::Cursor::Pointer)
                 .label("Play")
@@ -2555,7 +2563,7 @@ pub(super) fn card(item: &Item, rail: &str, s: &State, t: &tok::Theme) -> El {
                     .hover(t.hover)
                     .motion(motion::SNAPPY)
                     .focusable(true)
-                    .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                    .focus_visual(2.0)
                     .press_scale(0.94)
                     .label(if delta < 0 {
                         "Move earlier"
@@ -2589,7 +2597,7 @@ pub(super) fn card(item: &Item, rail: &str, s: &State, t: &tok::Theme) -> El {
                 .hover(t.hover)
                 .motion(motion::SNAPPY)
                 .focusable(true)
-                .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                .focus_visual(2.0)
                 .press_scale(0.94)
                 .label("Remove from playlist")
                 .help("Remove from playlist")
@@ -2720,7 +2728,7 @@ pub(super) fn card(item: &Item, rail: &str, s: &State, t: &tok::Theme) -> El {
                 .hover(t.hover)
                 .motion(motion::SNAPPY)
                 .focusable(true)
-                .focus_ring(theme::focus_width(), 2.0, theme::ring())
+                .focus_visual(2.0)
                 .press_scale(0.94)
                 .label("Select")
                 .help("Select")
@@ -2766,7 +2774,7 @@ pub(super) fn card(item: &Item, rail: &str, s: &State, t: &tok::Theme) -> El {
             .gap(6.0)
             .hover_group()
             .focusable(true)
-            .focus_ring(theme::focus_width(), 4.0, theme::ring())
+            .focus_visual(4.0)
             .press_scale(0.985)
             .motion(motion::SNAPPY)
             .label(title.to_string())
@@ -2991,7 +2999,7 @@ fn retry_button(label: &str, key: &str, t: &tok::Theme) -> El {
         .hover(t.hover)
         .motion(motion::SNAPPY)
         .focusable(true)
-        .focus_ring(theme::focus_width(), 2.0, theme::ring())
+        .focus_visual(2.0)
         .press_scale(0.97)
         .child(text(label).font(type_::label()).color(t.text))
         .cursor(rune::Cursor::Pointer)
