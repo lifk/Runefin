@@ -710,6 +710,22 @@ fn in_app_zones(s: &State) -> Vec<Zone> {
     if !s.osd_visible {
         return Vec::new();
     }
+    // The end-of-episode card replaces the transport: its three decisions are the screen.
+    if s.in_app_hover.is_none()
+        && s.next_up_eligible()
+        && !s.player_panel_open()
+        && !s.player_gear_visible()
+    {
+        return vec![Zone {
+            keys: vec![
+                "in-app-next-play".into(),
+                "in-app-next-credits".into(),
+                "in-app-next-dismiss".into(),
+            ],
+            columns: 0,
+            parent: None,
+        }];
+    }
     // A live stream has no timeline: the transport is the whole OSD.
     let live = s.in_app.as_ref().is_some_and(|session| session.live);
     let controls = Zone {
@@ -985,6 +1001,27 @@ mod tests {
             step(&state, Some("seerr-detail-open"), TvAction::Right).as_deref(),
             Some("seerr-detail-request")
         );
+    }
+
+    #[test]
+    fn the_end_card_actions_are_the_screen() {
+        let mut state = home();
+        let mut session = crate::demo::in_app();
+        session.position_ms = 47 * 60_000 + 40_000;
+        state.in_app = Some(session);
+        state.in_app_next = Some(crate::demo::next_episode());
+        state.osd_visible = true;
+        assert!(contains(&state, "in-app-next-play"));
+        assert!(!contains(&state, "in-app-seek"));
+        assert_eq!(
+            step(&state, Some("in-app-next-play"), TvAction::Right).as_deref(),
+            Some("in-app-next-credits")
+        );
+        assert_eq!(
+            step(&state, Some("in-app-next-credits"), TvAction::Right).as_deref(),
+            Some("in-app-next-dismiss")
+        );
+        assert_eq!(step(&state, Some("in-app-next-play"), TvAction::Down), None);
     }
 
     #[test]

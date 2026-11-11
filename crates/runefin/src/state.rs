@@ -626,6 +626,11 @@ pub struct State {
     osd_hide_at: Option<Instant>,
     /// The OSD just appeared: the next poll asks Rune to focus the timeline once.
     osd_focus_pending: bool,
+    /// Focus attempts left for the end-of-episode card's Play now button. The card mounts a
+    /// frame after the poll that notices it, so the request is made twice.
+    in_app_next_focus: u8,
+    /// Whether the end-of-episode card was offered on the previous poll.
+    in_app_next_offered: bool,
     pub in_app_start: Latest<Result<InAppStart, Failure>>,
     /// A YouTube trailer download in flight; the detail button shows its progress.
     pub trailer_loading: bool,
@@ -985,6 +990,8 @@ impl State {
             osd_visible: true,
             osd_hide_at: None,
             osd_focus_pending: false,
+            in_app_next_focus: 0,
+            in_app_next_offered: false,
             in_app_start: Latest::default(),
             trailer_loading: false,
             trailer_load: Latest::default(),
@@ -2887,6 +2894,13 @@ impl State {
         if let Some(key) = self.layer_focus_key() {
             return Some(key);
         }
+        if self.in_app_next_focus > 0 {
+            self.in_app_next_focus = self.in_app_next_focus.saturating_sub(1);
+            if self.next_up_eligible() && !self.player_panel_open() && !self.player_gear_visible() {
+                self.focus_first = false;
+                return Some("in-app-next-play".into());
+            }
+        }
         if self.osd_focus_pending {
             self.osd_focus_pending = false;
             if self.in_app.is_some() && self.osd_visible {
@@ -4285,6 +4299,8 @@ mod tests {
             osd_visible: true,
             osd_hide_at: None,
             osd_focus_pending: false,
+            in_app_next_focus: 0,
+            in_app_next_offered: false,
             in_app_start: Latest::default(),
             trailer_loading: false,
             trailer_load: Latest::default(),

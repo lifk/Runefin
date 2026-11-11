@@ -42,6 +42,15 @@
   </screenshots>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.1.24" date="2026-11-11">
+      <description>
+        <p>
+          End of episode: the episode shrinks to a corner over a dimmed next still while a card
+          offers Play now, Watch credits and Dismiss, with the next episode's runtime, overview
+          and countdown. The card takes focus from the timeline.
+        </p>
+      </description>
+    </release>
     <release version="0.1.23" date="2026-11-11">
       <description>
         <p>

@@ -4600,6 +4600,35 @@ mod tests {
     }
 
     #[test]
+    fn the_end_card_focuses_play_now() {
+        let env = Env {
+            system_dark: true,
+            scale: 1.5,
+        };
+        let mut state = home_state();
+        state.big_screen = true;
+        let mut session = demo::in_app();
+        session.position_ms = 47 * 60_000 + 40_000;
+        state.in_app = Some(session);
+        state.in_app_next = Some(demo::next_episode());
+        state.osd_visible = true;
+        let mut rt = Runtime::new(state, view, (1280.0, 720.0), env);
+        rt.on_key = Some(on_key);
+        rt.poll = Some(poll);
+        for step in 0..6 {
+            rt.frame(step as f64 * 0.016);
+        }
+        assert!(rt.find("in-app-next").is_some(), "the end card is drawn");
+        assert_eq!(
+            rt.focused_key().as_deref(),
+            Some("in-app-next-play"),
+            "the end card takes focus, not the hidden timeline"
+        );
+        assert!(rt.find("in-app-next").is_some());
+        assert!(rt.find("in-app-video").is_some());
+    }
+
+    #[test]
     fn a_big_screen_timeline_scrubs_then_commits_with_ok() {
         let env = Env {
             system_dark: true,

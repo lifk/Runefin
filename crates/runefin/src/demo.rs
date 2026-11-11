@@ -585,6 +585,10 @@ pub fn next_episode() -> Item {
         parent_index_number: Some(2),
         index_number: Some(3),
         production_year: Some(2025),
+        run_time_ticks: Some(48 * 60_000 * jellyfin_api::TICKS_PER_MS),
+        overview: Some(
+            "The floor stays silent while the night shift waits for the last lift to move.".into(),
+        ),
         image_tags: Some(std::collections::HashMap::from([(
             "Primary".to_string(),
             "demo-still".to_string(),

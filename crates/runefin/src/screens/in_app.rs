@@ -67,27 +67,50 @@ pub(super) fn in_app_screen(s: &State) -> El {
         SurfaceFit::Fit
     };
 
+    let end_card = next_up_visible(s);
+    let (window_w, _window_h) = if s.window_size.0 >= 1.0 {
+        s.window_size
+    } else if theme::is_big_screen() {
+        (1280.0, 720.0)
+    } else {
+        (1280.0, 800.0)
+    };
+    let (video_w, video_h) = if end_card {
+        (340.0, 191.0)
+    } else {
+        (window_w, _window_h)
+    };
+    let mut video = el()
+        .key("in-app-video")
+        .native_surface(session.player.surface(), fit)
+        // A player hides the pointer with its chrome; any move brings both back.
+        .cursor(if s.osd_visible {
+            rune::Cursor::Default
+        } else {
+            rune::Cursor::Hidden
+        })
+        .on_pointer_move(|s: &mut State, _| s.show_in_app_osd())
+        .on_press(|s: &mut State| s.toggle_in_app_pause());
+    video = if end_card {
+        video
+            .absolute(window_w - video_w - 28.0, 136.0)
+            .w(video_w)
+            .h(video_h)
+            .radius(10.0)
+            .clip_rounded(10.0)
+            .outline(1.0, 0.0, Color::WHITE.alpha(0.18))
+            .shadow(0.0, 18.0, Color::BLACK.alpha(0.55))
+    } else {
+        video.absolute(0.0, 0.0).w_full().h_full()
+    };
     let mut page = el()
         .key("in-app-player")
         .w_full()
         .h_full()
         .fill(Color::BLACK)
         .on_pointer_move(|s: &mut State, _| s.show_in_app_osd())
-        .child(
-            el().key("in-app-video")
-                .absolute(0.0, 0.0)
-                .w_full()
-                .h_full()
-                .native_surface(session.player.surface(), fit)
-                // A player hides the pointer with its chrome; any move brings both back.
-                .cursor(if s.osd_visible {
-                    rune::Cursor::Default
-                } else {
-                    rune::Cursor::Hidden
-                })
-                .on_pointer_move(|s: &mut State, _| s.show_in_app_osd())
-                .on_press(|s: &mut State| s.toggle_in_app_pause()),
-        );
+        .children(end_card.then(|| next_up_backdrop(s)).flatten())
+        .child(video);
     if !s.osd_visible {
         // Subtitles stay on screen when the chrome hides: they belong to the film, not the OSD.
         // So does a stall indicator, which is the only thing telling the viewer why nothing moves.
@@ -96,6 +119,12 @@ pub(super) fn in_app_screen(s: &State) -> El {
             .children(buffering_overlay(session))
             .children(still_watching_card(s))
             .children(resume_conflict_card(s));
+    }
+    if end_card {
+        return page
+            .child(top_bar(&title, &subtitle, &t))
+            .children(next_up_banner(s, &t))
+            .children(buffering_overlay(session));
     }
     page = page
         .child(top_bar(&title, &subtitle, &t))
@@ -823,11 +852,42 @@ fn cue_box(s: &State, cue: &crate::subtitles::Cue, size: f32, window_h: f32, key
 /// Track list plus the two controls readers actually ask for. It sits above the transport,
 /// anchored right so it never covers the play button.
 fn next_up_visible(s: &State) -> bool {
-    s.osd_visible && s.in_app_hover.is_none() && s.next_up_eligible()
+    s.osd_visible
+        && s.in_app_hover.is_none()
+        && s.next_up_eligible()
+        && !s.player_panel_open()
+        && !s.player_gear_visible()
 }
 
-/// The last-30-seconds offer: still, episode label, title and the two decisions. It is a full
-/// width strip above the timeline so a two-line subtitle still fits above it.
+/// The next episode's still behind the end card, dimmed enough that the card and the corner
+/// video keep their contrast.
+fn next_up_backdrop(s: &State) -> Option<El> {
+    let next = s.in_app_next.as_ref()?;
+    let key = s.next_episode_image_key(next)?;
+    let image = s.images.get(&key)?;
+    Some(
+        el().absolute(0.0, 0.0)
+            .w_full()
+            .h_full()
+            .child(
+                el().w_full()
+                    .h_full()
+                    .pixels_fit(image.pixels(), SurfaceFit::Fill)
+                    .opacity(0.32),
+            )
+            .child(el().absolute(0.0, 0.0).w_full().h_full().linear_gradient(
+                std::f32::consts::PI,
+                [
+                    (0.0, Color::BLACK.alpha(0.35)),
+                    (0.55, Color::BLACK.alpha(0.72)),
+                    (1.0, Color::BLACK),
+                ],
+            )),
+    )
+}
+
+/// The last-30-seconds offer: the next episode's still, label, title and three decisions. It is
+/// a card over a dimmed still, while the ending episode keeps playing in the corner.
 fn next_up_banner(s: &State, t: &tok::Theme) -> Option<El> {
     if !next_up_visible(s) {
         return None;
@@ -847,73 +907,101 @@ fn next_up_banner(s: &State, t: &tok::Theme) -> Option<El> {
         .next_episode_image_key(next)
         .and_then(|key| s.images.get(&key));
     let thumb = if let Some(image) = still {
-        el().w(104.0)
-            .h(58.0)
-            .radius(8.0)
-            .clip_rounded(8.0)
+        el().w(300.0)
+            .h(169.0)
+            .radius(10.0)
+            .clip_rounded(10.0)
             .pixels_fit(image.pixels(), SurfaceFit::Fill)
     } else {
-        el().w(104.0)
-            .h(58.0)
-            .radius(8.0)
+        el().w(300.0)
+            .h(169.0)
+            .radius(10.0)
             .fill(Color::WHITE.alpha(0.07))
     };
     let label = next
         .episode_label()
         .map(|label| format!("UP NEXT · {label}"))
         .unwrap_or_else(|| "UP NEXT".to_string());
+    let runtime = next
+        .runtime_ms()
+        .map(|ms| format!("{} min", (ms / 60_000).max(1)))
+        .unwrap_or_default();
     let banner = row()
         .key("in-app-next")
         .w(860.0)
-        .h(82.0)
-        .padding(12.0)
-        .gap(14.0)
-        .items_center()
-        .radius(12.0)
-        .fill(Color::BLACK.alpha(0.78))
+        .h(230.0)
+        .padding(18.0)
+        .gap(18.0)
+        .items_start()
+        .radius(16.0)
+        .fill(Color::BLACK.alpha(0.84))
         .outline(1.0, 0.0, Color::WHITE.alpha(0.14))
-        .shadow(0.0, 14.0, Color::BLACK.alpha(0.45))
-        .child(thumb)
+        .shadow(0.0, 24.0, Color::BLACK.alpha(0.55))
+        .child(
+            col().w(300.0).gap(8.0).child(thumb).child(
+                text(status)
+                    .font(type_::label())
+                    .color(Color::WHITE.alpha(0.72)),
+            ),
+        )
         .child(
             col()
-                .gap(2.0)
-                .items_start()
+                .grow(1.0)
+                .min_w(0.0)
+                .gap(7.0)
                 .child(
-                    text(label)
-                        .font(type_::caption())
-                        .color(tok::accent(0, true)),
+                    row()
+                        .w_full()
+                        .gap(10.0)
+                        .child(
+                            text(label)
+                                .font(type_::caption())
+                                .color(tok::accent(0, true)),
+                        )
+                        .child(el().grow(1.0))
+                        .children((!runtime.is_empty()).then(|| {
+                            text(runtime)
+                                .font(type_::caption())
+                                .color(Color::WHITE.alpha(0.55))
+                        })),
                 )
                 .child(
                     text(next.name.clone())
                         .font(type_::title())
                         .color(Color::WHITE)
+                        .max_lines(2)
                         .truncate(),
+                )
+                .children(next.overview.clone().map(|overview| {
+                    text(overview)
+                        .font(type_::overview())
+                        .color(Color::WHITE.alpha(0.72))
+                        .max_lines(2)
+                }))
+                .child(el().grow(1.0))
+                .child(
+                    row()
+                        .gap(8.0)
+                        .child(accent_control(
+                            "Play now",
+                            "in-app-next-play",
+                            t,
+                            |s: &mut State| s.play_in_app_next(),
+                        ))
+                        .child(control(
+                            "Watch credits",
+                            "in-app-next-credits",
+                            t,
+                            |s: &mut State| s.dismiss_in_app_next(),
+                        ))
+                        .child(control(
+                            "Dismiss",
+                            "in-app-next-dismiss",
+                            t,
+                            |s: &mut State| s.dismiss_in_app_next(),
+                        )),
                 ),
-        )
-        .child(el().grow(1.0))
-        .child(
-            text(status)
-                .font(type_::label())
-                .color(Color::WHITE.alpha(0.72)),
-        )
-        .child(accent_control(
-            "Play now",
-            "in-app-next-play",
-            t,
-            |s: &mut State| s.play_in_app_next(),
-        ))
-        .child(control(
-            "Watch credits",
-            "in-app-next-credits",
-            t,
-            |s: &mut State| s.dismiss_in_app_next(),
-        ))
-        .child(control(
-            "Dismiss",
-            "in-app-next-dismiss",
-            t,
-            |s: &mut State| s.dismiss_in_app_next(),
-        ));
+        );
     Some(
         col()
             .key("in-app-next-layer")
@@ -921,9 +1009,9 @@ fn next_up_banner(s: &State, t: &tok::Theme) -> Option<El> {
             .w_full()
             .h_full()
             .justify_end()
-            .items_end()
-            .px(24.0)
-            .pb(170.0)
+            .items_start()
+            .px(64.0)
+            .pb(64.0)
             .child(banner),
     )
 }

@@ -152,10 +152,12 @@ exactly the difference between "a client" and "a toy". Budget real time here.
   Resting, the timeline is a quiet 4 pt rule; under the pointer it doubles to 8 pt and grows a
   knob, which is what makes scrubbing findable over a dark frame.
 - Up next: an episode's next sibling in the same season is requested alongside playback
-  (`parentId=seasonId`, episode index greater than the current one). The last 30 s draw a
-  full-width strip above the timeline — still, `S2E03` label, title, ceiling countdown and
-  Play now / Dismiss — and wake the OSD for it. EOS rolls to that episode unless dismissed,
-  reporting the finished one first; the last episode stops as before.
+  (`parentId=seasonId`, episode index greater than the current one). The last 30 s draw the
+  end card: the ending episode shrinks to a 340×191 corner at top-right while the next
+  episode's still fills the page, dimmed, behind a bottom-left card — still, `S2E03` label,
+  runtime, title, overview, a ceiling countdown and Play now / Watch credits / Dismiss. The
+  card wakes the OSD and takes focus from the timeline. EOS rolls to that episode unless
+  dismissed, reporting the finished one first; the last episode stops as before.
 - Settings sheet: one sheet in the panel slot, grouped Tracks / Playback / Timers / Navigate /
   This device, each row showing its current value. A row that needs a list (audio, subtitles,
   quality, chapters, sleep, go-to) closes the sheet; `Esc` returns to the sheet, then to the

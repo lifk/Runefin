@@ -1657,6 +1657,17 @@ impl State {
             // The precomputed preview is only meaningful with the chrome it belongs to.
             self.in_app_hover = None;
         }
+        // The end-of-episode card replaces the transport. Focus its Play now once when it
+        // appears, and let go when it is dismissed or a panel takes over.
+        let end_card =
+            self.next_up_eligible() && !self.player_panel_open() && !self.player_gear_visible();
+        if end_card != self.in_app_next_offered {
+            self.in_app_next_offered = end_card;
+            self.in_app_next_focus = if end_card { 2 } else { 0 };
+        }
+        if !end_card {
+            self.in_app_next_focus = 0;
+        }
         if self.in_app.is_some()
             && self.osd_visible
             && !self.next_up_eligible()

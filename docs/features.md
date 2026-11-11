@@ -245,9 +245,10 @@ separate window. `scripts/check.sh` builds it; the player's contract is
 - Skip intro / credits / recap when the server publishes segments.
 - Play/pause, ±10 s, volume, mute, pitch-corrected playback speed (0.5×–2×), Fit/Fill,
   previous/next episode.
-- **Up next** strip in the last 30 seconds with a still, countdown, Play now and Dismiss;
-  auto-roll at EOS unless dismissed. A run's queue is shown by a `3 of 12` chip that opens the
-  queue panel.
+- **End-of-episode card** in the last 30 seconds: the episode shrinks to a corner over a
+  dimmed next still, with runtime, overview, countdown, Play now, Watch credits and Dismiss;
+  the card takes focus. Auto-roll at EOS unless dismissed. A run's queue is shown by a
+  `3 of 12` chip that opens the queue panel.
 - Buffering percentage; it wakes above the OSD and never flashes on a healthy start.
 - Diagnostics overlay: sink path, codec/resolution/range, active audio/subtitle, speed, position,
   frame count, cache/queue counts, server and last error.
@@ -429,7 +430,7 @@ keys the player already uses.
 ```sh
 cargo test -p jellyfin-api        # 45 API tests, no network
 cargo test -p seerr-api           # 25 Seerr API tests, no network
-cargo test -p runefin             # 341 app tests (22 ignored), headless
+cargo test -p runefin             # 343 app tests (22 ignored), headless
 scripts/check.sh                  # fmt, clippy, all three suites, release build
 scripts/snapshots.sh              # the committed views, in place
 JELLYFIN_URL=... JELLYFIN_USER_ID=... JELLYFIN_TOKEN=... \
