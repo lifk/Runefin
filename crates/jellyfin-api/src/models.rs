@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 pub const TICKS_PER_MS: i64 = 10_000;
 
 /// One item's server-side watch state. The resume position lives here.
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "PascalCase", default)]
 pub struct UserData {
     pub playback_position_ticks: i64,
@@ -43,7 +43,7 @@ impl UserData {
 
 /// A person credit on an item. The server sends these only when the item query asks for
 /// `People`, which the detail request now does.
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "PascalCase", default)]
 pub struct Person {
     pub id: String,
@@ -55,7 +55,7 @@ pub struct Person {
 }
 
 /// One file behind an item, with the streams the player can choose from.
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "PascalCase", default)]
 pub struct MediaSource {
     pub id: String,
@@ -70,7 +70,7 @@ pub struct MediaSource {
 }
 
 /// One audio, video or subtitle stream. Subtitle indexes are what the subtitle endpoint takes.
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "PascalCase", default)]
 pub struct MediaStream {
     pub index: i32,
@@ -119,7 +119,7 @@ pub struct SubtitleTrack {
 }
 
 /// A named server object: a studio, genre or tag with an id when one exists.
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "PascalCase", default)]
 pub struct NameGuid {
     pub id: String,
@@ -127,7 +127,7 @@ pub struct NameGuid {
 }
 
 /// A library item: movie, series, season, episode, collection folder.
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "PascalCase", default)]
 pub struct Item {
     pub id: String,
@@ -205,7 +205,7 @@ pub struct Item {
 }
 
 /// A trailer URL and the provider's label (`Official Trailer`, `Teaser`, …).
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "PascalCase", default)]
 pub struct RemoteTrailer {
     pub url: Option<String>,
@@ -213,7 +213,7 @@ pub struct RemoteTrailer {
 }
 
 /// The guide entry a live channel carries as `CurrentProgram`.
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "PascalCase", default)]
 pub struct CurrentProgram {
     pub name: String,
@@ -222,7 +222,7 @@ pub struct CurrentProgram {
     pub end_date: Option<String>,
 }
 
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "PascalCase", default)]
 pub struct TrickplayInfo {
     pub width: u32,
@@ -279,7 +279,7 @@ impl Item {
     }
 }
 
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "PascalCase", default)]
 pub struct ChapterInfo {
     pub start_position_ticks: i64,
@@ -411,7 +411,7 @@ impl Item {
 }
 
 /// One intro, outro, recap or preview span reported by `/MediaSegments/{itemId}`.
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "PascalCase", default)]
 pub struct MediaSegment {
     pub id: String,
@@ -435,7 +435,7 @@ impl MediaSegment {
 /// One online subtitle a provider offers for an item. `/RemoteSearch/Subtitles` returns these
 /// from every configured provider (Open Subtitles here); the id is the provider's handle for
 /// the download call, not something the server stores.
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "PascalCase", default)]
 pub struct RemoteSubtitle {
     pub id: String,
@@ -506,7 +506,7 @@ impl RemoteSubtitle {
 }
 
 /// One `/Search/Hints` row: a name the query matched, with its kind and id.
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "PascalCase", default)]
 pub struct SearchHint {
     pub id: String,
@@ -517,13 +517,13 @@ pub struct SearchHint {
 }
 
 /// `/Items/{id}/SpecialFeatures` and `/Items/{id}/ThemeMedia` containers.
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "PascalCase", default)]
 pub struct ItemsContainer {
     pub items: Vec<Item>,
 }
 
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "PascalCase", default)]
 pub struct ThemeMedia {
     pub theme_videos_result: Option<ItemsContainer>,
@@ -532,7 +532,7 @@ pub struct ThemeMedia {
 }
 
 /// One page of items.
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "PascalCase", default)]
 pub struct ItemsResult {
     pub items: Vec<Item>,
@@ -541,7 +541,7 @@ pub struct ItemsResult {
 }
 
 /// A top-level library, as the server advertises it (`/Users/{id}/Views`).
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "PascalCase", default)]
 pub struct LibraryView {
     pub id: String,
@@ -550,7 +550,7 @@ pub struct LibraryView {
     pub collection_type: Option<String>,
 }
 
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "PascalCase", default)]
 pub struct User {
     pub id: String,
@@ -559,7 +559,7 @@ pub struct User {
 }
 
 /// What `POST /Users/AuthenticateByName` returns.
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "PascalCase", default)]
 pub struct AuthResult {
     pub user: User,
@@ -568,7 +568,7 @@ pub struct AuthResult {
 }
 
 /// One session from `GET /Sessions`, used by the M6 remote-control screen.
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "PascalCase", default)]
 pub struct SessionInfo {
     pub id: String,
@@ -583,7 +583,7 @@ pub struct SessionInfo {
     pub play_state: Option<PlayerState>,
 }
 
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "PascalCase", default)]
 pub struct PlayerState {
     pub position_ticks: i64,
@@ -592,7 +592,7 @@ pub struct PlayerState {
 }
 
 /// `GET /System/Info/Public`: the pre-login handshake (server name for the connect screen).
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "PascalCase", default)]
 pub struct PublicSystemInfo {
     pub server_name: String,
@@ -605,7 +605,7 @@ pub struct PublicSystemInfo {
 ///
 /// Deliberately no `AccessToken` here: `QuickConnectResult` has none. Once `authenticated` flips,
 /// the token comes from [`crate::Client::authenticate_with_quick_connect`].
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "PascalCase", default)]
 pub struct QuickConnectState {
     pub secret: String,
@@ -661,7 +661,7 @@ impl SortBy {
 }
 
 /// `POST /Items/{id}/PlaybackInfo`: the server's answer, not a catalogue item.
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "PascalCase", default)]
 pub struct PlaybackInfoResponse {
     pub media_sources: Vec<PlaybackMediaSource>,
@@ -670,7 +670,7 @@ pub struct PlaybackInfoResponse {
 }
 
 /// One stream the server is willing to serve for a PlaybackInfo request.
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "PascalCase", default)]
 pub struct PlaybackMediaSource {
     pub id: String,

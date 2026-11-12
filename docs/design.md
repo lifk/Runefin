@@ -484,6 +484,9 @@ that is the whole state story.
   grid density.
 - `~/.cache/runefin/images/<item>-<kind>-<tag>-<width>.webp` — keyed by the server's immutable
   image tag, which is why nothing ever goes stale and scroll is instant on a second visit.
+- `~/.cache/runefin/home-<hash of server and user>.json` — the rails the reader last saw, at most
+  a day old, painted with the first frame while the server answers and replaced when it does. It
+  holds what the server already showed that reader, never a token, and sign-out deletes it.
 - Nothing else. No catalogue DB in v1 (D4).
 
 **Networking.** `jellyfin-api` is blocking and dependency-light (ureq + serde, 42 tests).

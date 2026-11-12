@@ -85,6 +85,10 @@ web wrapper and does not embed a second render stack.
 - Full-bleed ambient backdrop, item logo when the server has one, otherwise the title.
 - Poster art is fetched for **every card in a rail** when Home loads, not just the first
   screenful; rails never uncover empty boxes until a click.
+- **Instant Home**: the rails the reader last saw are kept on disk
+  (`~/.cache/runefin/home-<user>.json`, a day at most) and painted with the first frame, then
+  replaced by the server's answer. On this server the first home request takes 350–580 ms, so the
+  cached paint is what a launch shows instead of a skeleton; sign-out deletes it.
 - Skeleton, empty, error and loading states with matching final geometry.
 - Every text label that sits on artwork carries a soft shadow, so a bright backdrop never
   swallows the words.
@@ -474,7 +478,7 @@ keys the player already uses.
 ```sh
 cargo test -p jellyfin-api        # 45 API tests, no network
 cargo test -p seerr-api           # 25 Seerr API tests, no network
-cargo test -p runefin             # 409 app tests (22 ignored), headless
+cargo test -p runefin             # 411 app tests (22 ignored), headless
 scripts/check.sh                  # fmt, clippy, all three suites, release build
 scripts/snapshots.sh              # the committed views, in place
 JELLYFIN_URL=... JELLYFIN_USER_ID=... JELLYFIN_TOKEN=... \

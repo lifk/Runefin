@@ -426,6 +426,9 @@ pub struct State {
     /// The pressed card's shared-element id, so its poster flies to the detail page's poster even
     /// when another rail shows the same series (`card` names its id per rail).
     pub detail_match_id: Option<String>,
+    /// The rails on screen came from `home_cache` and the server has not answered yet: the next
+    /// home answer replaces them.
+    pub home_from_cache: bool,
     /// The end card has been read aloud once for this episode (`Tx::announce`), so a reader hears
     /// "Up next" when it opens without hearing it again every frame.
     pub next_up_announced: bool,
@@ -776,6 +779,25 @@ impl State {
     pub fn new() -> State {
         let mut state = State::from_config(Config::load());
         state.persist = true;
+        // Before the window exists: the rails this reader last saw, so the first frame paints
+        // them and the server's answers replace them a few hundred milliseconds later. A cache
+        // hit here is one file read on the thread that is already waiting for the GPU.
+        if state.is_signed_in() {
+            let config = &state.config;
+            if let Some(home) = crate::home_cache::load(
+                &config.server_url,
+                &config.user_id,
+                crate::home_cache::now_secs(),
+            ) {
+                state.home_data = home;
+                state.home_loaded = true;
+                state.home_from_cache = true;
+                crate::bench::mark("bench.home.cache");
+                // The posters come from the image cache on disk, but only a request brings them:
+                // without this the cached rails would stay grey until the fresh answer landed.
+                state.request_images();
+            }
+        }
         state
     }
 
@@ -850,6 +872,7 @@ impl State {
             detail_imdb: None,
             detail_imdb_for: None,
             detail_match_id: None,
+            home_from_cache: false,
             next_up_announced: false,
             detail_extras: Vec::new(),
             detail_collections: Vec::new(),
@@ -1804,7 +1827,9 @@ impl State {
         // setup, so fixtures stay hermetic.
         self.checkpoints = crate::checkpoint::load();
         self.history = crate::history::load(50);
+        crate::bench::mark("bench.setup.disk");
         self.start_tray(&waker);
+        crate::bench::mark("bench.setup.tray");
         self.history_ms = self.history.iter().map(|entry| entry.played_ms).sum();
         self.waker = Some(waker.clone());
         self.worker.set_waker(waker.clone());
@@ -1875,6 +1900,7 @@ impl State {
         if !std::env::args().any(|arg| arg == "--snap" || arg == "--tree") {
             self.mpris = crate::mpris::Mpris::start();
         }
+        crate::bench::mark("bench.setup.mpris");
         let dirty = Arc::clone(&self.image_dirty);
         let image_waker: rune::Waker = {
             let waker = waker.clone();
@@ -1884,6 +1910,7 @@ impl State {
             })
         };
         self.image_cache = Some(ImageCache::new(image_waker));
+        crate::bench::mark("bench.setup.cache");
         if self.is_signed_in() {
             self.home_started = true;
             self.load_home();
@@ -2046,6 +2073,7 @@ impl State {
             if self.is_signed_in() {
                 self.home_data.next_up = next_up;
                 self.request_images();
+                self.save_home_snapshot();
             }
             changed = true;
         }
@@ -2053,6 +2081,7 @@ impl State {
             if self.is_signed_in() {
                 self.home_data.on_now = on_now;
                 self.request_images();
+                self.save_home_snapshot();
             }
             changed = true;
         }
@@ -2061,6 +2090,7 @@ impl State {
                 self.home_data.recently_played =
                     crate::home::merge_recently_played(played, &self.home_data.resume);
                 self.request_images();
+                self.save_home_snapshot();
             }
             changed = true;
         }
@@ -2068,6 +2098,7 @@ impl State {
             if self.is_signed_in() {
                 self.home_data.collections = collections;
                 self.request_images();
+                self.save_home_snapshot();
             }
             changed = true;
         }
@@ -2519,23 +2550,52 @@ impl State {
         let on_now_client = client.clone();
         let played_client = client.clone();
         let collections_client = client.clone();
-        self.home
-            .request((), move |()| match crate::home::load(&client, now) {
+        self.home.request((), move |()| {
+            let t = crate::bench::timer();
+            let answer = match crate::home::load(&client, now) {
                 Ok(data) => HomeLoad::Ready(data),
                 Err(message) => HomeLoad::Failed(message),
-            });
+            };
+            crate::bench::lap("home.total", t);
+            answer
+        });
         // In parallel with the rest: this query is the slowest one on a large library, and it
         // only adds a rail, so it must not hold the first paint.
-        self.home_next_up
-            .request((), move |()| crate::home::load_next_up(&next_client));
-        self.home_on_now
-            .request((), move |()| crate::home::load_on_now(&on_now_client));
+        self.home_next_up.request((), move |()| {
+            let t = crate::bench::timer();
+            let answer = crate::home::load_next_up(&next_client);
+            crate::bench::lap("next_up", t);
+            answer
+        });
+        self.home_on_now.request((), move |()| {
+            let t = crate::bench::timer();
+            let answer = crate::home::load_on_now(&on_now_client);
+            crate::bench::lap("on_now", t);
+            answer
+        });
         self.home_recently_played.request((), move |()| {
-            crate::home::load_recently_played(&played_client)
+            let t = crate::bench::timer();
+            let answer = crate::home::load_recently_played(&played_client);
+            crate::bench::lap("recently_played", t);
+            answer
         });
         self.home_collections.request((), move |()| {
-            crate::home::load_collections(&collections_client)
+            let t = crate::bench::timer();
+            let answer = crate::home::load_collections(&collections_client);
+            crate::bench::lap("collections", t);
+            answer
         });
+    }
+
+    /// Hands the rails on screen to the on-disk snapshot, which writes them once they settle.
+    fn save_home_snapshot(&self) {
+        if self.persist && self.is_signed_in() {
+            crate::home_cache::save_soon(
+                self.config.server_url.clone(),
+                self.config.user_id.clone(),
+                self.home_data.clone(),
+            );
+        }
     }
 
     fn apply_home(&mut self, load: HomeLoad) {
@@ -2548,8 +2608,10 @@ impl State {
                 self.home_data.recently_played =
                     crate::home::merge_recently_played(played, &self.home_data.resume);
                 self.home_loaded = true;
+                self.home_from_cache = false;
                 self.home_error = None;
                 self.request_images();
+                self.save_home_snapshot();
             }
             HomeLoad::Failed(message) => {
                 // A revoked token must not leave a dead Home behind a Retry button. The API's
@@ -2563,6 +2625,7 @@ impl State {
                     return;
                 }
                 self.home_loaded = true;
+                self.home_from_cache = false;
                 self.home_error = Some(message);
             }
         }
@@ -4101,10 +4164,6 @@ impl State {
         };
         library.loading = true;
         let query = library.query();
-        eprintln!(
-            "LIVE library load id={} type={:?} start={start} total_before={} fetch_home={}",
-            library.id, library.collection_type, library.total, self.fetch_home
-        );
         if library.collection_type.as_deref() == Some("playlists") {
             let playlist_id = library.id.clone();
             self.library_page
@@ -4186,13 +4245,6 @@ impl State {
     }
 
     fn apply_library_page(&mut self, page: LibraryPage) {
-        eprintln!(
-            "LIVE library page start={} total={} items={} error={:?}",
-            page.start_index,
-            page.total,
-            page.items.len(),
-            page.error
-        );
         let prefetch = match &mut self.library {
             Some(library) => {
                 library.loading = false;
@@ -4481,6 +4533,9 @@ impl State {
 
     pub fn sign_out(&mut self) {
         self.stop_in_app();
+        if self.persist {
+            crate::home_cache::forget(&self.config.server_url, &self.config.user_id);
+        }
         self.config.sign_out();
         if self.persist {
             let _ = self.config.save();
@@ -4622,6 +4677,7 @@ mod tests {
             detail_imdb: None,
             detail_imdb_for: None,
             detail_match_id: None,
+            home_from_cache: false,
             next_up_announced: false,
             detail_extras: Vec::new(),
             detail_collections: Vec::new(),

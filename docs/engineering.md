@@ -293,6 +293,29 @@ against a real HDR remux is the remaining M5c work, not a missing path.
 The next feature projects are **P4** (PlaybackInfo + direct-play-first transcoding) and **Q9**
 (downloads/offline with a Settings path); music is still out of scope.
 
+## Benchmarking a launch, a screen and a request (2026-11-12)
+
+`RUNEFIN_BENCH=1` makes the app print its own measurements to stderr, as `bench ...` lines:
+Rune's launch marks plus the app's (`bench.main`, `bench.config`, `bench.setup`, `bench.home`,
+`bench.home.cache`, `bench.detail`, `bench.player.start`), one line per drawn frame with its update,
+encode, the app's `view` time and the text metrics, and one line a second with what the window drew
+and how long an input waited. Alongside them: `bench net <request>=<ms> at +<ms>` for each home
+request and `bench landed <screen> +<ms>` when data reaches the state.
+
+```sh
+# the whole pass: launches, home, and the screens whose ids are set
+RUNEFIN_LIVE_LIBRARY_ID=… RUNEFIN_LIVE_LIBRARY_NAME=Movies RUNEFIN_LIVE_ITEM_ID=… \
+  scripts/bench.sh --runs 5
+
+# one windowed launch, with the breakdown
+RUNEFIN_BENCH=1 target/release/runefin
+```
+
+Numbers and the method are in [`research/16-performance-benchmarks-2026-11.md`](research/16-performance-benchmarks-2026-11.md).
+Two rules for reading them: a covered window draws nothing on this compositor, so interaction
+numbers come from headless `--snap --live` renders; and the first frame of a screen costs what its
+text costs, so glyph counts in the same lines say where to look.
+
 ## 2. The patch: what exists and what is next
 
 `runefin/player` at `5221a35d` carries slices 1-3, the main-window adapter fix, the NV12/P010

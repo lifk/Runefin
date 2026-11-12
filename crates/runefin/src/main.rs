@@ -8,6 +8,7 @@
 //! Snap:  cargo run -p runefin -- --snap connect.png --scene error
 //! Live:  cargo run -p runefin -- --snap home.png --live --at 20 --wait 3
 
+mod bench;
 mod checkpoint;
 mod config;
 mod demo;
@@ -17,6 +18,7 @@ mod dmabuf_sink;
 mod handoff;
 mod history;
 mod home;
+mod home_cache;
 mod image;
 mod image_subtitles;
 mod imdb;
@@ -46,6 +48,7 @@ use library::LibraryState;
 use state::{Route, State, Step};
 
 fn view(s: &State, cx: &mut Cx<State>) -> El {
+    let bench = crate::bench::view_started();
     // The root's own rect is the window's content size; remembering it makes the next launch
     // open at the size the reader left. The write itself happens on close, not here.
     // Rune calls an element's own key handler before its focus-group navigation. Without this
@@ -60,6 +63,7 @@ fn view(s: &State, cx: &mut Cx<State>) -> El {
     } else {
         screen
     };
+    crate::bench::view_built(bench);
     screen
         .on_key(tv_key)
         .on_screen_layout(|s: &mut State, rect: [f32; 4]| {
@@ -178,6 +182,13 @@ fn apply_live_route(s: &mut State) {
             }
         }
         "seerr-requests" => s.open_seerr(crate::state::SeerrTab::Requests),
+        "play" => {
+            let id = env("RUNEFIN_LIVE_ITEM_ID");
+            if !id.is_empty() {
+                s.open_detail(id);
+                crate::bench::arm_live_play();
+            }
+        }
         "person" => {
             let id = env("RUNEFIN_LIVE_PERSON_ID");
             if !id.is_empty() {
@@ -202,11 +213,14 @@ fn apply_live_route(s: &mut State) {
 
 fn setup(s: &mut State, waker: rune::Waker) {
     s.setup(waker);
+    crate::bench::mark("bench.setup");
     // A live capture picks its route after every `Latest` has its waker, then waits for the
     // real requests before the frame is frozen. Neither path is used by the app itself.
     if std::env::args().any(|arg| arg == "--live") {
         apply_live_route(s);
+        let headless = std::env::args().any(|arg| arg == "--snap" || arg == "--tree");
         if let Some(position) = std::env::args().position(|arg| arg == "--wait")
+            && headless
             && let Some(seconds) = std::env::args().nth(position + 1)
             && let Ok(seconds) = seconds.parse::<u64>()
         {
@@ -219,6 +233,25 @@ fn setup(s: &mut State, waker: rune::Waker) {
 fn poll(s: &mut State, _clock: f64, tx: &mut Tx) -> bool {
     let started = std::time::Instant::now();
     let mut changed = s.poll();
+    if s.home_loaded && !s.home_from_cache {
+        crate::bench::landed("bench.home");
+    }
+    if s.library
+        .as_ref()
+        .is_some_and(|library| !library.items.is_empty())
+    {
+        crate::bench::landed("bench.library");
+    }
+    if !s.search.results.is_empty() {
+        crate::bench::landed("bench.search");
+    }
+    if s.detail
+        .as_ref()
+        .is_some_and(|detail| !detail.item.name.is_empty())
+    {
+        crate::bench::landed("bench.detail");
+    }
+    crate::bench::drive_live_play(s);
     if s.poll_hover_preview() {
         changed = true;
     }
@@ -1187,10 +1220,16 @@ fn claim_single_instance() -> bool {
 }
 
 fn main() {
+    crate::bench::start();
+    // GPU setup (adapter, device, the uber pipeline) takes 40-60 ms behind a window's first
+    // frame, and Rune only starts it once the event loop is being built. Starting it here, before
+    // the instance claim and the config read, overlaps it with everything a launch does first.
+    rune::prewarm_gpu();
     if !claim_single_instance() {
         return;
     }
     let startup = config::Config::load();
+    crate::bench::mark("bench.config");
     if big_screen_requested() {
         // The window's physical height sets the scale; 720 points of design keeps the same
         // layout at 1080p (1.5x) and 4K (3x).
@@ -2235,7 +2274,8 @@ fn main() {
             handle.wake();
         }
     });
-    app.run();
+    crate::bench::mark("bench.app");
+    crate::bench::attach(app).run();
 }
 
 #[cfg(test)]

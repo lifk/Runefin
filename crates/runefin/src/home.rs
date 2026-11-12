@@ -12,7 +12,7 @@ use jellyfin_api::{Client, ImageKind, Item, LibraryView};
 /// Resume entries older than this are hidden client-side (D2).
 const STALE_DAYS: i64 = 60;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct HomeData {
     pub libraries: Vec<LibraryView>,
     pub resume: Vec<Item>,
@@ -40,7 +40,7 @@ impl HomeData {
 }
 
 /// One "Recently added in <library>" rail.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct LatestRail {
     pub library: String,
     pub library_id: String,
@@ -61,20 +61,40 @@ pub enum HomeLoad {
 /// Libraries and Continue Watching are required; one library's Recently Added failing is not
 /// worth hiding the rest of the screen, so that rail is skipped and the others stay.
 pub fn load(client: &Client, now_days: i64) -> Result<HomeData, String> {
-    let libraries = client.libraries().map_err(|e| e.user_message())?;
+    // Continue Watching doesn't need the library list, so it travels beside the library call
+    // instead of behind it: the two answered in series cost their sum on the way to the first
+    // paint (164 + 170 ms against this server), and in parallel only the slower one.
+    let t = crate::bench::timer();
+    let (libraries, resume) = std::thread::scope(|scope| {
+        let libraries_job = scope.spawn(|| {
+            let t = crate::bench::timer();
+            let answer = client.libraries().map_err(|e| e.user_message());
+            crate::bench::lap("libraries", t);
+            answer
+        });
+        let resume_job = scope.spawn(|| {
+            let t = crate::bench::timer();
+            let answer = client.resume(24).map_err(|e| e.user_message());
+            crate::bench::lap("resume", t);
+            answer
+        });
+        let libraries = libraries_job.join().expect("libraries worker");
+        let resume = resume_job.join().expect("resume worker");
+        Ok::<_, String>((libraries?, resume?))
+    })?;
     // One Recently Added rail per video library. The server owns the order; every library the
     // reader can browse gets its own rail.
     let video: Vec<&LibraryView> = libraries
         .iter()
         .filter(|library| is_video_library(library))
         .collect();
-    let (resume, latest) = std::thread::scope(|scope| {
-        let resume_job = scope.spawn(|| client.resume(24).map_err(|e| e.user_message()));
+    let latest = std::thread::scope(|scope| {
         let latest_jobs: Vec<_> = video
             .iter()
             .map(|library| {
                 scope.spawn(move || {
-                    client
+                    let t = crate::bench::timer();
+                    let answer = client
                         .latest(Some(&library.id), 12)
                         .ok()
                         .filter(|items| !items.is_empty())
@@ -82,20 +102,21 @@ pub fn load(client: &Client, now_days: i64) -> Result<HomeData, String> {
                             library: library.name.clone(),
                             library_id: library.id.clone(),
                             items,
-                        })
+                        });
+                    crate::bench::lap("latest", t);
+                    answer
                 })
             })
             .collect();
-        let resume = resume_job.join().expect("resume worker")?;
-        let latest = latest_jobs
+        latest_jobs
             .into_iter()
             .filter_map(|job| job.join().expect("latest worker"))
-            .collect();
-        Ok::<_, String>((resume.items, latest))
-    })?;
+            .collect::<Vec<LatestRail>>()
+    });
+    crate::bench::lap("home.jobs", t);
     Ok(HomeData {
         libraries,
-        resume: merge_resume(resume, now_days),
+        resume: merge_resume(resume.items, now_days),
         next_up: Vec::new(),
         on_now: Vec::new(),
         // Loaded by [`load_collections`] beside this call: enumerating box sets walks every
