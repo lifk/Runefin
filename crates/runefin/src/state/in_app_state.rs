@@ -179,27 +179,30 @@ fn url_starts_at(url: &str, start_ms: i64) -> bool {
     })
 }
 
-/// Apply the resume to the pipeline unless the negotiated source already begins there.
-fn resume_after_start(
-    player: &crate::player::Player,
-    method: &'static str,
-    url: &str,
-    start_ms: i64,
+/// Where the pipeline should start: the resume point, unless the negotiated source already
+/// begins there (a transcode URL that carries `StartTimeTicks`).
+fn resume_target(method: &'static str, url: &str, start_ms: i64) -> Option<i64> {
+    let needs_seek = start_ms > 0 && (method != "Transcode" || !url_starts_at(url, start_ms));
+    needs_seek.then_some(start_ms)
+}
+
+/// The start worker's answer as the session wants it: the position the first picture shows, and
+/// the reason it is not the resume point when it could not be reached.
+fn resume_notice(
+    started_ms: Option<i64>,
+    resume_at: Option<i64>,
     notice: Option<String>,
 ) -> (Option<i64>, Option<String>) {
-    let needs_seek = start_ms > 0 && (method != "Transcode" || !url_starts_at(url, start_ms));
-    if !needs_seek {
-        return (None, notice);
-    }
-    match player.seek_and_confirm(start_ms) {
-        Ok(()) => (Some(start_ms), notice),
-        Err(_) => (
+    match (started_ms, resume_at) {
+        (Some(started), _) => (Some(started), notice),
+        (None, Some(target)) => (
             Some(0),
             Some(format!(
                 "Could not resume at {}; starting from the beginning.",
-                crate::detail::format_time(start_ms)
+                crate::detail::format_time(target)
             )),
         ),
+        (None, None) => (None, notice),
     }
 }
 
@@ -888,12 +891,13 @@ impl State {
                     cap,
                     &fallback,
                 );
-                match Player::start(&url, surface.clone(), waker.clone()) {
-                    Ok(player) => {
+                let resume_at = resume_target(method, &url, start_ms);
+                match Player::start_at(&url, surface.clone(), waker.clone(), resume_at) {
+                    Ok(started) => {
                         let (started_ms, notice) =
-                            resume_after_start(&player, method, &url, start_ms, notice);
+                            resume_notice(started.started_ms, resume_at, notice);
                         Ok(InAppStart {
-                            player,
+                            player: started.player,
                             method,
                             play_session_id,
                             notice,
@@ -934,13 +938,12 @@ impl State {
                             None,
                             &fallback,
                         );
-                        match Player::start(&url, surface, waker) {
-                            Ok(player) => {
-                                let (started_ms, notice) = resume_after_start(
-                                    &player,
-                                    method,
-                                    &url,
-                                    start_ms,
+                        let resume_at = resume_target(method, &url, start_ms);
+                        match Player::start_at(&url, surface, waker, resume_at) {
+                            Ok(started) => {
+                                let (started_ms, notice) = resume_notice(
+                                    started.started_ms,
+                                    resume_at,
                                     Some(
                                         "Direct play produced no frames; the server is \
                                          transcoding this item."
@@ -948,7 +951,7 @@ impl State {
                                     ),
                                 );
                                 Ok(InAppStart {
-                                    player,
+                                    player: started.player,
                                     method,
                                     play_session_id,
                                     notice,

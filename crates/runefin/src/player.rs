@@ -76,6 +76,13 @@ pub struct Player {
     colour: Arc<Mutex<Option<ColourFacts>>>,
 }
 
+/// A pipeline started and at its resume point: `started_ms` is the position the first picture
+/// actually shows, or `None` when the resume point could not be reached.
+pub struct Started {
+    pub player: Player,
+    pub started_ms: Option<i64>,
+}
+
 impl Player {
     /// A pipeline with no source, used by the headless OSD snapshots. It proves the player
     /// chrome's geometry without requiring a video window or a server. Kept in release builds
@@ -126,18 +133,38 @@ impl Player {
         surface: NativeSurface,
         waker: Option<rune::Waker>,
     ) -> Result<Player, String> {
+        Self::start_at(url, surface, waker, None).map(|started| started.player)
+    }
+
+    /// [`Player::start`] from a resume point: the seek is queued the moment the pipeline is
+    /// PLAYING instead of after the first picture, so the frame the wait sees is the resume
+    /// frame. A seek the pipeline ignored is caught by the clock check and retried once, which
+    /// is what `start` followed by `seek_and_confirm` does — only the first, wasted frame is
+    /// skipped. `started` is `None` when the resume point could not be reached.
+    pub fn start_at(
+        url: &str,
+        surface: NativeSurface,
+        waker: Option<rune::Waker>,
+        start_ms: Option<i64>,
+    ) -> Result<Started, String> {
         gst::init().map_err(|error| format!("GStreamer could not start: {error}"))?;
         if let Some(waker) = waker {
             surface.set_waker(waker);
         }
+        let target = start_ms.filter(|ms| *ms > 0);
+        crate::bench::mark("bench.player.pipeline");
         // The DMA-BUF path is the fast one, but a file the VA-API converter refuses reaches
         // PLAYING and then produces no frames. Waiting the CPU path's full timeout there costs
         // six seconds on every such file; two seconds is enough for a healthy first frame.
         let dmabuf = match start_pipeline(url, surface.clone(), true) {
-            Ok(player) => match player.wait_for_first_frame(Duration::from_secs(8)) {
-                Ok(()) => {
+            Ok(player) => match player.first_frame_at(target, Duration::from_secs(8)) {
+                Ok(started) => {
+                    crate::bench::mark("bench.player.first_frame");
                     player.begin_trace();
-                    return Ok(player);
+                    return Ok(Started {
+                        player,
+                        started_ms: started,
+                    });
                 }
                 Err(error) => error,
             },
@@ -145,8 +172,11 @@ impl Player {
         };
         eprintln!("in-app: DMA-BUF path unavailable ({dmabuf}); using CPU");
         match start_pipeline(url, surface, false) {
-            Ok(player) => match player.wait_for_first_frame(Duration::from_secs(12)) {
-                Ok(()) => Ok(player),
+            Ok(player) => match player.first_frame_at(target, Duration::from_secs(12)) {
+                Ok(started) => Ok(Started {
+                    player,
+                    started_ms: started,
+                }),
                 Err(cpu) => Err(format!(
                     "GStreamer produced no frames: {cpu} (DMA-BUF path: {dmabuf})"
                 )),
@@ -154,6 +184,30 @@ impl Player {
             Err(cpu) => Err(format!(
                 "GStreamer couldn't start: {cpu} (DMA-BUF path: {dmabuf})"
             )),
+        }
+    }
+
+    /// Queues a seek at `target`, waits for the first picture, and says whether the clock is
+    /// there. A picture that arrived at the file's beginning (the pipeline took the seek before
+    /// it could queue one) is followed by one confirmed seek.
+    fn first_frame_at(
+        &self,
+        target: Option<i64>,
+        timeout: Duration,
+    ) -> Result<Option<i64>, String> {
+        let Some(target) = target else {
+            self.wait_for_first_frame(timeout)?;
+            return Ok(None);
+        };
+        self.seek_ms(target);
+        self.wait_for_first_frame(timeout)?;
+        if (self.position_ms() - target).abs() <= 1_500 {
+            return Ok(Some(target));
+        }
+        match self.seek_and_confirm(target) {
+            Ok(()) => Ok(Some(target)),
+            // The resume point is unreachable; the picture at the start is what plays.
+            Err(_) => Ok(None),
         }
     }
 
@@ -180,6 +234,7 @@ impl Player {
             let _ = pipeline.set_state(gst::State::Null);
             return Err("the theme song did not start".into());
         }
+        crate::bench::mark("bench.player.audio");
         Ok(Player {
             pipeline,
             bus,

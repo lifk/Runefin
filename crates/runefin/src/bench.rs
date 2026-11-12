@@ -102,10 +102,26 @@ pub fn start() {
     mark("bench.main");
 }
 
+/// Set once the launch trace has printed: a mark after it (the player's, for one) is printed
+/// as it happens instead of waiting for a trace that already went out.
+static TRACED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 /// One step of the app's own, for the launch trace.
 pub fn mark(name: &'static str) {
-    if enabled() {
-        rune::marks::mark(name);
+    if !enabled() {
+        return;
+    }
+    rune::marks::mark(name);
+    if TRACED.load(Ordering::Relaxed)
+        && let Some(start) = START.get().copied()
+    {
+        eprintln!(
+            "bench mark {name} +{:.1}ms",
+            Instant::now()
+                .saturating_duration_since(start)
+                .as_secs_f64()
+                * 1000.0
+        );
     }
 }
 
@@ -157,6 +173,7 @@ fn launch_trace() {
     for (name, value) in rune::marks::notes() {
         eprintln!("bench note {name}={value}");
     }
+    TRACED.store(true, Ordering::Relaxed);
 }
 
 /// One second's worth of frames. Written by the frame hook, read and reset by the printer.

@@ -89,6 +89,28 @@ the window exists, painted with the first frame (343 glyphs, 40–56 ms update),
 the server answers. Cold, Continue Watching no longer waits for the library list or the rails, so
 the first paint holds real content instead of a skeleton within ~200 ms of process start.
 
+## Playback start
+
+The same bench marks on the player path (`RUNEFIN_BENCH=1`, muted through `volume = 0.0`, a
+1080p H.264 episode and an unplayed film, both direct-play over the LAN):
+
+| | before | now |
+|---|---|---|
+| Play requested → pipeline PLAYING | 240 ms | 120–240 ms |
+| Pipeline → first decoded picture | **1.65 s** (resumed) | **0.29–0.53 s** |
+| Process start → picture | 2.29 s | **0.79–1.05 s** |
+| Steady state | — | 22.8–25.0 fps, DMA-BUF P010, stalls 0–2 per 4 s, longest gap 45–73 ms |
+
+The 1.65 s was the resume: the app waited for a picture at the file's beginning, then seeked and
+waited again. `Player::start_at` queues the seek the moment the pipeline is PLAYING, so the frame
+the wait sees is the resume frame; a seek the pipeline dropped is caught by a clock check and
+retried once, which is exactly the old path. A transcode URL that already carries
+`StartTimeTicks` is not seeked at all, as before.
+
+The remaining 120–240 ms is GStreamer building playbin, vaspostproc, the DMA-BUF sink and its
+caps filter, plus plugin registry work on the first play of a process. Warming those elements at
+launch (after the first frame, on a thread) is the next candidate here.
+
 ## Idle
 
 While resting with nothing animating, the window **draws no frames** (0 over 13 s), and a covered
@@ -96,10 +118,9 @@ window draws none at all. Idle cost is a poll per wake, not a frame per display 
 
 ## Not measured here
 
-- **The player.** It needs a window and audio; its own meters cover it. Run
-  `RUNEFIN_TRACE_PLAYBACK=1` (sink pacing every two seconds) with
-  `RUNEFIN_LIVE_ROUTE=play RUNEFIN_LIVE_ITEM_ID=<id>` and `volume = 0.0` in the config; the DMA-BUF
-  path was last measured at 24 fps with a 41 ms worst gap
+- **Playback *quality* on a TV.** The numbers above come from a headless render against the real
+  server; the sink is the same, but a 4K HDR file on the TV's display is the other half, and it
+  was last measured at 24 fps with a 41 ms worst gap
   (`docs/research/14-player-renderer-options.md`).
 - **A cold image cache.** All screen figures above run with the disk image cache warm, which is
   what a second launch sees.
@@ -119,7 +140,11 @@ window draws none at all. Idle cost is a poll per wake, not a frame per display 
    boxes while scrolling), which is ~100 decoded 360 px posters and most of the 219 MB RSS. A cap
    or a smaller decode for rails far below the fold would trade a few grey boxes for ~100 MB on a
    TV box.
-3. **Ask Rune for a way to preload the symbol fallback fonts.** The first frame that draws a `·`,
+3. **Warm the player's elements at launch.** Between the play request and the pipeline there are
+   120–240 ms of GStreamer holding playbin, `vaspostproc`, a capsfilter and the DMA-BUF sink
+   built for the first time in the process; a background warm-up after the first frame would leave
+   only the source's own setup.
+4. **Ask Rune for a way to preload the symbol fallback fonts.** The first frame that draws a `·`,
    `✓` or `—` loads 20 ms of DejaVu/Noto files inside the frame; the window spends 40 ms waiting
    for the GPU adapter just before, which would hide it.
 
