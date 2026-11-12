@@ -2707,7 +2707,7 @@ dependencies = [
 [[package]]
 name = "rune"
 version = "0.0.1"
-source = "git+https://github.com/lifk/rune?rev=95e21b20d9c5113b74be548a9c4b34a802ae586a#95e21b20d9c5113b74be548a9c4b34a802ae586a"
+source = "git+https://github.com/lifk/rune?rev=d81a07699a55dc252afd41bb40e7c04752f01b4f#d81a07699a55dc252afd41bb40e7c04752f01b4f"
 dependencies = [
  "accesskit",
  "arboard",
@@ -2777,12 +2777,12 @@ dependencies = [
 [[package]]
 name = "rune-motion"
 version = "0.1.0"
-source = "git+https://github.com/lifk/rune?rev=95e21b20d9c5113b74be548a9c4b34a802ae586a#95e21b20d9c5113b74be548a9c4b34a802ae586a"
+source = "git+https://github.com/lifk/rune?rev=d81a07699a55dc252afd41bb40e7c04752f01b4f#d81a07699a55dc252afd41bb40e7c04752f01b4f"
 
 [[package]]
 name = "rune-staging"
 version = "0.0.1"
-source = "git+https://github.com/lifk/rune?rev=95e21b20d9c5113b74be548a9c4b34a802ae586a#95e21b20d9c5113b74be548a9c4b34a802ae586a"
+source = "git+https://github.com/lifk/rune?rev=d81a07699a55dc252afd41bb40e7c04752f01b4f#d81a07699a55dc252afd41bb40e7c04752f01b4f"
 dependencies = [
  "wgpu",
 ]
@@ -2790,7 +2790,7 @@ dependencies = [
 [[package]]
 name = "rune-taffy"
 version = "0.0.1"
-source = "git+https://github.com/lifk/rune?rev=95e21b20d9c5113b74be548a9c4b34a802ae586a#95e21b20d9c5113b74be548a9c4b34a802ae586a"
+source = "git+https://github.com/lifk/rune?rev=d81a07699a55dc252afd41bb40e7c04752f01b4f#d81a07699a55dc252afd41bb40e7c04752f01b4f"
 dependencies = [
  "taffy",
 ]
@@ -3999,7 +3999,7 @@ dependencies = [
 [[package]]
 name = "wgpu-external-frame"
 version = "0.4.0"
-source = "git+https://github.com/lifk/rune?rev=95e21b20d9c5113b74be548a9c4b34a802ae586a#95e21b20d9c5113b74be548a9c4b34a802ae586a"
+source = "git+https://github.com/lifk/rune?rev=d81a07699a55dc252afd41bb40e7c04752f01b4f#d81a07699a55dc252afd41bb40e7c04752f01b4f"
 dependencies = [
  "ash",
  "glow",
