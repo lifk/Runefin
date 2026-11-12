@@ -131,6 +131,9 @@ pub struct InAppStart {
     pub play_session_id: Option<String>,
     /// A short explanation when PlaybackInfo failed and the static stream was used.
     pub notice: Option<String>,
+    /// Where the stream really started when the worker had to seek. `None` means the
+    /// negotiated source already begins at the requested position (or started at zero).
+    pub started_ms: Option<i64>,
 }
 
 /// A "See all" grid over one of Home's dynamic rails. It is a local view, not a server library,

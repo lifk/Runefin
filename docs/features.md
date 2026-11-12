@@ -147,7 +147,8 @@ web wrapper and does not embed a second render stack.
 - Series: season chips, virtualized episode rows, Play season / Shuffle, next-up episode with
   its own resume action.
 - Extras rail grouped by server `ExtraType` (behind the scenes, deleted scenes, interviews, …); an extra plays in-app without reporting and outside the queue.
-- Cast and crew rail with portraits; a cast card opens the person page.
+- Cast and crew rail with portraits; a cast card opens the person page. On TV the focused
+  portrait takes a circular ring, not a wash over the name and role.
 - **More like this**: the server's `/Items/{id}/Similar` rail, loaded beside the page so a slow
   recommendation answer never delays the hero.
 - Playlist picker and a **New playlist** prompt that starts with the current item.
@@ -197,7 +198,9 @@ separate window. `scripts/check.sh` builds it; the player's contract is
   Always waits for the segment to start. Timeline with chapter ticks; hover shows a **240×135 trickplay preview** in a 300 pt panel
   with the chapter name and timestamp. Without server trickplay the same panel shows the time
   and says “No preview for this video” rather than a fake still.
-- Resume starts 0/5/10/15 s before the server position (setting), and a local checkpoint under
+- Resume starts 0/5/10/15 s before the server position (setting), and the worker confirms the
+  seek before the session begins (a direct play seeks and waits; a transcode URL without
+  `StartTimeTicks` is seeked too; a failed seek starts at zero truthfully). A local checkpoint under
   `~/.cache/runefin/positions.json` covers a crash; a newer local position wins.
 - **Still watching?** pauses a long run after N episodes or minutes with a quiet Continue/Stop
   card and a 60 s countdown; a **Sleep timer** offers 10/20/30/45/60 minutes or end of episode and
@@ -459,7 +462,7 @@ keys the player already uses.
 ```sh
 cargo test -p jellyfin-api        # 45 API tests, no network
 cargo test -p seerr-api           # 25 Seerr API tests, no network
-cargo test -p runefin             # 401 app tests (22 ignored), headless
+cargo test -p runefin             # 404 app tests (22 ignored), headless
 scripts/check.sh                  # fmt, clippy, all three suites, release build
 scripts/snapshots.sh              # the committed views, in place
 JELLYFIN_URL=... JELLYFIN_USER_ID=... JELLYFIN_TOKEN=... \

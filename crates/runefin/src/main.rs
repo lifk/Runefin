@@ -369,13 +369,19 @@ fn tv_key(s: &mut State, key: &KeyEvent, tx: &mut Tx) -> bool {
                     s.search.query.focused = false;
                 }
                 s.note_focus(target.clone());
-                tx.focus_key(target.clone());
-                // A vertical move glides the page to the new row instead of jumping; a
-                // horizontal one only reveals the card in its rail.
-                if matches!(action, tv_input::TvAction::Up | tv_input::TvAction::Down) {
+                // Quiet focus: Rune's own reveal would jump the page to the new control
+                // before the glide below. The router animates every move itself.
+                tx.focus_key_quiet(target.clone());
+                if target == "detail-back" {
+                    // Back sits above the detail page's scroll viewport, so centring it would
+                    // find nothing to move. Going up to it means going back to the top.
+                    tx.scroll_to("detail-scroll", 0.0, 0.0);
+                } else if matches!(action, tv_input::TvAction::Up | tv_input::TvAction::Down) {
+                    // A vertical move centres the new row in the page.
                     tx.scroll_center(target.clone());
                 } else {
-                    tx.scroll_into_view(target.clone());
+                    // A sideways move reveals the card just enough, on the same spring.
+                    tx.scroll_into_view_animated(target.clone());
                 }
             }
             return true;
@@ -1314,6 +1320,17 @@ fn main() {
                         value: false,
                     },
                 );
+            }),
+            #[cfg(debug_assertions)]
+            ("detail-cast", |s| {
+                demo::signed_in(s);
+                let mut detail = demo::movie_detail();
+                detail.item.people = demo::detail().item.people;
+                s.route = Route::Detail {
+                    id: "metropolis".into(),
+                };
+                s.detail = Some(detail);
+                s.detail_extras = demo::extras();
             }),
             #[cfg(debug_assertions)]
             ("detail-theme", |s| {
@@ -7878,6 +7895,91 @@ mod tv_reach_tests {
         state.route = Route::Remote;
         state.remote.sessions = demo::sessions();
         check("remote", state);
+    }
+
+    #[test]
+    fn the_home_rails_glide_between_rows() {
+        let env = rune::Env {
+            system_dark: true,
+            scale: 1.5,
+        };
+        let mut state = base();
+        state.big_screen = true;
+        let mut rt = rune::Runtime::new(state, view, (1280.0, 600.0), env);
+        rt.poll = Some(poll);
+        rt.on_key = Some(on_key);
+        rt.frame(0.0);
+        rt.frame(0.016);
+        rt.frame(0.032);
+        rt.update(|_, tx| tx.focus_key("rail-continue-watching-quiet-floor"));
+        rt.frame(0.048);
+        let before = rt
+            .presented("rail-next-up-quiet-floor")
+            .expect("the next rail")
+            .0[1];
+        rt.key(KeyEvent {
+            key: Key::Down,
+            mods: Default::default(),
+        });
+        let mut seen = Vec::new();
+        for step in 0..12 {
+            rt.frame(0.064 + step as f64 * 0.016);
+            if let Some((rect, _)) = rt.presented("rail-next-up-quiet-floor") {
+                seen.push(rect[1]);
+            }
+        }
+        let last = *seen.last().expect("a frame");
+        assert!(last < before, "the page scrolled to the row");
+        assert!(
+            seen[0] > last + 25.0,
+            "the first frame is still on the way, not at the destination: {seen:?}"
+        );
+        let distinct: std::collections::BTreeSet<i32> =
+            seen.iter().map(|y| y.round() as i32).collect();
+        assert!(
+            distinct.len() >= 3,
+            "the scroll is a glide, not a jump: {seen:?}"
+        );
+    }
+
+    #[test]
+    fn up_from_a_detail_row_scrolls_the_page_back_to_the_top() {
+        let env = rune::Env {
+            system_dark: true,
+            scale: 1.5,
+        };
+        let mut state = base();
+        state.big_screen = true;
+        state.route = Route::Detail {
+            id: "metropolis".into(),
+        };
+        let mut detail = demo::movie_detail();
+        detail.item.people = demo::detail().item.people;
+        state.detail = Some(detail);
+        state.detail_extras = demo::extras();
+        let mut rt = rune::Runtime::new(state, view, (1280.0, 600.0), env);
+        rt.poll = Some(poll);
+        rt.on_key = Some(on_key);
+        rt.frame(0.0);
+        rt.frame(0.016);
+        rt.frame(0.032);
+        rt.update(|_, tx| tx.focus_key("detail-cast-mara-ellison"));
+        rt.frame(0.048);
+        for step in 0..3 {
+            rt.key(KeyEvent {
+                key: Key::Up,
+                mods: Default::default(),
+            });
+            for frame in 0..8 {
+                rt.frame(0.064 + step as f64 * 0.016 + frame as f64 * 0.016);
+            }
+        }
+        assert_eq!(rt.focused_key().as_deref(), Some("detail-back"));
+        let poster = rt.presented("detail-poster").expect("the hero poster").0[1];
+        assert!(
+            poster >= 0.0,
+            "Back returns the page to the top, poster at {poster}"
+        );
     }
 
     #[test]

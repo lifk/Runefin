@@ -379,6 +379,7 @@ impl State {
             .request((stream.url, surface, waker), |(url, surface, waker)| {
                 Player::start(&url, surface, waker)
                     .map(|player| crate::state::InAppStart {
+                        started_ms: None,
                         player,
                         method: "DirectPlay",
                         play_session_id: None,

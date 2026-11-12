@@ -2169,28 +2169,39 @@ fn cast(s: &State, detail: &DetailState, t: &tok::Theme) -> Option<El> {
             });
         let person_id = person.id.clone();
         let person_for_page = person.clone();
+        let key = format!("detail-cast-{person_id}");
+        // The portrait is the focus target, so Rune paints its ring on the circle itself: a
+        // wash over the whole column read as a blue box around the face and the credits. The
+        // focusable ring sits on an unclipped 80 pt circle; the image keeps its 76 pt clip.
+        let portrait = el()
+            .key(key)
+            .role("button")
+            .w(80.0)
+            .h(80.0)
+            .radius(40.0)
+            .center()
+            .hover(t.hover)
+            .motion(motion::SNAPPY)
+            .focusable(true)
+            .focus_ring(theme::focus_width() + 1.0, 0.0, theme::ring())
+            .press_scale(0.97)
+            .cursor(rune::Cursor::Pointer)
+            .label(person.name.clone())
+            .on_press(move |s: &mut State| s.open_person(&person_for_page))
+            .child(
+                el().w(76.0)
+                    .h(76.0)
+                    .radius(38.0)
+                    .clip_rounded(38.0)
+                    .fill(t.card)
+                    .child(image),
+            );
         rail = rail.child(
             col()
-                .key(format!("detail-cast-{person_id}"))
-                .role("button")
                 .w(96.0)
                 .gap(6.0)
                 .items_center()
-                .hover(t.hover)
-                .motion(motion::SNAPPY)
-                .focusable(true)
-                .focus_visual(2.0)
-                .press_scale(0.98)
-                .cursor(rune::Cursor::Pointer)
-                .on_press(move |s: &mut State| s.open_person(&person_for_page))
-                .child(
-                    el().w(76.0)
-                        .h(76.0)
-                        .radius(38.0)
-                        .clip_rounded(38.0)
-                        .fill(t.card)
-                        .child(image),
-                )
+                .child(portrait)
                 .child(
                     text(person.name.clone())
                         .font(type_::caption())

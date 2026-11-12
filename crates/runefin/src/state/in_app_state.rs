@@ -152,6 +152,57 @@ impl InAppSession {
     }
 }
 
+/// Whether the server's transcoding URL already carries the requested start. Jellyfin writes
+/// `StartTimeTicks`; a URL without it transcodes from the file's beginning, so the picture
+/// must be seeked after the first frame or the resume clock would be a lie.
+fn url_starts_at(url: &str, start_ms: i64) -> bool {
+    if start_ms <= 0 {
+        return true;
+    }
+    let lower = url.to_ascii_lowercase();
+    let Some(at) = lower
+        .find("starttimeticks=")
+        .or_else(|| lower.find("startticks="))
+    else {
+        return false;
+    };
+    let value = url[at..]
+        .split_once('=')
+        .map(|(_, value)| value)
+        .unwrap_or_default()
+        .split('&')
+        .next()
+        .unwrap_or_default();
+    value.parse::<i64>().is_ok_and(|ticks| {
+        (ticks - start_ms.saturating_mul(jellyfin_api::TICKS_PER_MS)).abs()
+            <= 2_000 * jellyfin_api::TICKS_PER_MS
+    })
+}
+
+/// Apply the resume to the pipeline unless the negotiated source already begins there.
+fn resume_after_start(
+    player: &crate::player::Player,
+    method: &'static str,
+    url: &str,
+    start_ms: i64,
+    notice: Option<String>,
+) -> (Option<i64>, Option<String>) {
+    let needs_seek = start_ms > 0 && (method != "Transcode" || !url_starts_at(url, start_ms));
+    if !needs_seek {
+        return (None, notice);
+    }
+    match player.seek_and_confirm(start_ms) {
+        Ok(()) => (Some(start_ms), notice),
+        Err(_) => (
+            Some(0),
+            Some(format!(
+                "Could not resume at {}; starting from the beginning.",
+                crate::detail::format_time(start_ms)
+            )),
+        ),
+    }
+}
+
 /// Pick the URL and the method the server offered. Direct play wins unless the reader capped
 /// the bitrate below the file's own or the server says the profile cannot play it.
 fn choose_playback(
@@ -824,8 +875,9 @@ impl State {
                 fallback,
                 surface,
                 waker,
+                start_ms,
             ),
-            |(client, item_id, source, request, cap, fallback, surface, waker)| {
+            |(client, item_id, source, request, cap, fallback, surface, waker, start_ms)| {
                 let negotiated = request
                     .as_ref()
                     .and_then(|request| client.playback_info(&item_id, request).ok());
@@ -837,12 +889,17 @@ impl State {
                     &fallback,
                 );
                 match Player::start(&url, surface.clone(), waker.clone()) {
-                    Ok(player) => Ok(InAppStart {
-                        player,
-                        method,
-                        play_session_id,
-                        notice,
-                    }),
+                    Ok(player) => {
+                        let (started_ms, notice) =
+                            resume_after_start(&player, method, &url, start_ms, notice);
+                        Ok(InAppStart {
+                            player,
+                            method,
+                            play_session_id,
+                            notice,
+                            started_ms,
+                        })
+                    }
                     Err(first) => {
                         // A direct play that produced no frame is worth one more try through the
                         // server's transcoder: it can tone-map or re-encode whatever the local
@@ -878,16 +935,26 @@ impl State {
                             &fallback,
                         );
                         match Player::start(&url, surface, waker) {
-                            Ok(player) => Ok(InAppStart {
-                                player,
-                                method,
-                                play_session_id,
-                                notice: Some(
-                                    "Direct play produced no frames; the server is transcoding \
-                                     this item."
-                                        .into(),
-                                ),
-                            }),
+                            Ok(player) => {
+                                let (started_ms, notice) = resume_after_start(
+                                    &player,
+                                    method,
+                                    &url,
+                                    start_ms,
+                                    Some(
+                                        "Direct play produced no frames; the server is \
+                                         transcoding this item."
+                                            .into(),
+                                    ),
+                                );
+                                Ok(InAppStart {
+                                    player,
+                                    method,
+                                    play_session_id,
+                                    notice,
+                                    started_ms,
+                                })
+                            }
                             Err(second) => Err(Failure {
                                 stage: Stage::Player,
                                 message: format!("{method}: {first}; transcode retry: {second}"),
@@ -1547,11 +1614,9 @@ impl State {
                         "Dolby Vision: the server is tone-mapping this to SDR.".to_string(),
                     );
                 }
-                // A transcode URL already starts at `start_time_ticks`; seeking again would
-                // land at twice the resume point and leave the subtitles behind.
-                if pending.start_ms > 0 && method != "Transcode" {
-                    player.seek_ms(pending.start_ms);
-                }
+                // The worker applies and confirms the resume (unless the source already
+                // begins there), so the session starts from where the picture really is.
+                let start_ms = started.started_ms.unwrap_or(pending.start_ms);
                 if pending.paused {
                     player.set_paused(true);
                 }
@@ -1579,7 +1644,7 @@ impl State {
                     item: pending.item.clone(),
                     item_id: pending.item.id.clone(),
                     session_id: pending.session_id.clone(),
-                    position_ms: pending.start_ms,
+                    position_ms: start_ms,
                     duration_ms: pending.item.runtime_ms(),
                     paused: pending.paused,
                     scrub_ms: None,
@@ -1593,9 +1658,11 @@ impl State {
                     play_method: method,
                     play_reason,
                     play_session_id: play_session_id.clone(),
-                    history_start_ms: pending.start_ms,
+                    history_start_ms: start_ms,
                     position_base_ms: 0,
-                    position_calibrated: method != "Transcode" || pending.start_ms == 0,
+                    position_calibrated: method != "Transcode"
+                        || pending.start_ms == 0
+                        || started.started_ms == Some(0),
                 });
                 // The preference may have arrived before the player did; apply it now that
                 // there is a pipeline to switch.
@@ -2596,6 +2663,26 @@ mod tests {
     }
 
     #[test]
+    fn a_transcode_url_only_starts_at_the_resume_when_it_says_so() {
+        let start = 3_790_000;
+        let ticks = start * jellyfin_api::TICKS_PER_MS;
+        assert!(url_starts_at(
+            &format!("/Videos/x/master.m3u8?StartTimeTicks={ticks}&api_key=t"),
+            start
+        ));
+        assert!(url_starts_at(
+            &format!("/Videos/x/master.m3u8?startticks={}", ticks - 5_000_000),
+            start
+        ));
+        assert!(!url_starts_at("/Videos/x/master.m3u8", start));
+        assert!(!url_starts_at(
+            "/Videos/x/master.m3u8?StartTimeTicks=0",
+            start
+        ));
+        assert!(url_starts_at("/Videos/x/master.m3u8", 0));
+    }
+
+    #[test]
     fn a_negotiated_method_and_session_land_on_the_session() {
         let mut state = State::from_config(Config::fresh());
         state.pending_in_app = Some(PendingInApp {
@@ -2620,6 +2707,7 @@ mod tests {
             method: "Transcode",
             play_session_id: Some("server-session".into()),
             notice: Some("The 2 Mbps cap is below this file's 31 Mbps.".into()),
+            started_ms: None,
         }));
         let session = state.in_app.as_ref().expect("a session");
         assert_eq!(session.play_method, "Transcode");

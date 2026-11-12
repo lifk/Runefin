@@ -164,7 +164,9 @@ Undo puts the card back.
 
 **TV focus.** A controller-only test (`tv_reach_tests`) walks each screen, overlay and player
 layer with direction keys and fails if any visible control is unreachable, so a missing zone is
-a red test rather than a remote that dead-ends. The router's zones cover the whole page, not just the first
+a red test rather than a remote that dead-ends. Focus moves are quiet to Rune and carry their own
+animated scroll, so a rail-to-rail move glides; Back on a detail page also returns its scroll to
+the top, and a focused face is ringed rather than washed. The router's zones cover the whole page, not just the first
 row: a detail page
 adds collections, cast, extras and *More like this* below the episode list, and the player's gear
 sheet and each panel are focus groups so a remote can enter them. Back from a panel returns to

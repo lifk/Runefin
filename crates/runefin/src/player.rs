@@ -449,6 +449,26 @@ impl Player {
         }
     }
 
+    /// Seek and wait for the pipeline to report the target. A resume that is announced on the
+    /// clock but not applied to the pipeline shows the first frame under a resume timeline;
+    /// confirming here turns that into either a real seek or a truthful zero start.
+    pub fn seek_and_confirm(&self, position_ms: i64) -> Result<(), String> {
+        for _ in 0..2 {
+            self.seek_ms(position_ms);
+            let deadline = Instant::now() + Duration::from_secs(2);
+            while Instant::now() < deadline {
+                if (self.position_ms() - position_ms).abs() <= 1_500 {
+                    return Ok(());
+                }
+                std::thread::sleep(Duration::from_millis(50));
+            }
+        }
+        Err(format!(
+            "the pipeline did not reach {} ms after the seek",
+            position_ms
+        ))
+    }
+
     pub fn has_ended(&self) -> bool {
         self.poll_bus();
         self.eos.load(Ordering::Relaxed)
