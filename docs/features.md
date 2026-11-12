@@ -177,7 +177,7 @@ separate window. `scripts/check.sh` builds it; the player's contract is
   frames into Rune's Vulkan device. Tested at 4K HEVC HDR10 on AMD RADV/VCN: 256 ms to first
   frame, 24 fps, 232 MB RSS.
 - **HDR tone mapping** for PQ/HLG to the SDR window, calibrated so reference white lands at 0.8
-  and 1 000/4 000-nit highlights at 0.976/0.994. True HDR passthrough is not shipped (see §13).
+  and 1 000/4 000-nit highlights at 0.976/0.994. True HDR passthrough is not shipped (see §15).
 - **CPU NV12 fallback** when VA-API or DMA-BUF negotiation fails; it copies frames through
   system memory and plays SDR reliably.
 - **mpv fallback** if the in-app pipeline cannot produce a frame; the same start/progress/stop
@@ -286,7 +286,7 @@ separate window. `scripts/check.sh` builds it; the player's contract is
   frame count, cache/queue counts, server and last error.
 - Idle/sleep inhibitor while playing; volume is remembered.
 - Mini player while browsing: poster, title, elapsed/remaining, play/pause, stop and reopen.
-- **MPRIS2** (see §11).
+- **MPRIS2** (see §12).
 
 ### Audio and text
 
