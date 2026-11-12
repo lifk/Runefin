@@ -26,7 +26,7 @@ gstreamer-app = "0.25"
 gstreamer-base = "0.25"
 gstreamer-video = { version = "0.25", features = ["v1_18"] }
 gstreamer-allocators = "0.25"
-toml = "0.8"
+toml = "1.1"
 # D5: the access token is a bearer credential; wipe the heap copy when the session ends.
 zeroize = "1"
 # Pinned on purpose (see the workspace Cargo.toml). `dev` moves ~100 commits a day; a floating
