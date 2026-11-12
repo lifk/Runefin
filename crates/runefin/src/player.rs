@@ -607,6 +607,7 @@ fn start_pipeline(
         .build()
         .or_else(|_| gst::ElementFactory::make("playbin3").build())
         .map_err(|error| format!("GStreamer has no playbin: {error}"))?;
+    crate::bench::mark("bench.player.playbin");
     // The audio chain: pitch correction, a timestamp offset for A/V delay, an optional
     // compressor, and an optional downmix. Built as one bin so playbin sees a single filter.
     let (audio_filter, downmix, delay, dynamic) =
@@ -633,6 +634,7 @@ fn start_pipeline(
     let trace = Arc::new(Trace::default());
     let stopped = Arc::new(AtomicBool::new(false));
     let colour: Arc<Mutex<Option<ColourFacts>>> = Arc::new(Mutex::new(None));
+    crate::bench::mark("bench.player.converter");
     let sink: gst::Element = if prefer_dmabuf {
         let caps = dmabuf_caps(&convert)
             .ok_or_else(|| "VA-API exposes no AR24 DMA-BUF modifier".to_string())?;
@@ -704,6 +706,7 @@ fn start_pipeline(
             .map_err(|error| format!("GStreamer video sink pad: {error}"))?;
         bin.upcast::<gst::Element>()
     };
+    crate::bench::mark("bench.player.sink");
     playbin.set_property("video-sink", &sink);
     // The reverse proxy in front of the live server rejects GStreamer's stock user agent.
     // This is also the identity the Jellyfin API client uses.
@@ -732,6 +735,7 @@ fn start_pipeline(
     playbin
         .set_state(gst::State::Playing)
         .map_err(|error| format!("GStreamer couldn't start playback: {error}"))?;
+    crate::bench::mark("bench.player.playing");
     let pipeline = playbin
         .downcast::<gst::Pipeline>()
         .map_err(|_| "GStreamer playbin is not a pipeline".to_string())?;

@@ -107,9 +107,16 @@ the wait sees is the resume frame; a seek the pipeline dropped is caught by a cl
 retried once, which is exactly the old path. A transcode URL that already carries
 `StartTimeTicks` is not seeked at all, as before.
 
-The remaining 120–240 ms is GStreamer building playbin, vaspostproc, the DMA-BUF sink and its
-caps filter, plus plugin registry work on the first play of a process. Warming those elements at
-launch (after the first frame, on a thread) is the next candidate here.
+Where the remaining ~300–430 ms goes, over three items (play requested → pipeline 80–134 ms;
+pipeline setup 21 ms; preroll → first picture 214–267 ms):
+
+- **80–134 ms** before the pipeline: the worker thread and the `/PlaybackInfo` negotiation, a
+  server round trip. Asking for it when the detail page opens, instead of when Play is pressed,
+  would take it off this path.
+- **21 ms** building playbin, the audio filter, `vapostproc`, the capsfilter and the sink — too
+  little to be worth warming.
+- **214–267 ms** of preroll: the source's connection, demux, decoder start, the converter's first
+  buffer. Not ours to shorten.
 
 ## Idle
 
@@ -140,10 +147,9 @@ window draws none at all. Idle cost is a poll per wake, not a frame per display 
    boxes while scrolling), which is ~100 decoded 360 px posters and most of the 219 MB RSS. A cap
    or a smaller decode for rails far below the fold would trade a few grey boxes for ~100 MB on a
    TV box.
-3. **Warm the player's elements at launch.** Between the play request and the pipeline there are
-   120–240 ms of GStreamer holding playbin, `vaspostproc`, a capsfilter and the DMA-BUF sink
-   built for the first time in the process; a background warm-up after the first frame would leave
-   only the source's own setup.
+3. **Ask for `/PlaybackInfo` when a detail page opens.** It is a server round trip (80–134 ms)
+   paid between pressing Play and the pipeline starting; the detail page already knows what it
+   will play (`play_target`). A warm-up of GStreamer's elements, by contrast, saves only 21 ms.
 4. **Ask Rune for a way to preload the symbol fallback fonts.** The first frame that draws a `·`,
    `✓` or `—` loads 20 ms of DejaVu/Noto files inside the frame; the window spends 40 ms waiting
    for the GPU adapter just before, which would hide it.
