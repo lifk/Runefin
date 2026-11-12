@@ -338,8 +338,9 @@ The remaining work is:
 **Scope:** the patch stays in `native_surface`, one shader seam and the window adapter; upstream it
 once the seam stabilizes.
 
-**App pin:** `crates/runefin/Cargo.toml` now points at the fork
-`5221a35da1b25b1ac59678aa9164b02ef2cbea9d`. The fork adds `Plane::from_raw_fd` so the
+**App pin:** `crates/runefin/Cargo.toml` points at the fork
+`3fd8f44f8cfa4e0a355f42c78d624f053d539a71` (2026-11-12, upstream `dev` plus the player
+patches). The fork adds `Plane::from_raw_fd` so the
 app can hand GStreamer's descriptor to Rune without an unsafe app-side call. The DMA path is
 app-side (`dmabuf_sink.rs`), uses a `BaseSink` rather than `appsink`, and falls back to the CPU
 NV12 path if VA-API or DMA-BUF negotiation fails. Future Rune bumps stay standalone commits, per

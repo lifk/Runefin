@@ -20,6 +20,9 @@ finish-args:
   - --filesystem=xdg-run/pipewire-0
   - --talk-name=org.freedesktop.Notifications
   - --own-name=org.mpris.MediaPlayer2.runefin
+  # Screen readers: AccessKit reaches the AT-SPI registry through org.a11y.Bus, and the sandbox
+  # hides that name from an app that does not ask for it.
+  - --talk-name=org.a11y.Bus
 
 build-options:
   append-path: /usr/lib/sdk/rust-stable/bin

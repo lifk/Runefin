@@ -16,8 +16,10 @@ wins until it is amended in the same change. The full rationale for each rule li
 1. **Never block the UI thread.** No network, disk or process work inside a handler or `poll`.
    Use `rune::Latest` for request/response work and the `setup` waker for long-lived workers.
    `poll` returns `true` only when something visible changed.
-2. **Every interactive element has a stable `.key(..)`.** Keys are how tests, scripted input and
-   `--tree` address elements. Renaming one re-renders the snapshots in the same commit.
+2. **Every interactive element has a stable `.key(..)` and an accessible name.** Keys are how
+   tests, scripted input and `--tree` address elements; the name is what a screen reader reads,
+   from the visible text or an explicit `label`. `every_screen_names_every_control` walks the tree
+   and fails on a silent control. Renaming a key re-renders the snapshots in the same commit.
 3. **A change that can move pixels renders a snapshot.** `scripts/snapshots.sh` for the eight
    committed views, and `scripts/snapshots.sh --all` for any other screen the change touches.
    Commit the core views when they change; an intended diff says why.
