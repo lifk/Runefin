@@ -685,6 +685,13 @@ pub struct State {
     pub in_app_segments: Vec<MediaSegment>,
     pub in_app_segments_load: Latest<Result<Vec<MediaSegment>, String>>,
     pub in_app_subtitles: Subtitles,
+    /// Bring every film to one level before the reader's volume.
+    pub loudness: bool,
+    /// Measured levels, by item id; read at session start, written as they are taken.
+    pub loudness_cache: std::collections::HashMap<String, crate::loudness::Stored>,
+    /// A measurement in flight, and the item it belongs to.
+    loudness_load: Latest<Option<crate::loudness::Measurement>>,
+    loudness_for: Option<String>,
     /// Aligning the cues to the audio: the decoded window's verdict, or the reason there is none.
     subtitle_sync: Latest<Result<Option<crate::subtitle_sync::Alignment>, String>>,
     /// Seconds of audio the probe has decoded, read by the panel while it waits.
@@ -800,6 +807,7 @@ impl State {
         // Before the window exists: the rails this reader last saw, so the first frame paints
         // them and the server's answers replace them a few hundred milliseconds later. A cache
         // hit here is one file read on the thread that is already waiting for the GPU.
+        state.loudness_cache = crate::loudness::load();
         if state.is_signed_in() {
             let config = &state.config;
             if let Some(home) = crate::home_cache::load(
@@ -1082,6 +1090,10 @@ impl State {
             in_app_segments: Vec::new(),
             in_app_segments_load: Latest::default(),
             in_app_subtitles: Subtitles::default(),
+            loudness: false,
+            loudness_cache: std::collections::HashMap::new(),
+            loudness_load: Latest::default(),
+            loudness_for: None,
             subtitle_sync: Latest::default(),
             subtitle_sync_progress: Arc::new(std::sync::atomic::AtomicU64::new(0)),
             subtitle_sync_cancel: Arc::new(AtomicBool::new(false)),
@@ -1176,6 +1188,7 @@ impl State {
             _ => 10,
         };
         state.downmix_stereo = state.config.downmix_stereo.unwrap_or(false);
+        state.loudness = state.config.loudness.unwrap_or(false);
         state.audio_delay_ms = state.config.audio_delay_ms.unwrap_or(0).clamp(-100, 100);
         state.audio_mode = state.config.audio_mode.unwrap_or_default();
         state.reduce_motion = state.config.reduce_motion.unwrap_or(false);
@@ -1800,6 +1813,7 @@ impl State {
         self.config.still_watching_minutes = Some(self.still_watching_minutes);
         self.config.resume_rewind_seconds = Some(self.resume_rewind_seconds);
         self.config.downmix_stereo = Some(self.downmix_stereo);
+        self.config.loudness = Some(self.loudness);
         self.config.audio_delay_ms = Some(self.audio_delay_ms);
         self.config.audio_mode = Some(self.audio_mode);
         self.config.reduce_motion = Some(self.reduce_motion);
@@ -2106,6 +2120,24 @@ impl State {
             && self.is_signed_in()
         {
             self.playlists = playlists.unwrap_or_default();
+            changed = true;
+        }
+        if let Some(measured) = self.loudness_load.take()
+            && let (Some(item), Some(measured)) = (self.loudness_for.take(), measured)
+        {
+            crate::loudness::store(
+                &mut self.loudness_cache,
+                &item,
+                crate::loudness::Stored::from(measured),
+            );
+            if self.loudness
+                && self
+                    .in_app
+                    .as_ref()
+                    .is_some_and(|session| session.item_id == item)
+            {
+                self.apply_loudness();
+            }
             changed = true;
         }
         if let Some(result) = self.subtitle_sync.take() {
@@ -4936,6 +4968,10 @@ mod tests {
             in_app_segments: Vec::new(),
             in_app_segments_load: Latest::default(),
             in_app_subtitles: Subtitles::default(),
+            loudness: false,
+            loudness_cache: std::collections::HashMap::new(),
+            loudness_load: Latest::default(),
+            loudness_for: None,
             subtitle_sync: Latest::default(),
             subtitle_sync_progress: Arc::new(std::sync::atomic::AtomicU64::new(0)),
             subtitle_sync_cancel: Arc::new(AtomicBool::new(false)),

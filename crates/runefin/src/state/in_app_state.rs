@@ -1516,7 +1516,7 @@ impl State {
                     break;
                 }
                 let window =
-                    crate::audio_probe::sample(&url, start + extra, 240, &progress, &cancel)?;
+                    crate::audio_probe::sample(&url, start + extra, 240, None, &progress, &cancel)?;
                 if let Some(alignment) = crate::subtitle_sync::align(
                     &window.samples,
                     crate::audio_probe::RATE,
@@ -1785,6 +1785,9 @@ impl State {
                 // The preference may have arrived before the player did; apply it now that
                 // there is a pipeline to switch.
                 self.apply_audio_preference();
+                // A measured item takes its gain at once; an unmeasured one is measured in the
+                // background and applied when the number lands.
+                self.apply_loudness();
                 // The stream list can beat the first frame. A forced selection made then had no
                 // session to download its cues against, so finish that request now.
                 if self.in_app_subtitles.selected.is_some()
@@ -1957,10 +1960,12 @@ impl State {
                 self.sleep_deadline = None;
                 self.sleep_fade_percent = 100;
                 if let Some(session) = &mut self.in_app {
-                    session.player.set_volume(self.in_app_volume);
                     session.player.set_paused(true);
                     session.paused = true;
                 }
+                // The fade may have lowered the volume; the pause restores the reader's level,
+                // with the item's loudness gain when that is on.
+                self.push_in_app_volume();
                 self.show_toast("Sleep timer paused playback.");
                 changed = true;
             } else if left <= Duration::from_secs(20) {
@@ -2204,11 +2209,89 @@ impl State {
 
     pub fn set_in_app_volume(&mut self, volume: f64) {
         self.show_in_app_osd();
-        let volume = volume.clamp(0.0, 2.0);
-        if let Some(session) = &self.in_app {
-            session.player.set_volume(volume);
+        self.in_app_volume = volume.clamp(0.0, 2.0);
+        self.push_in_app_volume();
+    }
+
+    /// The reader's volume times the item's loudness gain, on the live pipeline. Every path that
+    /// changes either value ends here, so the two can never disagree.
+    fn push_in_app_volume(&self) {
+        let Some(session) = &self.in_app else {
+            return;
+        };
+        session
+            .player
+            .set_volume(self.in_app_volume * self.loudness_factor(&session.item_id));
+    }
+
+    /// The multiplier loudness normalisation wants for an item: 1.0 when it is off or the item
+    /// has not been measured yet.
+    fn loudness_factor(&self, item_id: &str) -> f64 {
+        if !self.loudness {
+            return 1.0;
         }
-        self.in_app_volume = volume;
+        self.loudness_cache
+            .get(item_id)
+            .map_or(1.0, |stored| f64::from(stored.gain))
+    }
+
+    /// Apply normalisation to the live session, measuring the item first if it never was.
+    pub fn apply_loudness(&mut self) {
+        let Some(session) = &self.in_app else {
+            return;
+        };
+        let item_id = session.item_id.clone();
+        if !self.loudness || self.loudness_cache.contains_key(&item_id) {
+            self.push_in_app_volume();
+            return;
+        }
+        if self.loudness_for.as_deref() == Some(item_id.as_str()) {
+            return;
+        }
+        let Some(client) = self.client() else {
+            return;
+        };
+        let Some(url) = client.direct_stream_url(&item_id) else {
+            return;
+        };
+        // Three windows at a fifth, a half and four fifths of the run: one quiet scene must not
+        // set a film's level (the first try put *28 Days Later* at −38.5 dBFS from a single quiet
+        // window where its body sits near −26), and a median of three shrugs one off.
+        let duration = session.duration_ms.unwrap_or(0);
+        let starts: Vec<i64> = if duration > 0 {
+            [2, 5, 8]
+                .iter()
+                .map(|tenths| duration * tenths / 10)
+                .collect()
+        } else {
+            vec![0]
+        };
+        self.loudness_for = Some(item_id);
+        self.loudness_load.request((), move |()| {
+            let progress = std::sync::atomic::AtomicU64::new(0);
+            let cancelled = std::sync::atomic::AtomicBool::new(false);
+            let mut levels: Vec<f32> = Vec::new();
+            for start in starts {
+                if let Ok(window) =
+                    crate::audio_probe::sample(&url, start, 60, None, &progress, &cancelled)
+                    && let Some(measured) =
+                        crate::loudness::measure(&window.samples, crate::audio_probe::RATE)
+                {
+                    levels.push(measured.dbfs);
+                }
+            }
+            if levels.is_empty() {
+                return None;
+            }
+            levels.sort_by(f32::total_cmp);
+            Some(crate::loudness::at_level(levels[levels.len() / 2]))
+        });
+    }
+
+    /// The setting's switch: on measures and applies, off restores the plain volume.
+    pub fn toggle_loudness(&mut self) {
+        self.loudness = !self.loudness;
+        self.apply_loudness();
     }
 
     pub fn toggle_in_app_audio_menu(&mut self) {

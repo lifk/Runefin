@@ -274,6 +274,13 @@ exactly the difference between "a client" and "a toy". Budget real time here.
   before the download — becomes the active track. Six languages, two rows of chips; search and
   download run on `rune::Latest`, so neither blocks the frame loop. `Esc` steps back from the
   lookup to the track list, then closes the panel.
+- Loudness normalisation (Settings → Playback, off by default): three 60 s windows of the item's
+  direct stream (a fifth, a half and four fifths in) are decoded at 8 kHz stereo, measured as gated
+  RMS (frames under −60 dBFS excluded) and reduced to the median, so one quiet scene cannot set a
+  film's level; the gain against −23 dBFS is clamped to ±12 dB and cached in
+  `~/.cache/runefin/loudness.json`. One helper applies `reader volume × gain` to the pipeline, so
+  the volume control, the sleep fade and the OSD cannot disagree; a first play measures in the
+  background and applies the number when it lands.
 - The display stays awake while a video plays: the app takes a `systemd-inhibit`
   `idle:sleep` block lock by spawning the tool and kills it on every stop path (EOS, error, Esc,
   channel zap). No session bus or no systemd means the spawn fails and playback is unchanged; the

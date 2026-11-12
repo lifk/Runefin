@@ -36,6 +36,7 @@ pub fn sample(
     url: &str,
     start_ms: i64,
     seconds: u32,
+    track: Option<i32>,
     progress: &AtomicU64,
     cancelled: &AtomicBool,
 ) -> Result<Window, String> {
@@ -43,9 +44,12 @@ pub fn sample(
     gst::init().map_err(|error| format!("GStreamer could not start: {error}"))?;
     let started = Instant::now();
 
+    // Stereo, then averaged here: `audioconvert`'s mono downmix divides by the channel count, so
+    // a 7.1 mix arrived 18 dB quieter than the same film through ffmpeg. The stereo downmix is
+    // level-preserving, and taking the mean of two channels is a no-op for loudness.
     let caps = gst::Caps::builder("audio/x-raw")
         .field("format", "S16LE")
-        .field("channels", 1i32)
+        .field("channels", 2i32)
         .field("rate", RATE as i32)
         .field("layout", "interleaved")
         .build();
@@ -92,6 +96,11 @@ pub fn sample(
     // Audio only: no video decode, no text, no visualisation.
     if playbin.find_property("flags").is_some() {
         playbin.set_property_from_str("flags", "soft-volume+audio");
+    }
+    if let Some(track) = track
+        && playbin.find_property("current-audio").is_some()
+    {
+        playbin.set_property("current-audio", track);
     }
     let pipeline = playbin
         .downcast::<gst::Pipeline>()
@@ -155,10 +164,14 @@ pub fn sample(
                     .buffer()
                     .and_then(|buffer| buffer.map_readable().ok())
                 {
-                    let take = (want - samples.len()) * 2;
+                    let take = (want - samples.len()) * 4;
                     let bytes = &bytes.as_slice()[..bytes.len().min(take)];
-                    let (pairs, _) = bytes.as_chunks::<2>();
-                    samples.extend(pairs.iter().map(|pair| i16::from_le_bytes(*pair)));
+                    let (frames, _) = bytes.as_chunks::<4>();
+                    samples.extend(frames.iter().map(|frame| {
+                        let left = i16::from_le_bytes([frame[0], frame[1]]) as i32;
+                        let right = i16::from_le_bytes([frame[2], frame[3]]) as i32;
+                        ((left + right) / 2) as i16
+                    }));
                 }
                 progress.store((samples.len() / RATE as usize) as u64, Ordering::Relaxed);
             }
@@ -235,6 +248,151 @@ mod tests {
     use super::*;
     use crate::subtitle_sync;
 
+    /// Two episodes of one series, through the real probe and the real detector:
+    /// `RUNEFIN_PROBE_SERIES=<series id>`, optionally `RUNEFIN_PROBE_PAIR=a,b` (1-based).
+    /// Prints what the pair shares, so the detector can be judged on a title sequence rather than
+    /// on synthetic notes.
+    #[test]
+    #[ignore = "needs RUNEFIN_PROBE_SERIES=<series id>"]
+    fn two_real_episodes_of_a_series_share_an_intro() {
+        let series = std::env::var("RUNEFIN_PROBE_SERIES").expect("RUNEFIN_PROBE_SERIES");
+        let config = crate::config::Config::load();
+        let client = jellyfin_api::Client::new(&config.server_url, config.device_id.clone())
+            .with_session(config.token.clone(), config.user_id.clone());
+        let episodes = client
+            .episodes_in(&series, jellyfin_api::SortBy::DatePlayed, 4)
+            .expect("the series' episodes");
+        let episodes = {
+            let mut sorted = episodes;
+            sorted.sort_by_key(|item| (item.parent_index_number, item.index_number));
+            sorted
+        };
+        let pair: Vec<usize> = std::env::var("RUNEFIN_PROBE_PAIR")
+            .ok()
+            .and_then(|value| {
+                let mut parts = value
+                    .split(',')
+                    .filter_map(|p| p.trim().parse::<usize>().ok());
+                Some(vec![parts.next()? - 1, parts.next()? - 1])
+            })
+            .unwrap_or_else(|| vec![0, 1]);
+        let (a, b) = (&episodes[pair[0]], &episodes[pair[1]]);
+        let progress = AtomicU64::new(0);
+        let cancelled = AtomicBool::new(false);
+        let mut windows = Vec::new();
+        for item in [a, b] {
+            let url = client.direct_stream_url(&item.id).expect("a stream");
+            let window = sample(&url, 0, 360, None, &progress, &cancelled).expect("decoded");
+            windows.push(window);
+        }
+        let (wa, wb) = (&windows[0], &windows[1]);
+        let found =
+            crate::intro_detect::detect(&wa.samples, wa.start_ms, &wb.samples, wb.start_ms, RATE);
+        let best = crate::intro_detect::best_match(
+            &crate::intro_detect::features(&wa.samples, RATE),
+            &crate::intro_detect::features(&wb.samples, RATE),
+        );
+        eprintln!(
+            "{} vs {}: candidate {:?} (shift s, span start-end s, corr), then {:?}",
+            a.name,
+            b.name,
+            best.map(|(shift, start, length, mean)| (
+                shift as f32 * 0.2,
+                start as f32 * 0.2,
+                (start + length) as f32 * 0.2,
+                (mean * 100.0).round() / 100.0
+            )),
+            found.map(|intro| (
+                intro.start_ms / 1000,
+                intro.end_ms / 1000,
+                (intro.confidence * 100.0).round() / 100.0
+            ))
+        );
+    }
+
+    /// What a real item measures, for tuning the target: `RUNEFIN_PROBE_ITEM=<id>` and optionally
+    /// `RUNEFIN_PROBE_START_MS`. Prints gated RMS and the gain it would take.
+    #[test]
+    #[ignore = "needs RUNEFIN_PROBE_ITEM=<id> [RUNEFIN_PROBE_START_MS]"]
+    fn a_real_item_measures_its_level() {
+        let config = crate::config::Config::load();
+        let client = jellyfin_api::Client::new(&config.server_url, config.device_id.clone())
+            .with_session(config.token.clone(), config.user_id.clone());
+        // A file URL tests the probe's own level against an ffmpeg measurement of the same WAV.
+        let (url, name, duration) = match std::env::var("RUNEFIN_PROBE_URL") {
+            Ok(url) => (url, "url".to_string(), 0),
+            Err(_) => {
+                let item_id = std::env::var("RUNEFIN_PROBE_ITEM").expect("RUNEFIN_PROBE_ITEM");
+                let item = client.playback_item(&item_id).expect("the item");
+                let url = client
+                    .direct_stream_url(&item_id)
+                    .expect("the item has a stream");
+                (url, item.name.clone(), item.runtime_ms().unwrap_or(0))
+            }
+        };
+        let starts: Vec<i64> = std::env::var("RUNEFIN_PROBE_START_MS")
+            .ok()
+            .and_then(|value| value.parse::<i64>().ok())
+            .map(|one| vec![one])
+            .unwrap_or_else(|| {
+                [2, 5, 8]
+                    .iter()
+                    .map(|tenths| duration * tenths / 10)
+                    .collect()
+            });
+        let progress = AtomicU64::new(0);
+        let cancelled = AtomicBool::new(false);
+        let mut levels = Vec::new();
+        for start in &starts {
+            let track = std::env::var("RUNEFIN_PROBE_AUDIO")
+                .ok()
+                .and_then(|value| value.parse::<i32>().ok());
+            let window =
+                sample(&url, *start, 60, track, &progress, &cancelled).expect("the probe decodes");
+            if let Ok(dump) = std::env::var("RUNEFIN_PROBE_DUMP") {
+                let data_len = window.samples.len() as u32 * 2;
+                let mut out = Vec::new();
+                out.extend_from_slice(b"RIFF");
+                out.extend_from_slice(&(36 + data_len).to_le_bytes());
+                out.extend_from_slice(b"WAVEfmt ");
+                out.extend_from_slice(&16u32.to_le_bytes());
+                out.extend_from_slice(&1u16.to_le_bytes());
+                out.extend_from_slice(&1u16.to_le_bytes());
+                out.extend_from_slice(&RATE.to_le_bytes());
+                out.extend_from_slice(&(RATE * 2).to_le_bytes());
+                out.extend_from_slice(&2u16.to_le_bytes());
+                out.extend_from_slice(&16u16.to_le_bytes());
+                out.extend_from_slice(b"data");
+                out.extend_from_slice(&data_len.to_le_bytes());
+                for sample in &window.samples {
+                    out.extend_from_slice(&sample.to_le_bytes());
+                }
+                std::fs::write(dump, out).expect("dump written");
+            }
+            let measured = crate::loudness::measure(&window.samples, RATE).expect("a level");
+            levels.push(measured.dbfs);
+        }
+        let mut sorted = levels.clone();
+        sorted.sort_by(f32::total_cmp);
+        let measured = crate::loudness::at_level(sorted[sorted.len() / 2]);
+        let gain_db = 20.0 * measured.gain.log10();
+        eprintln!(
+            "{}: windows {:?} -> median {:.1} dBFS, gain {gain_db:+.1} dB -> {:.1} dBFS",
+            name,
+            levels
+                .iter()
+                .map(|l| (l * 10.0).round() / 10.0)
+                .collect::<Vec<_>>(),
+            measured.dbfs,
+            measured.dbfs + gain_db
+        );
+        assert!(
+            measured.dbfs < -5.0 && measured.dbfs > -45.0,
+            "{}",
+            measured.dbfs
+        );
+    }
+
     /// The real path, against the real server: `RUNEFIN_PROBE_ITEM` a signed-in item and
     /// `RUNEFIN_PROBE_SRT` its text track, with `RUNEFIN_PROBE_START_MS` the window to listen to.
     /// It decodes through the app's own probe (not ffmpeg, whose `-ss` on a long-GOP file seeks
@@ -258,8 +416,8 @@ mod tests {
             .unwrap_or(0);
         let progress = AtomicU64::new(0);
         let cancelled = AtomicBool::new(false);
-        let window =
-            sample(&url, start, 240, &progress, &cancelled).expect("the probe decodes the window");
+        let window = sample(&url, start, 240, None, &progress, &cancelled)
+            .expect("the probe decodes the window");
         let cues: Vec<(i64, i64)> = crate::subtitles::parse(&std::fs::read(srt_path).expect("srt"))
             .iter()
             .map(|cue| (cue.start_ms, cue.end_ms))
@@ -377,7 +535,7 @@ mod tests {
         let url = format!("file://{}", path.display());
         let progress = AtomicU64::new(0);
         let cancelled = AtomicBool::new(false);
-        let window = match sample(&url, 0, 40, &progress, &cancelled) {
+        let window = match sample(&url, 0, 40, None, &progress, &cancelled) {
             Ok(window) => window,
             Err(error) => {
                 let _ = std::fs::remove_file(&path);
@@ -414,7 +572,8 @@ mod tests {
         let progress = AtomicU64::new(0);
         let cancelled = AtomicBool::new(false);
         // Start at 20 s: the cues are in item time, so the window's own start must be added back.
-        let window = sample(&url, 20_000, 20, &progress, &cancelled).expect("the probe decodes");
+        let window =
+            sample(&url, 20_000, 20, None, &progress, &cancelled).expect("the probe decodes");
         let _ = std::fs::remove_file(&path);
         let cues: Vec<(i64, i64)> = bursts.iter().map(|(a, b)| (a + 800, b + 800)).collect();
         let found = subtitle_sync::align(&window.samples, RATE, window.start_ms, &cues)

@@ -94,6 +94,9 @@ pub struct Config {
     /// Fold surround tracks into two channels.
     #[serde(default)]
     pub downmix_stereo: Option<bool>,
+    /// Bring every film to one level before the reader's own volume: measured from the item's
+    /// audio and cached, because the server sends no loudness tags.
+    pub loudness: Option<bool>,
     /// Audio shifted against video, in milliseconds (-100 to 100).
     #[serde(default)]
     pub audio_delay_ms: Option<i64>,

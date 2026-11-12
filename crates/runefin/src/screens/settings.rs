@@ -446,6 +446,12 @@ pub(super) fn settings_screen(s: &State) -> El {
             (|s: &mut State| s.cycle_audio_mode()) as fn(&mut State),
         ),
         (
+            "setting-loudness",
+            "Loudness",
+            if s.loudness { "Normalised" } else { "Off" }.to_string(),
+            (|s: &mut State| s.toggle_loudness()) as fn(&mut State),
+        ),
+        (
             "setting-resume-rewind",
             "Rewind on resume",
             format!("{} s", s.resume_rewind_seconds),

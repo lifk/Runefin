@@ -23,7 +23,9 @@ mod home_cache;
 mod image;
 mod image_subtitles;
 mod imdb;
+mod intro_detect;
 mod library;
+mod loudness;
 mod mpris;
 mod net;
 mod pad;
@@ -4797,6 +4799,66 @@ mod tests {
             rt.state.focused_card_rect.is_none(),
             "a non-card focus clears the halo rect"
         );
+    }
+
+    #[test]
+    fn loudness_normalisation_rides_on_top_of_the_readers_volume() {
+        let mut state = home_state();
+        state.in_app = Some(demo::in_app());
+        let item = state.in_app.as_ref().expect("a session").item_id.clone();
+        state.in_app_volume = 0.8;
+        // A measured item with a −6 dB gain: the session plays at 0.8 × 0.5.
+        state.loudness_cache.insert(
+            item.clone(),
+            crate::loudness::Stored {
+                dbfs: -17.0,
+                gain: 0.5,
+                saved: 1,
+            },
+        );
+        state.loudness = true;
+        state.apply_loudness();
+        let volume = state.in_app.as_ref().expect("a session").player.volume();
+        assert!((volume - 0.4).abs() < 0.01, "volume {volume}");
+        // The reader turning it up moves the amplified level, not the raw one.
+        state.set_in_app_volume(1.0);
+        let volume = state.in_app.as_ref().expect("a session").player.volume();
+        assert!((volume - 0.5).abs() < 0.01, "volume {volume}");
+        assert!(
+            (state.in_app_volume - 1.0).abs() < 0.01,
+            "the setting is the reader's"
+        );
+        // Off puts the reader's own volume back.
+        state.toggle_loudness();
+        assert!(!state.loudness);
+        let volume = state.in_app.as_ref().expect("a session").player.volume();
+        assert!((volume - 1.0).abs() < 0.01, "volume {volume}");
+        // An item nobody measured is left at the reader's level until a number lands.
+        state.loudness = true;
+        state.loudness_cache.clear();
+        state.apply_loudness();
+        let volume = state.in_app.as_ref().expect("a session").player.volume();
+        assert!((volume - 1.0).abs() < 0.01, "volume {volume}");
+    }
+
+    #[test]
+    fn the_settings_sheet_offers_loudness_normalisation() {
+        let env = Env {
+            system_dark: true,
+            scale: 1.5,
+        };
+        let mut state = home_state();
+        state.route = Route::Settings;
+        let mut rt = Runtime::new(state, view, (1280.0, 800.0), env);
+        rt.on_key = Some(on_key);
+        rt.frame(0.0);
+        assert!(rt.find("setting-loudness").is_some());
+        // The row's action is the state's switch; the sheet only names it.
+        let before = rt.state.loudness;
+        rt.state.toggle_loudness();
+        assert_ne!(rt.state.loudness, before, "the row switches it");
+        rt.frame(0.016);
+        assert!(rt.find("setting-loudness").is_some());
     }
 
     #[test]

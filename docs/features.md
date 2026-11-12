@@ -305,6 +305,10 @@ separate window. `scripts/check.sh` builds it; the player's contract is
   rectangle), Normal/Bold/Italic, Bottom/Middle/Top, text opacity and plate opacity.
 - Delay (±100 ms) and size (±10%); default keys `c` cycles tracks, `[`/`]` delay, `-`/`=` size
   (`c` can be remapped in Settings → Keyboard).
+- **Loudness normalisation** (Settings → Playback, off by default): each film is measured once
+  from three windows of its own audio and played at a common level, on top of the reader's volume.
+  The gain is cached per item and clamped to ±12 dB; a film with an unusually quiet mix plays as
+  loud as the clamp allows.
 - **PGS and VobSub** bitmap subtitles extracted with ffmpeg into the subtitle cache and decoded
   with `libbitsub-core`; **DVB** is transcoded by ffmpeg to DVD subtitle packets and read by
   the same parser. All are normal selectable rows.
@@ -486,7 +490,7 @@ keys the player already uses.
 ```sh
 cargo test -p jellyfin-api        # 45 API tests, no network
 cargo test -p seerr-api           # 25 Seerr API tests, no network
-cargo test -p runefin             # 420 app tests (22 ignored), headless
+cargo test -p runefin             # 431 app tests (26 ignored), headless
 scripts/check.sh                  # fmt, clippy, all three suites, release build
 scripts/snapshots.sh              # the committed views, in place
 JELLYFIN_URL=... JELLYFIN_USER_ID=... JELLYFIN_TOKEN=... \
