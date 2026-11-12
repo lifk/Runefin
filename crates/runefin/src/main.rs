@@ -4894,6 +4894,10 @@ mod tests {
         state.big_screen = true;
         let mut session = demo::in_app();
         session.position_ms = 47 * 60_000 + 40_000;
+        // The player is the clock `poll` reads, so it sits where the session does: otherwise the
+        // first clock query past the OSD's 100 ms gate pulls the position back to 42:00 and the
+        // card never opens. A frame in a debug build can take longer than that gate.
+        session.player = crate::player::Player::preview_at(session.position_ms);
         state.in_app = Some(session);
         state.in_app_next = Some(demo::next_episode());
         state.osd_visible = true;
