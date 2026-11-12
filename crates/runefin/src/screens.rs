@@ -1956,55 +1956,55 @@ fn on_now_rail(s: &State, t: &tok::Theme) -> El {
             .unwrap_or_default();
         let number = channel.channel_number.clone().unwrap_or_else(|| "—".into());
         let play = channel.clone();
-        rail = rail.child(
-            col()
-                .key(format!("rail-on-now-{}", channel.id))
-                .role("button")
-                .w(250.0)
-                .h(104.0)
-                .padding(12.0)
-                .gap(5.0)
-                .radius(10.0)
-                .fill(t.card)
-                .gradient(Color::WHITE.alpha(0.045), Color::TRANSPARENT)
-                .outline(1.0, 0.0, t.card_border)
-                .shadow(1.0, 2.0, Color::BLACK.alpha(0.25))
-                .shadow(6.0, 18.0, Color::BLACK.alpha(0.16))
-                .hover(t.hover)
-                .motion(motion::SNAPPY)
-                .focusable(true)
-                .focus_visual(2.0)
-                .press_scale(0.98)
-                .cursor(rune::Cursor::Pointer)
-                .on_press(move |s: &mut State| s.play_live_channel(play.clone()))
-                .child(
-                    row()
-                        .gap(8.0)
-                        .items_center()
-                        .child(
-                            text("● LIVE")
-                                .font(type_::caption())
-                                .color(tok::accent(2, true)),
-                        )
-                        .child(
-                            text(format!("#{number}"))
-                                .font(type_::mono_caption())
-                                .color(t.text_secondary),
-                        ),
-                )
-                .child(
-                    text(channel.name.clone())
-                        .font(type_::title())
-                        .color(t.text)
-                        .truncate(),
-                )
-                .child(
-                    text(program)
-                        .font(type_::meta())
-                        .color(t.text_secondary)
-                        .truncate(),
-                ),
-        );
+        let card_key = format!("rail-on-now-{}", channel.id);
+        let tile = col()
+            .key(card_key.clone())
+            .role("button")
+            .w(250.0)
+            .h(104.0)
+            .padding(12.0)
+            .gap(5.0)
+            .radius(10.0)
+            .fill(t.card)
+            .gradient(Color::WHITE.alpha(0.045), Color::TRANSPARENT)
+            .outline(1.0, 0.0, t.card_border)
+            .shadow(1.0, 2.0, Color::BLACK.alpha(0.25))
+            .shadow(6.0, 18.0, Color::BLACK.alpha(0.16))
+            .hover(t.hover)
+            .motion(motion::SNAPPY)
+            .focusable(true)
+            .focus_visual(2.0)
+            .press_scale(0.98)
+            .cursor(rune::Cursor::Pointer)
+            .on_press(move |s: &mut State| s.play_live_channel(play.clone()))
+            .child(
+                row()
+                    .gap(8.0)
+                    .items_center()
+                    .child(
+                        text("● LIVE")
+                            .font(type_::caption())
+                            .color(tok::accent(2, true)),
+                    )
+                    .child(
+                        text(format!("#{number}"))
+                            .font(type_::mono_caption())
+                            .color(t.text_secondary),
+                    ),
+            )
+            .child(
+                text(channel.name.clone())
+                    .font(type_::title())
+                    .color(t.text)
+                    .truncate(),
+            )
+            .child(
+                text(program)
+                    .font(type_::meta())
+                    .color(t.text_secondary)
+                    .truncate(),
+            );
+        rail = rail.child(report_focused_rect(tile, s, &card_key));
     }
     col()
         .key("rail-on-now")

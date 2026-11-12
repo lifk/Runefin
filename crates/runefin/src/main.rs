@@ -4795,6 +4795,42 @@ mod tests {
     }
 
     #[test]
+    fn a_live_channel_tile_takes_the_halo_too() {
+        // Home's On now tiles are cards like any other: the halo, not just the hover wash.
+        let env = Env {
+            system_dark: true,
+            scale: 1.5,
+        };
+        let mut state = home_state();
+        state.big_screen = true;
+        state.route = Route::Home;
+        let channel = state
+            .home_data
+            .on_now
+            .first()
+            .expect("the demo has a live channel")
+            .id
+            .clone();
+        let mut rt = Runtime::new(state, view, (1280.0, 720.0), env);
+        rt.frame(0.0);
+        let key = format!("rail-on-now-{channel}");
+        rt.state.note_focus(key.clone());
+        rt.update(|_, tx| tx.focus_key(key.clone()));
+        let mut t = 0.0;
+        for _ in 0..6 {
+            t += 0.016;
+            rt.frame(t);
+        }
+        let drawn = rt.presented(&key).expect("the tile is drawn");
+        assert_eq!(
+            rt.state.focused_card_rect,
+            Some(drawn.0),
+            "the tile reports the rect the halo paints at"
+        );
+        assert!(rt.find("focus-glow").is_some(), "the halo is drawn");
+    }
+
+    #[test]
     fn the_search_field_leaves_down_for_its_results() {
         let env = Env {
             system_dark: true,

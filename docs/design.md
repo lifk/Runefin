@@ -418,7 +418,8 @@ halo is painted at the window root, outside any rail scroll clip, so all four si
 focused card hands the window its drawn rect for as long as it holds focus: Rune reports a
 stationary element only on its first draw, so a card that kept the handler would never report
 again and the halo would stay gone after a sideways step in a rail with nothing to scroll. Other
-controls take the pointer's `t.hover` wash. Focus reads like hover rather than a selection box. Return activation comes from `set_return_activates`, so a CEC
+controls take the pointer's `t.hover` wash. The live channel tiles in Home's On now rail are
+cards too, so they carry the wash and the halo. Focus reads like hover rather than a selection box. Return activation comes from `set_return_activates`, so a CEC
 remote's Select/OK reaches the same control. Desktop keeps its accent ring. The light theme uses a light text
 halo over artwork, and the selected nav pill uses dark text on the blue fill. D-pad and the left
 stick move focus (400 ms then 80 ms repeats), A is Space —
