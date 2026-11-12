@@ -93,15 +93,17 @@ Ordered by value per hour for this app. Nothing here needs a fork patch.
 
 ## Applied in the second pass (2026-11-12)
 
-- **Pin**: `3fd8f44f`; the fork also carries the halo fix (below).
+- **Pin**: `3fd8f44f`, unchanged by this pass: everything here is app-side.
 - **Accessibility**: feature on (`accesskit` crates), four controls named (`sidebar-toggle`, the
   player's video area, its scrim, the gear sheet), the timeline and volume slider report as
   sliders, the end card announces once, and `every_screen_names_every_control` pins all of it.
   `docs/design.md` gained the rule-5 line; `docs/accessibility.md` a "Screen readers" section.
-- **Duplicate matched ids**: gone. `card()` now names its shared id by rail
-  (`poster-{rail}-{id}`) and `open_detail_from_card` carries the pressed card's id into the detail
-  poster, so the flight starts where the press was. `a_card_hands_the_detail_its_own_shared_id`
-  pins it, and the four stderr warnings on every Home render are gone.
+- **Duplicate matched ids**: gone. A card's shared id is its own key
+  (`poster-{rail}-{item-key}`), which is unique even when two rails show one series or a search
+  rail holds two episodes of it, and `open_detail_from_card` carries the pressed card's id into
+  the detail poster, so the flight starts where the press was.
+  `a_card_hands_the_detail_its_own_shared_id` pins it, and the warnings on every Home render and
+  in the search screen are gone.
 - **Subtitle Serif**: a family list through fontconfig instead of one face.
 - **Not done, needs the live app**: the `RUNE_PERF_WARN` / `RUNE_REGION_MISS` audit, which wants a
   real window and a session, and the `caret-blink` pick (it would add a permanent fork patch for a
