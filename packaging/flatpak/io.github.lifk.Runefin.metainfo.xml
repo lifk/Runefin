@@ -42,6 +42,23 @@
   </screenshots>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.1.36" date="2026-11-12">
+      <description>
+        <p>
+          Faster everywhere it is felt: a launch reaches its first frame in about a tenth of a
+          second, Home paints the rails you had last time while the server answers instead of a
+          skeleton (about 125 ms rather than 600), Continue Watching arrives before the
+          recently-added rails on a cold start, and pressing Play on a part-watched item shows
+          the picture in about a third of a second instead of one and a half. The screen-reader
+          tree is now published to the desktop's accessibility API, with the player's timeline
+          and volume as sliders and the end-of-episode card announced once. The card halo on the
+          big screen no longer disappears after a sideways move, and it now covers Home's live
+          channel tiles. Underneath, Rune's engine moved 418 upstream changes forward: fallback
+          fonts through fontconfig, colour emoji, bidirectional text, faster image decoding and
+          the virtual-list and paint fixes.
+        </p>
+      </description>
+    </release>
     <release version="0.1.35" date="2026-11-12">
       <description>
         <p>
