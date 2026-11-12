@@ -811,7 +811,11 @@ fn hero(s: &State, detail: &DetailState, t: &tok::Theme) -> El {
         .radius(12.0)
         .clip_rounded(12.0)
         .fill(t.card)
-        .matched(format!("poster-{}", detail.item.id))
+        .matched(
+            s.detail_match_id
+                .clone()
+                .unwrap_or_else(|| format!("poster-{}", detail.item.id)),
+        )
         .child(poster);
 
     let title = s

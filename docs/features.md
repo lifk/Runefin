@@ -332,7 +332,19 @@ separate window. `scripts/check.sh` builds it; the player's contract is
   fallback when that download fails.
 - Missing scores leave a compact link/empty badge rather than a zero.
 
-## 11. Desktop integration
+## 11. Accessibility
+
+- Every window and overlay is published to the desktop's accessibility API (AT-SPI on Linux,
+  through Rune's `accessibility` feature): roles, names, values, focus, checked/expanded states and
+  scroll viewports, built from the elements the app already draws.
+- Icon-only controls carry a label ("Expand sidebar", "Video", "Close player settings"). The
+  timeline reports as a slider with "12:34 of 48:00" and a numeric range, and so does the volume
+  slider; the end-of-episode card is announced once through a polite live region.
+- Reduced motion, text size 85–130 %, high contrast, remappable keys, audio-description and SDH
+  badges, and text-only capability badges are the non-screen-reader half of the story; see
+  `docs/accessibility.md`.
+
+## 12. Desktop integration
 
 - **Fullscreen** from `F11` or the OSD chip (§2).
 - **MPRIS2** on the session bus: identity, PlaybackStatus, title/series/album, length,
@@ -348,7 +360,7 @@ separate window. `scripts/check.sh` builds it; the player's contract is
   VA-API stack. On a Steam Machine the config lives at
   `~/.var/app/io.github.lifk.Runefin/config/runefin/config.toml`.
 
-## 12. Configuration and storage
+## 13. Configuration and storage
 
 - `~/.config/runefin/config.toml` (0600): server, token, user, device id, subtitle/audio
   preferences, text size, player shortcuts, desktop-notification opt-in, live reminders,
@@ -372,7 +384,7 @@ separate window. `scripts/check.sh` builds it; the player's contract is
   choosing; "Continue on…" sends the current position to another session and stops locally only
   after the server accepts.
 
-## 13. Requests and discovery (Seerr)
+## 14. Requests and discovery (Seerr)
 
 The optional Seerr/Jellyseerr companion is a second service, not a second media server. Settings
 holds the address, the masked admin key and an optional user id; **Test** proves `/status` and
@@ -408,7 +420,7 @@ holds the address, the masked admin key and an optional user id; **Test** proves
 - Polling is 5 s and only while the Requests tab is visible; leaving stops it. No background
   poll, no web view, no async runtime.
 
-## 14. Limits and deliberate non-features
+## 15. Limits and deliberate non-features
 
 | Limit | Why |
 |---|---|
@@ -462,7 +474,7 @@ keys the player already uses.
 ```sh
 cargo test -p jellyfin-api        # 45 API tests, no network
 cargo test -p seerr-api           # 25 Seerr API tests, no network
-cargo test -p runefin             # 406 app tests (22 ignored), headless
+cargo test -p runefin             # 409 app tests (22 ignored), headless
 scripts/check.sh                  # fmt, clippy, all three suites, release build
 scripts/snapshots.sh              # the committed views, in place
 JELLYFIN_URL=... JELLYFIN_USER_ID=... JELLYFIN_TOKEN=... \

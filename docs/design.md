@@ -501,6 +501,15 @@ the image track itself is extracted with the system `ffmpeg`. Both additions are
 because rule 5 asks for a line, and neither pulls an async runtime, a web view or a second
 render stack.
 
+**Accessibility.** Rune's `accessibility` feature (the `accesskit` crates) is on: on Linux it
+publishes the element tree to AT-SPI over D-Bus on its own thread, and only while the desktop's
+accessibility bus is running. Roles, names, values and states come from the elements the app
+already builds — a button's text, or an icon-only control's `label` — so there is no second tree
+to keep in step, and `--tree` / `Runtime::accessibility_json` read the same one in tests. The
+timeline and the volume slider report as sliders with a value and a range; the end card is
+announced once through a polite live region. Nothing is drawn differently: accessibility moves no
+pixels. It adds no async runtime, web view or render stack.
+
 **Controller input.** `gilrs` 0.11 (`crates/runefin/src/pad.rs`) is the one input dependency: a
 worker thread polls it and injects the same `KeyEvent`s the keyboard sends through Rune's
 `AppHandle::key`, so focus, shortcuts and the player keep one input path and the UI thread never

@@ -1023,6 +1023,11 @@ pub(super) fn sidebar(s: &State, t: &tok::Theme) -> El {
     } else {
         el().key("sidebar-toggle")
             .role("button")
+            .label(if collapsed {
+                "Expand sidebar"
+            } else {
+                "Collapse sidebar"
+            })
             .w(28.0)
             .h(28.0)
             .radius(7.0)
@@ -2519,7 +2524,10 @@ pub(super) fn card(item: &Item, rail: &str, s: &State, t: &tok::Theme) -> El {
     };
     let focus_key = format!("{rail}-{key_id}");
     let detail_id = item.series_id.clone().unwrap_or_else(|| item.id.clone());
-    let match_id = format!("poster-{detail_id}");
+    // The card's own key is the shared-element id: the same series can sit in two rails, and a
+    // search rail can hold two episodes of one series, while Rune matches the last id in tree
+    // order. The detail page takes the pressed card's id through `open_detail_from_card`.
+    let match_id = format!("poster-{focus_key}");
     let press_id = detail_id.clone();
     let key = s.image_key(item);
     let poster = key
@@ -2535,7 +2543,7 @@ pub(super) fn card(item: &Item, rail: &str, s: &State, t: &tok::Theme) -> El {
         .inset_edge()
         .outline(1.0, 0.0, t.card_border)
         .shadow(10.0, 24.0, t.shadow_soft)
-        .matched(match_id)
+        .matched(match_id.clone())
         .child(
             el().absolute(0.0, 0.0)
                 .w_full()
@@ -2925,7 +2933,10 @@ pub(super) fn card(item: &Item, rail: &str, s: &State, t: &tok::Theme) -> El {
         .motion(motion::SNAPPY)
         .label(title.to_string())
         .cursor(rune::Cursor::Pointer)
-        .on_press(move |s: &mut State| s.open_detail(press_id.clone()))
+        .on_press({
+            let match_id = match_id.clone();
+            move |s: &mut State| s.open_detail_from_card(press_id.clone(), match_id.clone())
+        })
         .on_secondary_press({
             let item = item.clone();
             let focus_key = focus_key.clone();

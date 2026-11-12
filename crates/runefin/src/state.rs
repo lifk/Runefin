@@ -423,6 +423,12 @@ pub struct State {
     /// IMDb is not in Jellyfin's schema; it comes from OMDb when a key is configured.
     pub detail_imdb: Option<f64>,
     detail_imdb_for: Option<String>,
+    /// The pressed card's shared-element id, so its poster flies to the detail page's poster even
+    /// when another rail shows the same series (`card` names its id per rail).
+    pub detail_match_id: Option<String>,
+    /// The end card has been read aloud once for this episode (`Tx::announce`), so a reader hears
+    /// "Up next" when it opens without hearing it again every frame.
+    pub next_up_announced: bool,
     /// Special features for the open detail page.
     pub detail_extras: Vec<Item>,
     /// Collections this item belongs to.
@@ -843,6 +849,8 @@ impl State {
             detail_notice: None,
             detail_imdb: None,
             detail_imdb_for: None,
+            detail_match_id: None,
+            next_up_announced: false,
             detail_extras: Vec::new(),
             detail_collections: Vec::new(),
             detail_collections_for: None,
@@ -4613,6 +4621,8 @@ mod tests {
             detail_notice: None,
             detail_imdb: None,
             detail_imdb_for: None,
+            detail_match_id: None,
+            next_up_announced: false,
             detail_extras: Vec::new(),
             detail_collections: Vec::new(),
             detail_collections_for: None,

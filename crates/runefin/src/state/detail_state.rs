@@ -6,6 +6,19 @@ impl State {
     /// Open a detail page from a card, remembering where to return. A card for an episode opens
     /// its series, which is the page with seasons and the next-up row.
     pub fn open_detail(&mut self, id: String) {
+        self.detail_match_id = None;
+        self.open_detail_inner(id);
+    }
+
+    /// A card opened a detail page: its poster flies to the page's poster as one shared element
+    /// (`El::matched`). The id names the card's rail too, because the same series can sit in two
+    /// rails and Rune matches the last id in tree order.
+    pub fn open_detail_from_card(&mut self, id: String, match_id: String) {
+        self.open_detail_inner(id);
+        self.detail_match_id = Some(match_id);
+    }
+
+    fn open_detail_inner(&mut self, id: String) {
         if matches!(self.route, Route::Detail { .. }) {
             // Opening a collection member from the collection page: remember the parent so
             // Back returns to it instead of skipping to the library.

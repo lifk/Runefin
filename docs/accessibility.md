@@ -61,6 +61,27 @@ Anything not listed here is not claimed.
   across all 121 snapshots. The visible focus ring is present; the numeric contrast record is
   still a follow-up.
 
+## Screen readers
+
+- Rune's `accessibility` feature is on (`crates/runefin/Cargo.toml`), so every window and overlay
+  is published to AT-SPI on Linux through AccessKit, on its own thread and only while the
+  desktop's accessibility bus runs. Nothing is built until a client asks.
+- Names come from what the app already draws: a control's text, or the `label` on an icon-only
+  one (the sidebar toggle, the player's video area, the gear sheet's scrim). Where a control's
+  meaning is not its text, the label says it: "Expand sidebar", "Close player settings", "Video".
+- Values: the player's timeline is a `slider` with a spoken "12:34 of 48:00" and a numeric range
+  in seconds; the volume slider reports its level and range the same way. Toggles expose
+  `checked`, panels `expanded`.
+- The end-of-episode card is announced once per episode through a polite live region ("Up next:
+  S2E03 · Who Is Awake?"), not once per frame.
+- `every_screen_names_every_control` walks the tree (`Runtime::accessibility_json`) for Home,
+  Settings, Search, a library, Detail, a person, Live TV, Remote, Seerr, the player and its gear
+  sheet, and fails naming any interactive node with no accessible name. It also pins the
+  timeline's slider role and range.
+- **Not yet:** announcements for toasts, the still-watching countdown and the scrub preview;
+  a keyboard-only pass that drives adjustments through slider actions (`El::on_step`); and a
+  screen-reader walk of the live app, which needs a desktop with Orca running.
+
 ## Tests
 
 - `reduced_motion` is exercised through the setting and the theme-video guard.
@@ -69,3 +90,5 @@ Anything not listed here is not claimed.
   text badges are rendered and addressable.
 - `the_text_size_preference_scales_size_and_leading_together` checks the scale maths, and
   `shortcuts_can_be_remapped_but_not_duplicated` checks remapping and duplicate refusal.
+- `every_screen_names_every_control` and `the_end_card_is_read_aloud_once` cover the tree and its
+  one announcement.

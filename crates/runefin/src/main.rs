@@ -230,6 +230,21 @@ fn poll(s: &mut State, _clock: f64, tx: &mut Tx) -> bool {
         tx.focus_key(key);
         changed = true;
     }
+    // The end card is a picture of the next episode: a screen reader hears it open once. The
+    // card's own title is on screen, so this is the spoken form of the same news.
+    let end_card = s.osd_visible && s.next_up_eligible();
+    if end_card && !s.next_up_announced {
+        s.next_up_announced = true;
+        if let Some(next) = s.in_app_next.as_ref() {
+            let title = next
+                .episode_label()
+                .map(|label| format!("{label} · {}", next.name))
+                .unwrap_or_else(|| next.name.clone());
+            tx.announce(format!("Up next: {title}"), rune::LiveRegion::Polite);
+        }
+    } else if !end_card {
+        s.next_up_announced = false;
+    }
     if let Some(fullscreen) = s.pending_fullscreen.take() {
         tx.set_fullscreen(fullscreen);
     }
@@ -4792,6 +4807,202 @@ mod tests {
                 "step {step}: the halo is drawn"
             );
         }
+    }
+
+    /// Every control a reader can reach, named. Rune builds the tree from labels, roles and the
+    /// text inside; an icon-only button or a bare press area is silent without a name.
+    #[test]
+    fn every_screen_names_every_control() {
+        fn walk(node: &serde_json::Value, out: &mut Vec<String>) {
+            if let Some(role) = node["role"].as_str() {
+                let interactive = matches!(
+                    role,
+                    "button"
+                        | "link"
+                        | "check box"
+                        | "radio button"
+                        | "slider"
+                        | "combo box"
+                        | "tab"
+                        | "menu item"
+                        | "switch"
+                        | "scroll bar"
+                );
+                let named = node["name"]
+                    .as_str()
+                    .is_some_and(|name| !name.trim().is_empty())
+                    || node["value"]
+                        .as_str()
+                        .is_some_and(|value| !value.trim().is_empty());
+                if interactive && !named {
+                    out.push(format!(
+                        "{role} key={:?} bounds={}",
+                        node["key"].as_str().unwrap_or("-"),
+                        node["bounds"]
+                    ));
+                }
+            }
+            for child in node["children"].as_array().into_iter().flatten() {
+                walk(child, out);
+            }
+        }
+        let env = Env {
+            system_dark: true,
+            scale: 1.5,
+        };
+        type Setup = (&'static str, fn(&mut State));
+        let screens: Vec<Setup> = vec![
+            ("home", |_s: &mut State| {}),
+            ("settings", |s: &mut State| s.route = Route::Settings),
+            ("search", |s: &mut State| {
+                s.route = Route::Search { scope: None }
+            }),
+            ("library", |s: &mut State| {
+                let library = demo::library(12);
+                s.route = Route::Library {
+                    id: library.id.clone(),
+                };
+                s.library = Some(library);
+            }),
+            ("detail", |s: &mut State| {
+                s.route = Route::Detail {
+                    id: "quiet-floor".into(),
+                };
+                s.detail_return = Route::Home;
+                s.detail = Some(demo::detail());
+            }),
+            ("person", |s: &mut State| {
+                s.route = Route::Person {
+                    id: "person-1".into(),
+                };
+                s.person = Some(demo::person());
+            }),
+            ("live-tv", |s: &mut State| s.route = Route::LiveTv),
+            ("remote", |s: &mut State| s.route = Route::Remote),
+            ("seerr", crate::seerr_scene),
+            ("in-app", |s: &mut State| {
+                s.in_app = Some(demo::in_app());
+                s.osd_visible = true;
+            }),
+            ("in-app-gear", |s: &mut State| {
+                s.in_app = Some(demo::in_app());
+                s.osd_visible = true;
+                s.in_app_gear_open = true;
+            }),
+        ];
+        let mut failures = Vec::new();
+        for (name, setup) in screens {
+            let mut state = home_state();
+            setup(&mut state);
+            let mut rt = Runtime::new(state, view, (1280.0, 720.0), env);
+            rt.on_key = Some(on_key);
+            rt.frame(0.0);
+            let json = rt.accessibility_json();
+            let mut unnamed = Vec::new();
+            walk(&json, &mut unnamed);
+            for line in unnamed {
+                failures.push(format!("{name}: {line}"));
+            }
+            if name == "in-app" {
+                // The timeline is the one control a reader adjusts rather than presses.
+                let seek = find_key(&json, "in-app-seek").expect("the timeline is in the tree");
+                assert_eq!(seek["role"], "slider", "the timeline reads as a slider");
+                assert!(
+                    seek["range"].is_array(),
+                    "the timeline reports its position and length"
+                );
+            }
+        }
+        assert!(
+            failures.is_empty(),
+            "controls with no accessible name:\n{}",
+            failures.join("\n")
+        );
+    }
+
+    fn find_key<'a>(node: &'a serde_json::Value, key: &str) -> Option<&'a serde_json::Value> {
+        if node["key"].as_str() == Some(key) {
+            return Some(node);
+        }
+        node["children"]
+            .as_array()?
+            .iter()
+            .find_map(|child| find_key(child, key))
+    }
+
+    #[test]
+    fn the_end_card_is_read_aloud_once() {
+        let env = Env {
+            system_dark: true,
+            scale: 1.5,
+        };
+        let mut state = home_state();
+        state.big_screen = true;
+        let mut session = demo::in_app();
+        session.position_ms = 47 * 60_000 + 40_000;
+        session.player = crate::player::Player::preview_at(session.position_ms);
+        state.in_app = Some(session);
+        state.in_app_next = Some(demo::next_episode());
+        state.osd_visible = true;
+        let mut rt = Runtime::new(state, view, (1280.0, 720.0), env);
+        rt.on_key = Some(on_key);
+        rt.poll = Some(poll);
+        for step in 0..4 {
+            rt.frame(step as f64 * 0.016);
+        }
+        assert!(rt.state.next_up_announced, "the card has been announced");
+        let json = rt.accessibility_json();
+        let said = find_role(&json, "status").expect("the live region is in the tree");
+        let words = said["name"].as_str().unwrap_or("");
+        assert!(
+            words.contains("Up next: S2E03") && words.contains("Who Is Awake?"),
+            "a reader hears the card: {words:?}"
+        );
+        // It is news, not a tick: a second frame does not repeat it.
+        rt.frame(0.064);
+        assert!(rt.state.next_up_announced);
+    }
+
+    fn find_role<'a>(node: &'a serde_json::Value, role: &str) -> Option<&'a serde_json::Value> {
+        if node["role"].as_str() == Some(role) {
+            return Some(node);
+        }
+        node["children"]
+            .as_array()?
+            .iter()
+            .find_map(|child| find_role(child, role))
+    }
+
+    #[test]
+    fn a_card_hands_the_detail_its_own_shared_id() {
+        // Home can show one series in two rails. The card names its shared id by rail, and the
+        // detail poster takes the pressed card's, so the flight starts at the card that was
+        // pressed rather than the last one in tree order.
+        let env = Env {
+            system_dark: true,
+            scale: 1.5,
+        };
+        let mut state = home_state();
+        state.big_screen = true;
+        let mut rt = Runtime::new(state, view, (1280.0, 720.0), env);
+        rt.on_key = Some(on_key);
+        rt.frame(0.0);
+        let key = "rail-next-up-quiet-floor".to_string();
+        assert!(rt.find(&key).is_some(), "the next-up card is drawn");
+        rt.state.note_focus(key.clone());
+        rt.update(|_, tx| tx.focus_key(key));
+        rt.frame(0.016);
+        rt.key(KeyEvent {
+            key: Key::Text(" ".into()),
+            mods: Default::default(),
+        });
+        rt.frame(0.032);
+        assert!(rt.state.detail.is_some(), "the detail page opened");
+        assert_eq!(
+            rt.state.detail_match_id.as_deref(),
+            Some("poster-rail-next-up-quiet-floor"),
+            "the pressed card's rail travels with the poster"
+        );
     }
 
     #[test]

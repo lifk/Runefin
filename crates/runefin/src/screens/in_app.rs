@@ -82,6 +82,7 @@ pub(super) fn in_app_screen(s: &State) -> El {
     };
     let mut video = el()
         .key("in-app-video")
+        .label("Video")
         .native_surface(session.player.surface(), fit)
         // A player hides the pointer with its chrome; any move brings both back.
         .cursor(if s.osd_visible {
@@ -751,7 +752,11 @@ fn cue_box(s: &State, cue: &crate::subtitles::Cue, size: f32, window_h: f32, key
     let color_authored = ass || cue.color_explicit;
     let family = match s.subtitle_font {
         crate::config::SubtitleFont::Sans => rune::Family::Sans,
-        crate::config::SubtitleFont::Serif => rune::Family::Named("DejaVu Serif"),
+        // A CSS-style list, tried in order before the sans slot: a minimal install may carry any
+        // one of these, and fontconfig resolves the generic name on the way out.
+        crate::config::SubtitleFont::Serif => {
+            rune::Family::Named("DejaVu Serif, Liberation Serif, Noto Serif, FreeSerif, serif")
+        }
         crate::config::SubtitleFont::Mono => rune::Family::SystemMono,
     };
     let mut style = rune::TextStyle::new(px, if bold { 700.0 } else { 600.0 })
@@ -2447,6 +2452,8 @@ fn volume_slider(s: &State, t: &tok::Theme) -> El {
         .key("in-app-volume-slider")
         .role("slider")
         .label(format!("Volume {}%", (s.in_app_volume * 100.0).round()))
+        .range_value(s.in_app_volume, 0.0, 1.0)
+        .range_step(0.05)
         .w(width)
         .h(24.0)
         .justify_center()
@@ -2534,8 +2541,26 @@ fn seek_bar(s: &State, session: &crate::state::InAppSession, progress: f32, t: &
     let knob_x = (s.in_app_seek_width * progress - knob / 2.0)
         .clamp(0.0, (s.in_app_seek_width - knob).max(0.0));
     let knob_y = 24.0 - track / 2.0 - knob / 2.0;
+    let duration_ms = session.duration_ms.unwrap_or(0).max(0);
+    let position_ms = session
+        .scrub_ms
+        .unwrap_or(session.position_ms)
+        .clamp(0, duration_ms.max(0));
     let bar = el()
         .key("in-app-seek")
+        .role("slider")
+        .label("Seek")
+        .a11y_value(format!(
+            "{} of {}",
+            format_time(position_ms),
+            format_time(duration_ms)
+        ))
+        .range_value(
+            position_ms as f64 / 1000.0,
+            0.0,
+            duration_ms as f64 / 1000.0,
+        )
+        .range_step(10.0)
         .w_full()
         .h(24.0)
         .focusable(true)
@@ -3050,6 +3075,8 @@ fn gear_panel(s: &State, t: &tok::Theme) -> El {
         );
 
     el().key("in-app-gear-layer")
+        .role("button")
+        .label("Close player settings")
         .absolute(0.0, 0.0)
         .w_full()
         .h_full()

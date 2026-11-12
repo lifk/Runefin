@@ -81,32 +81,48 @@ Ordered by value per hour for this app. Nothing here needs a fork patch.
 
 | # | Change | What it buys | Effort |
 |---|---|---|---|
-| 1 | `rune::prewarm_gpu()` in `main` | Our own frame logs show 105–283 ms of GPU init before the first frame, on the same thread that then reads config, credentials and the first view. Prewarm overlaps it with that work | One call; measure with the debug frame log |
-| 2 | Add Rune's `accessibility` feature (currently **off**: the app builds `default-features = false`) | `accesskit_unix` exposes the tree to AT-SPI, plus `label`, `description`, `a11y_value`, `range_value`, `checked`, `live_region` and `Tx::announce`. The fork's `default` list includes it; our feature list does not | One feature + a line in `docs/design.md` (rule 5, new dependency); names are mostly the visible text |
-| 3 | Audit with upstream's debug tools: `RUNE_PERF_WARN=1`, `RUNE_REGION_MISS=1`, `RUNE_FRAME_LOG=1` | Names a `poll` that reports change with nothing changing, a window drawing 120 frames in 2 s idle, a memo/region that rebuilds, and the stages of a slow launch. A TV that burns frames while resting is the worst case for a media box | Hours, no API |
-| 4 | Give every control an accessible name, then pin it with a test over `Runtime::accessibility_json` | Makes the a11y tree honest rather than present; the test catches an icon-only button that loses its label | Small, test-driven |
+| 1 | ~~`rune::prewarm_gpu()` in `main`~~ | **Already done by Rune**: `run_configured` calls `prewarm_gpu()` before it builds the event loop (`window/event_loop.rs:65`), so GPU init already overlaps winit setup and window creation. The app's own call would only cover the few milliseconds of config reading and `App::new` before `run`. No action | — |
+| 2 | Rune's `accessibility` feature | **Applied**: `accesskit_unix` publishes the tree to AT-SPI, the four unnamed controls are named, the timeline and volume read as sliders with ranges, and the end card announces once | Done |
+| 3 | Audit with upstream's debug tools: `RUNE_PERF_WARN=1`, `RUNE_REGION_MISS=1`, `RUNE_FRAME_LOG=1` | Names a `poll` that reports change with nothing changing, a window drawing 120 frames in 2 s idle, a memo/region that rebuilds, and the stages of a slow launch. A TV that burns frames while resting is the worst case for a media box | Hours, no API; needs a live window |
+| 4 | Give every control an accessible name, then pin it with a test | **Applied**: `every_screen_names_every_control` walks eleven screens and fails on any unnamed interactive node | Done |
 | 5 | `El::enter_delay` + `rune::Stagger` for rails and sheets that mount many rows at once | Rows enter in sequence instead of together; it holds the whole entrance (offset, fade, blur) on one progress, and respects Reduce Motion | Small; snapshots move |
 | 6 | `El::hover_alone` on the play/press affordance inside a poster; `El::animated_changes` around the OSD | A pointer on the play badge no longer lights the whole card; the OSD keeps its own reveal while the page under it animates | Small |
 | 7 | `Tracked` fields and `region_with` for the home and library screens | Upstream's regions rebuild only when a value they read changed. The app has one large `State`; this is the incremental way to stop rebuilding whole screens for one unrelated field | Large; per-screen, measurable with `RUNE_REGION_MISS` |
-| 8 | `Family::Named` CSS-list for the subtitle Serif slot; `set_font_families` if a UI font setting ever ships; `font_epoch` in any measurement cache | Serif currently names one face (`DejaVu Serif`) that a minimal install may not have; a list plus fontconfig falls through. `set_font_families` switches the UI's Sans/Mono at runtime | Small |
+| 8 | `Family::Named` CSS-list for the subtitle Serif slot; `set_font_families` if a UI font setting ever ships; `font_epoch` in any measurement cache | **Applied** for Serif: `"DejaVu Serif, Liberation Serif, Noto Serif, FreeSerif, serif"` falls through on a minimal install. `set_font_families` stays unused until the app offers a UI font | Done / small |
 | 9 | `El::stuck_reveal` for the library toolbar | The sort/filter row stays visible while the grid scrolls (deferred in review 13 as an optional design change; still optional) | Medium; a design decision |
+
+## Applied in the second pass (2026-11-12)
+
+- **Pin**: `3fd8f44f`; the fork also carries the halo fix (below).
+- **Accessibility**: feature on (`accesskit` crates), four controls named (`sidebar-toggle`, the
+  player's video area, its scrim, the gear sheet), the timeline and volume slider report as
+  sliders, the end card announces once, and `every_screen_names_every_control` pins all of it.
+  `docs/design.md` gained the rule-5 line; `docs/accessibility.md` a "Screen readers" section.
+- **Duplicate matched ids**: gone. `card()` now names its shared id by rail
+  (`poster-{rail}-{id}`) and `open_detail_from_card` carries the pressed card's id into the detail
+  poster, so the flight starts where the press was. `a_card_hands_the_detail_its_own_shared_id`
+  pins it, and the four stderr warnings on every Home render are gone.
+- **Subtitle Serif**: a family list through fontconfig instead of one face.
+- **Not done, needs the live app**: the `RUNE_PERF_WARN` / `RUNE_REGION_MISS` audit, which wants a
+  real window and a session, and the `caret-blink` pick (it would add a permanent fork patch for a
+  desktop-only caret; better asked upstream).
 
 ## Findings about our own code, from running the new pin
 
-- **Duplicate matched ids on Home.** Every Home render prints, in a debug build:
+- **Duplicate matched ids on Home** (fixed above). Every Home render printed, in a debug build:
   `duplicate matched id "poster-quiet-floor" … give each element its own id` (also
   `poster-service`, `poster-long-orbit`, `poster-harbour`). Two rails show the same series, and
   `screens.rs` matches both on `poster-{id}`. Rune matches the last in tree order, so the flight
   from a card to a detail page can start at the other rail's copy. Fix: a rail suffix on the
   card's id and the origin carried into the detail's poster. Today it is a warning and a
   wrong-origin flight, not a broken screen.
-- **Accessibility is compiled out.** `crates/runefin/Cargo.toml` asks for
+- **Accessibility is compiled out** (fixed above). `crates/runefin/Cargo.toml` asked for
   `default-features = false, features = ["embedded-fonts", "svg", "dbus"]`; upstream's `accessibility`
   is a default feature, so it is off here. The tree exists either way (`--tree`,
   `Runtime::accessibility_tree`), the platform adapter does not.
 - **Startup budget.** Debug first frame on `home` is 406 ms with 140 ms of GPU init; the snapshot
-  views report 105–283 ms of GPU init each. Discount the debug factor, but prewarm is free money
-  on a TV that boot-loops through its own updater.
+  views report 105–283 ms of GPU init each. The snapshot path discards the prewarm, so those
+  numbers are the cold path, not what a window pays.
 - **The end-card test depended on wall clock.** Fixed here; the pattern to avoid is injecting a
   session position without the player clock that `poll` reads.
 
