@@ -53,7 +53,7 @@ screen() {
     shift
     if env "$@" "$bin" --snap "/tmp/runefin-bench-$name.png" --live --wait 3 \
         --size 1280x800 --scale 2 2>&1 |
-        grep -E "^bench (landed|net (libraries|resume|home.total)|frame (update|metric text\.(glyphs|raster_ns)))|layout nodes"; then
+        grep -E "^bench (landed|net (libraries|resume|rails|watching|recently_played)|frame (update|metric text\.(glyphs|raster_ns)))|layout nodes"; then
         :
     fi
 }

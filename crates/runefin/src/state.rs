@@ -16,7 +16,7 @@ use crate::config::{
 };
 use crate::detail::{DetailPage, DetailState, EpisodesPage};
 use crate::handoff::PlaybackHandle;
-use crate::home::{HomeData, HomeLoad};
+use crate::home::{HomeData, HomeRails};
 use crate::library::{
     LibraryCounts, LibraryFacets, LibraryFilter, LibraryPage, LibraryRequest, LibraryState,
     SortMode, ViewMode,
@@ -365,7 +365,11 @@ pub struct State {
     pub password: TextEdit,
     pub step: Step,
     pub worker: Worker,
-    pub home: Latest<HomeLoad>,
+    /// Continue Watching alone: it lands first and lets the screen paint while the rails are
+    /// still in flight.
+    home_watching: Latest<Result<Vec<Item>, String>>,
+    /// The libraries and their Recently Added rails, which land after Continue Watching.
+    home_rails: Latest<Result<HomeRails, String>>,
     pub home_data: HomeData,
     home_next_up: Latest<Vec<Item>>,
     home_on_now: Latest<Vec<Item>>,
@@ -826,7 +830,8 @@ impl State {
             password: TextEdit::new("").secure(),
             step,
             worker: Worker::new(),
-            home: Latest::default(),
+            home_watching: Latest::default(),
+            home_rails: Latest::default(),
             home_data: HomeData::default(),
             home_next_up: Latest::default(),
             home_on_now: Latest::default(),
@@ -1833,7 +1838,8 @@ impl State {
         self.history_ms = self.history.iter().map(|entry| entry.played_ms).sum();
         self.waker = Some(waker.clone());
         self.worker.set_waker(waker.clone());
-        self.home.set_waker(waker.clone());
+        self.home_watching.set_waker(waker.clone());
+        self.home_rails.set_waker(waker.clone());
         self.queue_load.set_waker(waker.clone());
         self.playlist_remove_load.set_waker(waker.clone());
         self.playlists_load.set_waker(waker.clone());
@@ -1841,6 +1847,8 @@ impl State {
         self.collection_choices_load.set_waker(waker.clone());
         self.collection_add_load.set_waker(waker.clone());
         self.playlist_create_load.set_waker(waker.clone());
+        self.home_watching.set_waker(waker.clone());
+        self.home_rails.set_waker(waker.clone());
         self.home_next_up.set_waker(waker.clone());
         self.home_on_now.set_waker(waker.clone());
         self.home_recently_played.set_waker(waker.clone());
@@ -2027,9 +2035,22 @@ impl State {
         for message in messages {
             self.apply(message);
         }
-        if let Some(load) = self.home.take() {
-            self.apply_home(load);
+        if let Some(watching) = self.home_watching.take() {
             changed = true;
+            match watching {
+                Ok(items) => self.apply_watching(items),
+                Err(message) => self.home_failed(message),
+            }
+        }
+        if let Some(rails) = self.home_rails.take() {
+            changed = true;
+            match rails {
+                Ok(rails) => self.apply_rails(rails),
+                Err(message) => self.home_failed(message),
+            }
+            // The slowest home query (337 ms against this server), and its rail is the last one:
+            // asking for it after the rails land keeps it out of the first paint's way.
+            self.load_recently_played();
         }
         if let Some((items, shuffle)) = self.queue_load.take() {
             if !items.is_empty() {
@@ -2548,15 +2569,18 @@ impl State {
         let now = crate::home::now_days();
         let next_client = client.clone();
         let on_now_client = client.clone();
-        let played_client = client.clone();
         let collections_client = client.clone();
-        self.home.request((), move |()| {
+        let watching_client = client.clone();
+        self.home_watching.request((), move |()| {
             let t = crate::bench::timer();
-            let answer = match crate::home::load(&client, now) {
-                Ok(data) => HomeLoad::Ready(data),
-                Err(message) => HomeLoad::Failed(message),
-            };
-            crate::bench::lap("home.total", t);
+            let answer = crate::home::load_watching(&watching_client, now);
+            crate::bench::lap("watching", t);
+            answer
+        });
+        self.home_rails.request((), move |()| {
+            let t = crate::bench::timer();
+            let answer = crate::home::load_rails(&client);
+            crate::bench::lap("home.rails", t);
             answer
         });
         // In parallel with the rest: this query is the slowest one on a large library, and it
@@ -2571,12 +2595,6 @@ impl State {
             let t = crate::bench::timer();
             let answer = crate::home::load_on_now(&on_now_client);
             crate::bench::lap("on_now", t);
-            answer
-        });
-        self.home_recently_played.request((), move |()| {
-            let t = crate::bench::timer();
-            let answer = crate::home::load_recently_played(&played_client);
-            crate::bench::lap("recently_played", t);
             answer
         });
         self.home_collections.request((), move |()| {
@@ -2598,37 +2616,64 @@ impl State {
         }
     }
 
-    fn apply_home(&mut self, load: HomeLoad) {
-        match load {
-            HomeLoad::Ready(data) => {
-                let played = std::mem::take(&mut self.home_data.recently_played);
-                self.home_data = data;
-                // If Recently Played arrived first, re-apply the Continue Watching dedupe now
-                // that the fresh resume list is known.
-                self.home_data.recently_played =
-                    crate::home::merge_recently_played(played, &self.home_data.resume);
-                self.home_loaded = true;
-                self.home_from_cache = false;
-                self.home_error = None;
-                self.request_images();
-                self.save_home_snapshot();
-            }
-            HomeLoad::Failed(message) => {
-                // A revoked token must not leave a dead Home behind a Retry button. The API's
-                // 401 message is the one place this distinction survives the worker boundary.
-                if message.contains("session expired") {
-                    self.sign_out();
-                    self.step = Step::Failed(Failure {
-                        stage: Stage::Credentials,
-                        message,
-                    });
-                    return;
-                }
-                self.home_loaded = true;
-                self.home_from_cache = false;
-                self.home_error = Some(message);
-            }
+    /// Continue Watching landed: the screen can draw. Its rails come separately, so a first
+    /// paint is 130–250 ms rather than the 355–525 ms all of them together take here.
+    fn apply_watching(&mut self, items: Vec<Item>) {
+        self.home_data.resume = items;
+        self.home_loaded = true;
+        self.home_from_cache = false;
+        self.home_error = None;
+        self.request_images();
+        self.save_home_snapshot();
+        crate::bench::mark("bench.home.watching");
+    }
+
+    /// The libraries and their Recently Added rails landed.
+    fn apply_rails(&mut self, rails: HomeRails) {
+        self.home_data.libraries = rails.libraries;
+        self.home_data.latest = rails.latest;
+        self.home_loaded = true;
+        self.home_from_cache = false;
+        // Recently Played dedupes against Continue Watching, which is known by now.
+        self.home_data.recently_played = crate::home::merge_recently_played(
+            std::mem::take(&mut self.home_data.recently_played),
+            &self.home_data.resume,
+        );
+        self.request_images();
+        self.save_home_snapshot();
+        crate::bench::mark("bench.home.rails");
+    }
+
+    /// A home request failed. A revoked token must not leave a dead Home behind a Retry button:
+    /// the API's 401 message is the one place that distinction survives the worker boundary.
+    fn home_failed(&mut self, message: String) {
+        if message.contains("session expired") {
+            self.sign_out();
+            self.step = Step::Failed(Failure {
+                stage: Stage::Credentials,
+                message,
+            });
+            return;
         }
+        self.home_loaded = true;
+        self.home_from_cache = false;
+        self.home_error = Some(message);
+    }
+
+    /// The trailing rail, asked for once the first paint is out of the way.
+    fn load_recently_played(&mut self) {
+        if !self.fetch_home || !self.is_signed_in() {
+            return;
+        }
+        let Some(client) = self.client() else {
+            return;
+        };
+        self.home_recently_played.request((), move |()| {
+            let t = crate::bench::timer();
+            let answer = crate::home::load_recently_played(&client);
+            crate::bench::lap("recently_played", t);
+            answer
+        });
     }
 
     /// Open a library from the sidebar. The first page starts immediately; the viewport returns
@@ -4540,7 +4585,8 @@ impl State {
         if self.persist {
             let _ = self.config.save();
         }
-        self.home.cancel();
+        self.home_watching.cancel();
+        self.home_rails.cancel();
         self.home_next_up.cancel();
         self.home_collections.cancel();
         self.playlists_load.cancel();
@@ -4631,7 +4677,8 @@ mod tests {
             password: TextEdit::new("").secure(),
             step: Step::Idle,
             worker: Worker::new(),
-            home: Latest::default(),
+            home_watching: Latest::default(),
+            home_rails: Latest::default(),
             home_data: HomeData::default(),
             home_next_up: Latest::default(),
             home_on_now: Latest::default(),
@@ -5105,9 +5152,7 @@ mod tests {
             ..Config::default()
         };
         let mut state = State::from_config(config);
-        state.apply_home(HomeLoad::Failed(
-            "Your session expired. Sign in again.".into(),
-        ));
+        state.home_failed("Your session expired. Sign in again.".into());
         assert!(!state.is_signed_in());
         assert!(state.config.token.is_empty());
         assert!(matches!(state.step, Step::Failed(_)));

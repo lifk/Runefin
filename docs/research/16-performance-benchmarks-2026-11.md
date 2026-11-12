@@ -80,11 +80,14 @@ beside it: 373 → 355 ms median, a small win that is within the jitter of this 
 | | Before | Now |
 |---|---|---|
 | First frame on screen | 100 ms (skeleton or restored route) | 90 ms, and with the snapshot: Home's rails |
-| Home content ready | 100 + 355–580 + 73 = **530–750 ms** | **113–128 ms** (snapshot painted in the first frame), fresh rails at +355 |
+| Home **content** on a warm install | 530–750 ms | **113–128 ms** (snapshot painted in the first frame) |
+| Home **content** on a cold install | 530–750 ms | **~150 ms of state + one frame**: Continue Watching lands at 120–175 ms, the rails at ~300 ms |
+| Recently Played | requested at launch, 337 ms, competing with the rails | requested after the rails land (147–160 ms, +460–550 ms), its rail five screens down |
 
 The snapshot is `~/.cache/runefin/home-<hash>.json` (84–97 KB here): read in **3.6 ms** before
 the window exists, painted with the first frame (343 glyphs, 40–56 ms update), then replaced when
-the server answers. Cold (no file) the app behaves as before.
+the server answers. Cold, Continue Watching no longer waits for the library list or the rails, so
+the first paint holds real content instead of a skeleton within ~200 ms of process start.
 
 ## Idle
 
@@ -106,16 +109,17 @@ window draws none at all. Idle cost is a poll per wake, not a frame per display 
 
 ## What to do next, in order
 
-1. **Build only the rails on screen.** 300 of Home's 490 glyphs are below the fold. Limiting the
-   rail list to the viewport plus one, growing it on scroll and on focus, should cut the home
-   paint from 73 to ~30 ms and its glyph rasterisation by two thirds. It touches `tv_focus` zones,
-   the range tests and eight snapshots.
-2. **Paint when Continue Watching answers, not when the last rail does.** 155 ms instead of
-   355 ms to first content on a cold snapshot. Needs `home_loaded` to mean "enough to draw" and
-   the rails to append as they land; the skeleton already matches final geometry.
-3. **Skip Recently Played until it can be paid for.** It is the slowest single query (337 ms) and
-   its rail is five screens down. Request it when the page nears it.
-4. **Ask Rune for a way to preload the symbol fallback fonts.** The first frame that draws a `·`,
+1. **Build only the rails on screen.** Rune already skips glyphs outside the viewport (a 400 pt
+   tall window rasterises 257 glyphs where an 800 pt one rasterises 490), so this is about *layout
+   and paint*: all nine rails are laid out (1259 nodes) and the offscreen ones cost ~10–12 ms of
+   the 58 ms update, plus their share of the 219 MB resident. Limiting the rail list to the
+   viewport plus one, growing on scroll and on focus, touches `tv_focus` zones, the reach tests
+   and eight snapshots — a product decision as much as a performance one.
+2. **A budget for poster art.** Home prefetches every card in every rail (by design: no empty
+   boxes while scrolling), which is ~100 decoded 360 px posters and most of the 219 MB RSS. A cap
+   or a smaller decode for rails far below the fold would trade a few grey boxes for ~100 MB on a
+   TV box.
+3. **Ask Rune for a way to preload the symbol fallback fonts.** The first frame that draws a `·`,
    `✓` or `—` loads 20 ms of DejaVu/Noto files inside the frame; the window spends 40 ms waiting
    for the GPU adapter just before, which would hide it.
 

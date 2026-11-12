@@ -71,6 +71,9 @@ web wrapper and does not embed a second render stack.
 
 - Continue Watching, one card per series, newest first; entries untouched for 60 days are
   hidden and finished items are dropped.
+- **Continue Watching paints first**: `/UserItems/Resume` is its own request, so the screen
+  holds real content ~150 ms after a cold launch instead of waiting for the library list and one
+  Recently Added query per library (~300 ms more). The remaining rails append as they arrive.
 - **Next Up** streamed beside the first paint, so a slow answer never delays Home.
 - One **Recently Added** rail for every video library, then a **Recently Played** rail. That
   rail is deduplicated by series and never repeats a Continue Watching card. Home has no rail

@@ -47,43 +47,23 @@ pub struct LatestRail {
     pub items: Vec<Item>,
 }
 
-/// A finished home request: the screen renders either the data or the reason it is missing.
-#[derive(Debug, Clone)]
-pub enum HomeLoad {
-    Ready(HomeData),
-    Failed(String),
+/// Continue Watching alone. It is what the first paint needs, and it doesn't depend on the
+/// library list, so the screen can show it while the Recently Added rails are still in flight.
+/// The series merge and the 60-day cut are the same rules a full load applies.
+pub fn load_watching(client: &Client, now_days: i64) -> Result<Vec<Item>, String> {
+    let t = crate::bench::timer();
+    let items = client.resume(24).map_err(|e| e.user_message())?;
+    crate::bench::lap("resume", t);
+    Ok(merge_resume(items.items, now_days))
 }
 
-/// Fetch the rails that must be on screen together: libraries, Continue Watching and the
-/// Recently Added rails. The requests after `libraries` run in parallel; Next Up is fetched by
-/// [`load_next_up`] at the same time so a slow guide query cannot delay the first paint.
-///
-/// Libraries and Continue Watching are required; one library's Recently Added failing is not
-/// worth hiding the rest of the screen, so that rail is skipped and the others stay.
-pub fn load(client: &Client, now_days: i64) -> Result<HomeData, String> {
-    // Continue Watching doesn't need the library list, so it travels beside the library call
-    // instead of behind it: the two answered in series cost their sum on the way to the first
-    // paint (164 + 170 ms against this server), and in parallel only the slower one.
+/// The library list and one Recently Added rail per video library. One library's query failing
+/// is not worth hiding the rest: that rail is skipped and the others stay.
+pub fn load_rails(client: &Client) -> Result<HomeRails, String> {
     let t = crate::bench::timer();
-    let (libraries, resume) = std::thread::scope(|scope| {
-        let libraries_job = scope.spawn(|| {
-            let t = crate::bench::timer();
-            let answer = client.libraries().map_err(|e| e.user_message());
-            crate::bench::lap("libraries", t);
-            answer
-        });
-        let resume_job = scope.spawn(|| {
-            let t = crate::bench::timer();
-            let answer = client.resume(24).map_err(|e| e.user_message());
-            crate::bench::lap("resume", t);
-            answer
-        });
-        let libraries = libraries_job.join().expect("libraries worker");
-        let resume = resume_job.join().expect("resume worker");
-        Ok::<_, String>((libraries?, resume?))
-    })?;
-    // One Recently Added rail per video library. The server owns the order; every library the
-    // reader can browse gets its own rail.
+    let libraries = client.libraries().map_err(|e| e.user_message())?;
+    crate::bench::lap("libraries", t);
+    // The server owns the order; every library the reader can browse gets its own rail.
     let video: Vec<&LibraryView> = libraries
         .iter()
         .filter(|library| is_video_library(library))
@@ -113,18 +93,15 @@ pub fn load(client: &Client, now_days: i64) -> Result<HomeData, String> {
             .filter_map(|job| job.join().expect("latest worker"))
             .collect::<Vec<LatestRail>>()
     });
-    crate::bench::lap("home.jobs", t);
-    Ok(HomeData {
-        libraries,
-        resume: merge_resume(resume.items, now_days),
-        next_up: Vec::new(),
-        on_now: Vec::new(),
-        // Loaded by [`load_collections`] beside this call: enumerating box sets walks every
-        // library on the server and would otherwise add ~40 ms to the first paint.
-        collections: Vec::new(),
-        recently_played: Vec::new(),
-        latest,
-    })
+    crate::bench::lap("rails", t);
+    Ok(HomeRails { libraries, latest })
+}
+
+/// The libraries and their rails, without Continue Watching, so the two can land separately.
+#[derive(Debug, Clone, Default)]
+pub struct HomeRails {
+    pub libraries: Vec<LibraryView>,
+    pub latest: Vec<LatestRail>,
 }
 
 /// Box sets for the home rail, loaded beside the rest so a large library's box-set walk never

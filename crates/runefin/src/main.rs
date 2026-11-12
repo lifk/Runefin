@@ -4831,17 +4831,22 @@ mod tests {
                 key: Key::Right,
                 mods: Default::default(),
             });
-            for _ in 0..4 {
+            // The card glides to its place and reports as it moves; wait for the report and the
+            // drawn rect to agree, which is the frame at rest.
+            let mut settled = false;
+            for _ in 0..24 {
                 t += 0.016;
                 rt.frame(t);
+                let focused = rt.state.focused_key.clone().expect("a card holds focus");
+                if let (Some(rect), Some((drawn, _))) =
+                    (rt.state.focused_card_rect, rt.presented(&focused))
+                    && rect == drawn
+                {
+                    settled = true;
+                    break;
+                }
             }
-            let focused = rt.state.focused_key.clone().expect("a card holds focus");
-            let drawn = rt.presented(&focused).expect("the card is drawn");
-            let rect = rt
-                .state
-                .focused_card_rect
-                .unwrap_or_else(|| panic!("step {step}: the card reported no rect"));
-            assert_eq!(rect, drawn.0, "step {step}: the halo sits on the card");
+            assert!(settled, "step {step}: the halo sits on the focused card");
             assert!(
                 rt.find("focus-glow").is_some(),
                 "step {step}: the halo is drawn"
@@ -5072,12 +5077,18 @@ mod tests {
             t += 0.016;
             rt.frame(t);
         }
-        let drawn = rt.presented(&key).expect("the tile is drawn");
-        assert_eq!(
-            rt.state.focused_card_rect,
-            Some(drawn.0),
-            "the tile reports the rect the halo paints at"
-        );
+        let mut settled = false;
+        for _ in 0..24 {
+            t += 0.016;
+            rt.frame(t);
+            if let (Some(rect), Some((drawn, _))) = (rt.state.focused_card_rect, rt.presented(&key))
+                && rect == drawn
+            {
+                settled = true;
+                break;
+            }
+        }
+        assert!(settled, "the tile reports the rect the halo paints at");
         assert!(rt.find("focus-glow").is_some(), "the halo is drawn");
     }
 
@@ -8133,8 +8144,11 @@ mod tests {
                 times[4].as_secs_f64() * 1000.0
             );
         };
-        measure("home::load", &mut || {
-            crate::home::load(&client, now_days).expect("home");
+        measure("home::load_watching", &mut || {
+            crate::home::load_watching(&client, now_days).expect("watching");
+        });
+        measure("home::load_rails", &mut || {
+            crate::home::load_rails(&client).expect("rails");
         });
         measure("home::load_next_up", &mut || {
             crate::home::load_next_up(&client);
