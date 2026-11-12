@@ -8,6 +8,7 @@
 //! Snap:  cargo run -p runefin -- --snap connect.png --scene error
 //! Live:  cargo run -p runefin -- --snap home.png --live --at 20 --wait 3
 
+mod audio_probe;
 mod bench;
 mod checkpoint;
 mod config;
@@ -33,6 +34,7 @@ mod screens;
 mod search;
 mod shortcuts;
 mod state;
+mod subtitle_sync;
 mod subtitles;
 mod theme;
 mod trailer;
@@ -4795,6 +4797,92 @@ mod tests {
             rt.state.focused_card_rect.is_none(),
             "a non-card focus clears the halo rect"
         );
+    }
+
+    #[test]
+    fn the_subtitle_panel_syncs_the_cues_to_the_audio() {
+        let env = Env {
+            system_dark: true,
+            scale: 2.0,
+        };
+        let mut state = home_state();
+        let mut session = demo::in_app();
+        session.position_ms = 42 * 60_000;
+        state.in_app = Some(session);
+        state.in_app_subtitles.tracks = demo::subtitle_tracks();
+        state.in_app_subtitles.selected = Some(0);
+        state.in_app_subtitles.cues = demo::subtitle_cues();
+        state.in_app_subtitles.open = true;
+        state.osd_visible = true;
+        let mut rt = Runtime::new(state, view, (1280.0, 800.0), env);
+        rt.frame(0.0);
+        assert!(
+            rt.find("subtitle-sync").is_some(),
+            "a text track offers the sync row"
+        );
+        assert!(rt.find("subtitle-sync-status").is_some());
+
+        // The worker's verdict is what moves the delay, and it says so both times.
+        rt.state.in_app_subtitles.syncing = true;
+        rt.state
+            .apply_subtitle_sync(Ok(Some(crate::subtitle_sync::Alignment {
+                lag_ms: 1_800,
+                confidence: 0.62,
+                contrast: 0.11,
+            })));
+        assert!(!rt.state.in_app_subtitles.syncing);
+        assert_eq!(rt.state.in_app_subtitles.delay_ms, 1_800);
+        let note = rt.state.in_app_subtitles.sync_note.clone().expect("a note");
+        assert!(note.contains("+1.8"), "{note}");
+        rt.frame(0.016);
+        assert!(rt.find("subtitle-sync-status").is_some());
+
+        // A window the estimator cannot read leaves the delay alone.
+        let before = rt.state.in_app_subtitles.delay_ms;
+        rt.state.apply_subtitle_sync(Ok(None));
+        assert_eq!(rt.state.in_app_subtitles.delay_ms, before);
+        assert!(
+            rt.state
+                .in_app_subtitles
+                .sync_note
+                .as_deref()
+                .is_some_and(|note| note.contains("No clear match"))
+        );
+
+        // The cancellation the panel's close sends is not an error a reader should read.
+        rt.state.in_app_subtitles.syncing = true;
+        rt.state.apply_subtitle_sync(Err("cancelled".into()));
+        assert!(!rt.state.in_app_subtitles.syncing);
+        assert!(rt.state.in_app_subtitles.sync_note.is_some());
+    }
+
+    #[test]
+    fn a_bitmap_or_live_track_is_not_offered_a_sync() {
+        let env = Env {
+            system_dark: true,
+            scale: 2.0,
+        };
+        let mut state = home_state();
+        let mut session = demo::in_app();
+        session.live = true;
+        state.in_app = Some(session);
+        state.in_app_subtitles.tracks = demo::subtitle_tracks();
+        state.in_app_subtitles.selected = Some(0);
+        state.in_app_subtitles.cues = demo::subtitle_cues();
+        state.in_app_subtitles.open = true;
+        state.osd_visible = true;
+        let mut rt = Runtime::new(state, view, (1280.0, 800.0), env);
+        rt.frame(0.0);
+        assert!(
+            rt.find("subtitle-sync").is_none(),
+            "live TV has no file to listen to"
+        );
+
+        // Without cues there is nothing to move either.
+        rt.state.in_app.as_mut().expect("a session").live = false;
+        rt.state.in_app_subtitles.cues.clear();
+        rt.frame(0.016);
+        assert!(rt.find("subtitle-sync").is_none());
     }
 
     #[test]

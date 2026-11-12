@@ -270,6 +270,10 @@ pub struct Subtitles {
     pub image_error: Option<String>,
     /// The track list / delay / size panel above the transport controls.
     pub open: bool,
+    /// A sync against the audio is decoding right now.
+    pub syncing: bool,
+    /// The last sync's verdict, shown under the button: "Synced +1.8 s", "No clear match".
+    pub sync_note: Option<String>,
 }
 
 impl Default for Subtitles {
@@ -287,6 +291,8 @@ impl Default for Subtitles {
             image_loading: false,
             image_error: None,
             open: false,
+            syncing: false,
+            sync_note: None,
         }
     }
 }
@@ -679,6 +685,14 @@ pub struct State {
     pub in_app_segments: Vec<MediaSegment>,
     pub in_app_segments_load: Latest<Result<Vec<MediaSegment>, String>>,
     pub in_app_subtitles: Subtitles,
+    /// Aligning the cues to the audio: the decoded window's verdict, or the reason there is none.
+    subtitle_sync: Latest<Result<Option<crate::subtitle_sync::Alignment>, String>>,
+    /// Seconds of audio the probe has decoded, read by the panel while it waits.
+    pub subtitle_sync_progress: Arc<std::sync::atomic::AtomicU64>,
+    /// Stops the probe when the panel closes, the episode stops or another track is chosen.
+    subtitle_sync_cancel: Arc<AtomicBool>,
+    /// The progress the last frame showed, so a frame is drawn only when it moves.
+    subtitle_sync_seen: u64,
     pub in_app_subtitle_search: SubtitleSearch,
     in_app_subtitle_search_load: Latest<Result<Vec<jellyfin_api::RemoteSubtitle>, String>>,
     in_app_subtitle_download_load: Latest<Result<(), String>>,
@@ -1068,6 +1082,10 @@ impl State {
             in_app_segments: Vec::new(),
             in_app_segments_load: Latest::default(),
             in_app_subtitles: Subtitles::default(),
+            subtitle_sync: Latest::default(),
+            subtitle_sync_progress: Arc::new(std::sync::atomic::AtomicU64::new(0)),
+            subtitle_sync_cancel: Arc::new(AtomicBool::new(false)),
+            subtitle_sync_seen: 0,
             in_app_subtitle_search: SubtitleSearch::default(),
             in_app_subtitle_search_load: Latest::default(),
             in_app_subtitle_download_load: Latest::default(),
@@ -2089,6 +2107,20 @@ impl State {
         {
             self.playlists = playlists.unwrap_or_default();
             changed = true;
+        }
+        if let Some(result) = self.subtitle_sync.take() {
+            self.apply_subtitle_sync(result);
+            changed = true;
+        }
+        if self.in_app_subtitles.syncing {
+            // The panel shows how much of the window is decoded; one frame when it moves.
+            let progress = self
+                .subtitle_sync_progress
+                .load(std::sync::atomic::Ordering::Relaxed);
+            if progress != self.subtitle_sync_seen {
+                self.subtitle_sync_seen = progress;
+                changed = true;
+            }
         }
         if let Some(next_up) = self.home_next_up.take() {
             if self.is_signed_in() {
@@ -4904,6 +4936,10 @@ mod tests {
             in_app_segments: Vec::new(),
             in_app_segments_load: Latest::default(),
             in_app_subtitles: Subtitles::default(),
+            subtitle_sync: Latest::default(),
+            subtitle_sync_progress: Arc::new(std::sync::atomic::AtomicU64::new(0)),
+            subtitle_sync_cancel: Arc::new(AtomicBool::new(false)),
+            subtitle_sync_seen: 0,
             in_app_subtitle_search: SubtitleSearch::default(),
             in_app_subtitle_search_load: Latest::default(),
             in_app_subtitle_download_load: Latest::default(),

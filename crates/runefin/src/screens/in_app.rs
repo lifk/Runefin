@@ -1615,6 +1615,64 @@ fn subtitle_tracks_panel(s: &State, t: &tok::Theme) -> El {
             |s: &mut State| s.adjust_in_app_subtitle_size(-0.1),
             |s: &mut State| s.adjust_in_app_subtitle_size(0.1),
         ));
+    // Aligning the cues to the film's own sound. Hidden for a bitmap track (its cues are
+    // pictures the server times) and for anything live, where there is no file to listen to.
+    let live = s.in_app.as_ref().is_some_and(|session| session.live);
+    if !live && !subs.cues.is_empty() && subs.image.is_none() {
+        let status = if subs.syncing {
+            let seconds = s
+                .subtitle_sync_progress
+                .load(std::sync::atomic::Ordering::Relaxed);
+            format!("Listening… {seconds} s")
+        } else {
+            subs.sync_note
+                .clone()
+                .unwrap_or_else(|| "Match the cues to the voices".into())
+        };
+        panel = panel.child(
+            row()
+                .key("subtitle-sync")
+                .role("button")
+                .w_full()
+                .h(36.0)
+                .px(10.0)
+                .radius(8.0)
+                .items_center()
+                .gap(8.0)
+                .fill(Color::TRANSPARENT)
+                .hover(t.hover)
+                .motion(motion::SNAPPY)
+                .focusable(true)
+                .focus_visual(2.0)
+                .press_scale(0.98)
+                .label("Sync subtitles to the audio")
+                .help("Listen to the film and move the cues to match")
+                .cursor(rune::Cursor::Pointer)
+                .on_press(|s: &mut State| s.sync_in_app_subtitles())
+                .child(
+                    text("≋".to_string())
+                        .font(type_::label())
+                        .color(tok::accent(0, true)),
+                )
+                .child(
+                    text("Sync to audio".to_string())
+                        .font(type_::label())
+                        .color(t.text),
+                )
+                .child(el().grow(1.0))
+                .child(
+                    text(status)
+                        .key("subtitle-sync-status")
+                        .font(type_::caption())
+                        .color(if subs.sync_note.is_some() && !subs.syncing {
+                            t.text
+                        } else {
+                            t.text_secondary
+                        })
+                        .truncate(),
+                ),
+        );
+    }
     panel = panel
         .child(el().w_full().h(1.0).fill(t.separator).mt(6.0))
         .child(

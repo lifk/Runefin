@@ -309,6 +309,11 @@ separate window. `scripts/check.sh` builds it; the player's contract is
   with `libbitsub-core`; **DVB** is transcoded by ffmpeg to DVD subtitle packets and read by
   the same parser. All are normal selectable rows.
 - Online subtitle search and download into the player, then selection.
+- **Sync to audio**: the panel's row listens to four minutes of the film's own sound (a private
+  audio-only pipeline on the direct stream), finds where the dialogue sits in the speech band and
+  moves the cues to match, then sets the delay and says what it applied. It tries a second window
+  when the first is unclear, and reports "No clear match" rather than guess when two windows
+  disagree or neither has enough speech; bitmap tracks and live TV are not offered it.
 - Server-hosted trailers play in-app; YouTube trailers download once through optional `yt-dlp`
   into `~/.cache/runefin/trailers` and play in-app with reporting disabled. Without `yt-dlp`
   the action opens the browser.
@@ -481,7 +486,7 @@ keys the player already uses.
 ```sh
 cargo test -p jellyfin-api        # 45 API tests, no network
 cargo test -p seerr-api           # 25 Seerr API tests, no network
-cargo test -p runefin             # 411 app tests (22 ignored), headless
+cargo test -p runefin             # 420 app tests (22 ignored), headless
 scripts/check.sh                  # fmt, clippy, all three suites, release build
 scripts/snapshots.sh              # the committed views, in place
 JELLYFIN_URL=... JELLYFIN_USER_ID=... JELLYFIN_TOKEN=... \

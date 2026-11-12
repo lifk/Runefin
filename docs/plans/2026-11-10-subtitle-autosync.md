@@ -1,6 +1,7 @@
 # Subtitle auto-sync — feasibility and plan
 
-**Status:** planned, 2026-11-10. Not implemented.
+**Status:** shipped 2026-11-12 (0.1.36 cycle, post-release). What differs from this plan is
+recorded at the end, under "As shipped".
 **Question:** can Runefin align a subtitle track to the audio automatically, the way Bazarr
 does?
 
@@ -99,3 +100,43 @@ Rough effort: 2–3 days for steps 1–3 in a focused pass, plus tests and one l
 - Bundle ffsubsync or webrtcvad as a dependency.
 - Rewrite the subtitle on the server (needs file access and a write path the API does not offer).
 - Claim frame-rate sync before a fixture with a 23.976/25 mismatch proves the drift fit.
+
+## As shipped (2026-11-12)
+
+- `crates/runefin/src/subtitle_sync.rs`: the envelope is **band-limited to 300–3400 Hz** (a pair of
+  second-order biquads) and then **modulated**: each 20 ms frame's level minus the level around it
+  over a second. Both steps came out of measuring against this library, and both were necessary:
+  a plain RMS envelope put the correlation peak at a spurious −27.8 s on a music-heavy episode,
+  and the band limit alone left a −21 s peak on a film. With the modulation feature, five windows
+  of *28 Days Later* agreed on −0.1…−0.4 s (confidence 0.22–0.40, contrast 0.05–0.17) where the
+  same windows had scattered from −0.7 s to +0.0 s before.
+- The cue mask keeps 40 ms of dilation, the search is a 100 ms coarse grid over ±30 s refined to
+  20 ms, and a result must reach confidence 0.2 with a ±1 s contrast of 0.05. The signs are pinned
+  by tests: a positive result is how much *later* the cues should play, i.e. what the delay control
+  takes.
+- **Two windows, and disagreement is no answer**: the worker decodes from five seconds before the
+  playhead and, if that window is unsure, another 240 s further on; a strong first answer
+  (confidence ≥ 0.35) skips the second. `subtitle_sync::settle` takes the more confident and
+  returns `None` when the two differ by more than 800 ms.
+- `crates/runefin/src/audio_probe.rs`: a private playbin of the file's **direct stream** — audio
+  only, `sync=false`, mono S16 at 8 kHz — with a 60 s deadline, a cancel flag, a seconds-decoded
+  counter, and the window's start taken from the first buffer's PTS rather than the seek that was
+  asked for. Tested end to end against a generated WAV, no server: the probe decodes it and the
+  aligner recovers a known offset (and keeps item time for a window that starts mid-file).
+- **A live check, kept as an ignored test** (`a_real_track_lines_up_with_real_audio` with
+  `RUNEFIN_PROBE_ITEM`, `RUNEFIN_PROBE_SRT`, `RUNEFIN_PROBE_START_MS`): it decodes through the
+  app's own probe and prints the alignment. On this server it reports −0.40 s and −0.32 s on two
+  windows of *28 Days Later* (a track that is slightly early, which is what the estimator is for),
+  and refuses the two windows of a music-heavy anime episode it was tried on. That is the intended
+  shape: useful where there is dialogue, silent where there is not.
+- `state/in_app_state.rs`: `sync_in_app_subtitles` (file URL, window from the playhead, cues,
+  worker), `apply_subtitle_sync` (delay, toast, and the three outcomes: applied, no clear match,
+  error), cancellation when the panel closes, another track is chosen or playback stops.
+- `screens/in_app.rs`: a **Sync to audio** row under Delay and Size, with `Listening… N s` while it
+  runs and the verdict after; hidden for bitmap tracks and live TV.
+- Tests: 5 synthetic-mask tests, 2 probe tests, 2 app tests (the row and its outcomes; the row's
+  absence for live/bitmap).
+
+Left out of this pass, in the order they would help: persisting the offset per item and track, a
+second frequency band for the envelope, drift (three windows and a line fit), and asking the
+probe's pipeline for a transcode URL when the file itself is not reachable.

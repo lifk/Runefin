@@ -248,6 +248,23 @@ exactly the difference between "a client" and "a toy". Budget real time here.
   zero-copy. DVB (and any future unsupported bitmap codec) remains a listed row with the online
   text-search action; the extraction takes seconds on a large file, so the panel says
   "Preparing image subtitles…".
+- Syncing a track to the audio: **Sync to audio** under Delay and Size reads the film's own
+  sound and moves the cues to match. It opens a private playbin on the item's direct-play URL —
+  audio only, mono 8 kHz S16, `sync=false`, so a few minutes decode in a second — takes the
+  window from the playhead (240 s, cut short at the end of the file), band-limits it to 300–3400 Hz
+  so the score under the dialogue does not dominate, takes the envelope's own modulation over a
+  second (speech comes in syllables; music swells do not), builds a speech mask from the cues
+  (dilated 40 ms for the text's own padding), and searches ±30 s in 100 ms steps then 20 ms. A
+  result must reach confidence 0.2 with a 0.05 contrast over its neighbours; if the first window
+  does not, a second one 240 s on is tried, and two confident answers that disagree by more than
+  0.8 s read as no answer at all. The result is the delay the reader would have typed:
+  `Synced +1.8 s` sets it, a window without clear speech says `No clear match — adjust by hand`
+  and leaves the delay alone, and the row shows `Listening… N s` while the probe runs. Only a constant offset is estimated: a track that drifts
+  (23.976 against 25) needs a rate fit this does not claim. Live TV and bitmap tracks have no cues
+  to move, so the row is not offered; closing the panel, choosing another track or stopping
+  playback cancels the probe. The maths (`subtitle_sync.rs`) and the probe (`audio_probe.rs`) are
+  tested without a server: synthetic masks recover known offsets, and a generated WAV goes
+  through the real pipeline.
 - Online subtitles: "Search online…" in that panel opens in the language from Settings (or
   English when none is set), then asks `/Items/{id}/RemoteSearch/Subtitles/{lang}`
   for every configured provider (Open Subtitles on the live box), lists the results with the facts

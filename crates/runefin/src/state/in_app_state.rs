@@ -179,6 +179,15 @@ fn url_starts_at(url: &str, start_ms: i64) -> bool {
     })
 }
 
+/// The session's length, for clamping a second sync window to the file.
+fn session_duration_ms(state: &State) -> i64 {
+    state
+        .in_app
+        .as_ref()
+        .and_then(|session| session.duration_ms)
+        .unwrap_or(0)
+}
+
 /// Where the pipeline should start: the resume point, unless the negotiated source already
 /// begins there (a transcode URL that carries `StartTimeTicks`).
 fn resume_target(method: &'static str, url: &str, start_ms: i64) -> Option<i64> {
@@ -1030,6 +1039,8 @@ impl State {
     /// Download and parse one selected track. The server converts embedded ASS to SRT, so a
     /// single parser covers both external and in-container text subtitles.
     pub fn select_in_app_subtitle(&mut self, at: Option<usize>) {
+        self.cancel_subtitle_sync();
+        self.in_app_subtitles.sync_note = None;
         self.show_in_app_osd();
         self.in_app_subtitles.open = false;
         self.in_app_subtitles.selected = at;
@@ -1450,6 +1461,110 @@ impl State {
 
     pub fn close_in_app_subtitles_menu(&mut self) {
         self.in_app_subtitles.open = false;
+        self.cancel_subtitle_sync();
+    }
+
+    /// Align the selected track to the film's own audio: decode a few minutes of the file's
+    /// sound, build the speech mask from both sides and set the delay to the shift that matches.
+    ///
+    /// The decode is the file's direct stream, not the playing pipeline: subtitle cues are in
+    /// file time, and a server transcode would only add CPU on both ends. Live TV and bitmap
+    /// tracks have no cues to move and are left alone.
+    pub fn sync_in_app_subtitles(&mut self) {
+        let Some(session) = &self.in_app else {
+            return;
+        };
+        if session.live || self.in_app_subtitles.cues.is_empty() {
+            return;
+        }
+        let (position, item_id) = (session.position_ms, session.item_id.clone());
+        let Some(client) = self.client() else {
+            self.in_app_subtitles.sync_note = Some("Sign in again to sync.".into());
+            return;
+        };
+        let Some(url) = client.direct_stream_url(&item_id) else {
+            self.in_app_subtitles.sync_note = Some("This stream has no file to listen to.".into());
+            return;
+        };
+        self.show_in_app_osd();
+        let start = (position - 5_000).max(0);
+        let cues: Vec<(i64, i64)> = self
+            .in_app_subtitles
+            .cues
+            .iter()
+            .map(|cue| (cue.start_ms, cue.end_ms))
+            .collect();
+        self.in_app_subtitles.syncing = true;
+        self.in_app_subtitles.sync_note = None;
+        self.subtitle_sync_seen = 0;
+        self.subtitle_sync_progress
+            .store(0, std::sync::atomic::Ordering::Relaxed);
+        self.subtitle_sync_cancel
+            .store(false, std::sync::atomic::Ordering::Relaxed);
+        let progress = Arc::clone(&self.subtitle_sync_progress);
+        let cancel = Arc::clone(&self.subtitle_sync_cancel);
+        let duration = session_duration_ms(self);
+        self.subtitle_sync.request((), move |()| {
+            // Two windows: a scene of just music or a stretch of silence decides nothing, and the
+            // next few minutes usually do. Two confident answers that disagree are not an answer.
+            let mut found: Vec<crate::subtitle_sync::Alignment> = Vec::new();
+            for extra in [0i64, 240_000] {
+                if cancel.load(std::sync::atomic::Ordering::Relaxed) {
+                    return Err("cancelled".into());
+                }
+                if duration > 0 && start + extra >= duration {
+                    break;
+                }
+                let window =
+                    crate::audio_probe::sample(&url, start + extra, 240, &progress, &cancel)?;
+                if let Some(alignment) = crate::subtitle_sync::align(
+                    &window.samples,
+                    crate::audio_probe::RATE,
+                    window.start_ms,
+                    &cues,
+                ) {
+                    found.push(alignment);
+                    // A strong answer needs no second opinion.
+                    if alignment.confidence >= 0.35 {
+                        break;
+                    }
+                }
+            }
+            Ok(crate::subtitle_sync::settle(found))
+        });
+    }
+
+    /// Stop a running sync without waiting for it; its answer, if one still lands, is dropped
+    /// with the cancelled request.
+    fn cancel_subtitle_sync(&mut self) {
+        self.subtitle_sync.cancel();
+        self.subtitle_sync_cancel
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+        self.in_app_subtitles.syncing = false;
+    }
+
+    /// The worker's verdict: set the delay, or say why there is nothing to set.
+    pub fn apply_subtitle_sync(
+        &mut self,
+        result: Result<Option<crate::subtitle_sync::Alignment>, String>,
+    ) {
+        self.in_app_subtitles.syncing = false;
+        match result {
+            Ok(Some(found)) => {
+                let applied = found.lag_ms.clamp(-30_000, 30_000);
+                self.in_app_subtitles.delay_ms = applied;
+                let label = format!("Synced {:+.1} s", applied as f32 / 1000.0);
+                self.in_app_subtitles.sync_note = Some(label.clone());
+                self.show_toast(format!("Subtitles {label}"));
+            }
+            Ok(None) => {
+                self.in_app_subtitles.sync_note = Some("No clear match — adjust by hand.".into());
+            }
+            Err(error) if error == "cancelled" => {}
+            Err(error) => {
+                self.in_app_subtitles.sync_note = Some(format!("Could not sync: {error}"));
+            }
+        }
     }
 
     /// The chapter list. It shares the panel slot with the audio, subtitle and stats panels,
@@ -2366,6 +2481,7 @@ impl State {
     }
 
     pub fn stop_in_app(&mut self) {
+        self.cancel_subtitle_sync();
         if let Some(session) = &self.in_app
             && session.position_ms > 0
         {
