@@ -71,8 +71,8 @@ name and the fixture addresses changed.
 ### Publishing a later commit
 
 Development now happens directly on GitHub. `origin` is `https://github.com/lifk/Runefin` in
-both checkouts; the pre-rewrite history survives only as the `private-archive` branch of the old
-private remote (`forgejo`), which is never pushed to `origin`:
+both checkouts; the pre-rewrite history survives only as the local `private-archive` branch (the
+old private remote it used to track was retired on 2026-11-12), which is never pushed to `origin`:
 
 ```sh
 git push origin main     # after scripts/check.sh is green

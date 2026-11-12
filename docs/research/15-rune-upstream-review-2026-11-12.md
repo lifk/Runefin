@@ -1,9 +1,12 @@
 # Rune upstream and community review — 2026-11-12
 
-Method: `git fetch` on the fork's three remotes (`origin` = lifk/rune, `forgejo` = the home mirror,
-`upstream` = anomalyco/rune), `git log`/`git diff` of `2bc3179d..upstream/dev` (418 commits), the
-548 unreleased changelog entries, the 40+ `forgejo/*` contributor branches, and the listing in
-`neiii/awesome-rune`. Follows `13-rune-ecosystem-review-2026-11.md`.
+Method: `git fetch` on the fork's remotes (`origin` = lifk/rune, `upstream` = anomalyco/rune), plus
+the home mirror that then stood beside them, `git log`/`git diff` of `2bc3179d..upstream/dev` (418
+commits), the 548 unreleased changelog entries, the 40+ contributor branches it carried, and the
+listing in `neiii/awesome-rune`. Follows `13-rune-ecosystem-review-2026-11.md`.
+
+That mirror is retired (2026-11-12): both the app and the fork live on GitHub only, so a later
+review reads contributor branches from `upstream` itself.
 
 ## Applied: the pin bump
 
@@ -141,9 +144,9 @@ Ordered by value per hour for this app. Nothing here needs a fork patch.
 
 ## Community
 
-- `forgejo/*`: 40+ branches, all at least 750 commits behind `upstream/dev`; most are already in
-  `dev` (`p111-image-pool` = the four-thread decoder, `emoji-color`, `boundary-lints`,
-  `mermaid-lenient`). Still open and interesting:
+- The mirror's contributor branches (read then as `forgejo/*`): 40+ branches, all at least 750
+  commits behind `upstream/dev`; most are already in `dev` (`p111-image-pool` = the four-thread
+  decoder, `emoji-color`, `boundary-lints`, `mermaid-lenient`). Still open and interesting:
   - **`caret-blink`** (one commit, 207 lines with tests): a text-field caret blinking 0.5 s on and
     off, restarted by an edit or a caret move, one wake per change, still when the window isn't
     key, off under Reduce Motion. The app has real text fields on the desktop side (search, server
