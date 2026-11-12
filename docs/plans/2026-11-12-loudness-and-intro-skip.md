@@ -90,7 +90,20 @@ the channel count, so a 7.1 film measured 18 dB below ffmpeg's stereo decode of 
 now decodes stereo and averages the two channels itself, and a test pins that a file URL decodes
 to the same samples ffmpeg wrote.
 
-**Intro detection.** `crates/runefin/src/intro_detect.rs` builds band-limited envelopes (200 ms
+**Intro data from the server first.** Jellyfin already has this: `GET /MediaSegments/{itemId}`
+returns the item's segments, and the app has asked for them at every playback start since the
+player was rewritten — the "Skip intro" / "Skip credits" pill (Ask, five seconds' lead), the `S`
+key and the Always mode all read that list (`state/in_app_state.rs`, `apply_in_app_segments`).
+What the server cannot do on its own is *produce* them: the OpenAPI document for 12.4 exposes only
+`GET /MediaSegments/{itemId}`, so a client cannot publish segments, and detection comes from a
+provider plugin. On this server the list is empty for every item tried (`[]` for an episode with
+five chapters and a film with nine), and the plugin catalogue carries no intro detector — only
+"Local Intros" (pre-rolls) and "Chapter Segments Provider", which produced nothing here. The
+practical route is the third-party Intro Skipper plugin, added through its own plugin repository
+in the server's dashboard; once its segments exist the app skips with no change. That is why the
+local detector is a **fallback for servers without a provider**, not the main path.
+
+The local detector (`crates/runefin/src/intro_detect.rs`) builds band-limited envelopes (200 ms
 frames), normalised and clamped to ±3σ, and looks for the shift and the longest stretch where two
 episodes stay correlated (an "audible" gate keeps two silences from counting). Five synthetic
 tests pass: a shared 30 s span at the same offset is found within a second, a span at a different

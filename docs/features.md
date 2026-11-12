@@ -209,6 +209,11 @@ separate window. `scripts/check.sh` builds it; the player's contract is
   seek before the session begins (a direct play seeks and waits; a transcode URL without
   `StartTimeTicks` is seeked too; a failed seek starts at zero truthfully). A local checkpoint under
   `~/.cache/runefin/positions.json` covers a crash; a newer local position wins.
+- **Skip intro / credits from the server**: a play start asks `/MediaSegments/{itemId}`; an Intro
+  segment offers "Skip intro" five seconds early (Ask) or skips itself (Always), and the `S` key
+  takes it. The data comes from a server-side segment provider (the Intro Skipper plugin — not in
+  the official catalogue, added through its own plugin repository); with none installed the list
+  is empty and nothing is offered.
 - **Still watching?** pauses a long run after N episodes or minutes with a quiet Continue/Stop
   card and a 60 s countdown; a **Sleep timer** offers 10/20/30/45/60 minutes or end of episode and
   fades the last 20 s.
