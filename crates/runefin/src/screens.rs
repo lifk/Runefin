@@ -1929,15 +1929,7 @@ fn resume_card(item: &Item, s: &State, t: &tok::Theme, highlight: bool) -> El {
                 })),
         );
     }
-    art = art.on_drawn_layout_tx({
-        let key = focus_key.clone();
-        move |s: &mut State, rect: [f32; 4], tx: &mut rune::Tx| {
-            if s.focused_key.as_deref() == Some(key.as_str()) && s.focused_card_rect != Some(rect) {
-                s.focused_card_rect = Some(rect);
-                tx.wake_after(std::time::Duration::from_millis(0));
-            }
-        }
-    });
+    art = report_focused_rect(art, s, &focus_key);
     el().key(focus_key.clone())
         .role("button")
         .w(RESUME_W)
@@ -2497,6 +2489,27 @@ fn menu_row(label: &str, key: &str, t: &tok::Theme, on: impl Fn(&mut State) + 's
     )
 }
 
+/// Hand the window the drawn rect of the card that holds focus, for the halo it paints outside
+/// the rail's scroll clip.
+///
+/// Rune reports a stationary element's drawn rect on its first draw and then only when it moves.
+/// A card that reported once would never report again after focus came back to it, so a sideways
+/// move in a rail that had nothing to scroll left the halo gone until the card moved for another
+/// reason. Attaching the handler only while the card holds focus makes gaining focus a first draw
+/// again; a card that isn't focused drops the handler, so its next report is its next focus.
+fn report_focused_rect(el: El, s: &State, key: &str) -> El {
+    if s.focused_key.as_deref() != Some(key) {
+        return el;
+    }
+    let key = key.to_string();
+    el.on_drawn_layout_tx(move |s: &mut State, rect: [f32; 4], tx: &mut rune::Tx| {
+        if s.focused_key.as_deref() == Some(key.as_str()) && s.focused_card_rect != Some(rect) {
+            s.focused_card_rect = Some(rect);
+            tx.wake_after(std::time::Duration::from_millis(0));
+        }
+    })
+}
+
 pub(super) fn card(item: &Item, rail: &str, s: &State, t: &tok::Theme) -> El {
     // Home dedupes by series; a library lists the items it actually contains.
     let key_id = if rail == "library" || rail.starts_with("search-") {
@@ -2523,17 +2536,6 @@ pub(super) fn card(item: &Item, rail: &str, s: &State, t: &tok::Theme) -> El {
         .outline(1.0, 0.0, t.card_border)
         .shadow(10.0, 24.0, t.shadow_soft)
         .matched(match_id)
-        .on_drawn_layout_tx({
-            let key = focus_key.clone();
-            move |s: &mut State, rect: [f32; 4], tx: &mut rune::Tx| {
-                if s.focused_key.as_deref() == Some(key.as_str())
-                    && s.focused_card_rect != Some(rect)
-                {
-                    s.focused_card_rect = Some(rect);
-                    tx.wake_after(std::time::Duration::from_millis(0));
-                }
-            }
-        })
         .child(
             el().absolute(0.0, 0.0)
                 .w_full()
@@ -2563,6 +2565,7 @@ pub(super) fn card(item: &Item, rail: &str, s: &State, t: &tok::Theme) -> El {
                 .outline(2.0, -1.0, rune::Color::WHITE.alpha(0.62))
                 .group_opacity(0.0, 1.0),
         );
+    poster_box = report_focused_rect(poster_box, s, &focus_key);
     // The silent hover preview: a trickplay frame from the item, drawn over its poster once
     // the pointer has rested. It is opt-in and has no audio track at all.
     if s.hover_preview_enabled

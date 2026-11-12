@@ -4743,6 +4743,58 @@ mod tests {
     }
 
     #[test]
+    fn the_focused_card_halo_returns_after_a_sideways_move() {
+        // The halo used to vanish for good on a sideways move in a rail with nothing left to
+        // scroll: the card had reported its rect once already, and Rune reports a stationary
+        // element only on its first draw, so the cleared rect was never set again until the card
+        // moved for some other reason.
+        let env = Env {
+            system_dark: true,
+            scale: 1.5,
+        };
+        let mut state = home_state();
+        state.big_screen = true;
+        state.route = Route::Home;
+        let mut rt = Runtime::new(state, view, (1280.0, 720.0), env);
+        rt.on_key = Some(on_key);
+        rt.frame(0.0);
+        let key = rt
+            .state
+            .take_focus_key()
+            .expect("home asks for its first card");
+        rt.state.note_focus(key.clone());
+        rt.update(|_, tx| tx.focus_key(key));
+        let mut t = 0.0;
+        for _ in 0..8 {
+            t += 0.016;
+            rt.frame(t);
+        }
+        assert!(rt.find("focus-glow").is_some(), "the halo starts on a card");
+
+        for step in 0..2 {
+            rt.key(KeyEvent {
+                key: Key::Right,
+                mods: Default::default(),
+            });
+            for _ in 0..4 {
+                t += 0.016;
+                rt.frame(t);
+            }
+            let focused = rt.state.focused_key.clone().expect("a card holds focus");
+            let drawn = rt.presented(&focused).expect("the card is drawn");
+            let rect = rt
+                .state
+                .focused_card_rect
+                .unwrap_or_else(|| panic!("step {step}: the card reported no rect"));
+            assert_eq!(rect, drawn.0, "step {step}: the halo sits on the card");
+            assert!(
+                rt.find("focus-glow").is_some(),
+                "step {step}: the halo is drawn"
+            );
+        }
+    }
+
+    #[test]
     fn the_search_field_leaves_down_for_its_results() {
         let env = Env {
             system_dark: true,

@@ -636,30 +636,23 @@ pub(super) fn discover_card(item: &seerr_api::DiscoverItem, s: &State, t: &tok::
         .cursor(rune::Cursor::Pointer)
         .on_press(move |s: &mut State| s.open_seerr_detail(media_type.clone(), tmdb_id))
         .child(
-            el().w(CARD_W)
-                .h(CARD_H)
-                .radius(10.0)
-                .clip_rounded(10.0)
-                .fill(t.card)
-                .inset_edge()
-                .outline(1.0, 0.0, t.card_border)
-                .shadow(10.0, 24.0, t.shadow_soft)
-                .on_drawn_layout_tx({
-                    let key = card_key.clone();
-                    move |s: &mut State, rect: [f32; 4], tx: &mut rune::Tx| {
-                        if s.focused_key.as_deref() == Some(key.as_str())
-                            && s.focused_card_rect != Some(rect)
-                        {
-                            s.focused_card_rect = Some(rect);
-                            tx.wake_after(std::time::Duration::from_millis(0));
-                        }
-                    }
-                })
-                .child(poster)
-                .children(
-                    (state != seerr_api::MediaStatus::Unknown)
-                        .then(|| el().absolute(8.0, 8.0).child(status_chip(state, t))),
-                ),
+            super::report_focused_rect(
+                el().w(CARD_W)
+                    .h(CARD_H)
+                    .radius(10.0)
+                    .clip_rounded(10.0)
+                    .fill(t.card)
+                    .inset_edge()
+                    .outline(1.0, 0.0, t.card_border)
+                    .shadow(10.0, 24.0, t.shadow_soft),
+                s,
+                &card_key,
+            )
+            .child(poster)
+            .children(
+                (state != seerr_api::MediaStatus::Unknown)
+                    .then(|| el().absolute(8.0, 8.0).child(status_chip(state, t))),
+            ),
         )
         .child(
             text(item.title().to_string())
