@@ -1200,36 +1200,18 @@ fn in_app_audio_scene(_s: &mut State) {}
 /// Refuse a second full instance. The socket is only a lease: a live connection means another
 /// process owns it; a stale socket is removed and reclaimed. `--snap` is exempt because it is a
 /// headless tool, not a desktop session.
-fn claim_single_instance() -> bool {
-    use std::os::unix::net::{UnixListener, UnixStream};
-    if std::env::args().any(|arg| arg == "--snap") {
-        return true;
-    }
-    let path = std::env::temp_dir().join(format!(
-        "runefin-{}.sock",
-        std::env::var("USER").unwrap_or_else(|_| "user".into())
-    ));
-    if UnixStream::connect(&path).is_ok() {
-        eprintln!("Runefin is already running.");
-        return false;
-    }
-    let _ = std::fs::remove_file(&path);
-    let Ok(listener) = UnixListener::bind(&path) else {
-        return true;
-    };
-    // Keep the listener for the process lifetime. Dropping it would release the lease while
-    // the app is still open.
-    std::mem::forget(listener);
-    true
-}
-
 fn main() {
     crate::bench::start();
     // GPU setup (adapter, device, the uber pipeline) takes 40-60 ms behind a window's first
     // frame, and Rune only starts it once the event loop is being built. Starting it here, before
     // the instance claim and the config read, overlaps it with everything a launch does first.
     rune::prewarm_gpu();
-    if !claim_single_instance() {
+    // One Runefin: a second launch brings the running window forward instead of starting another
+    // player. Rune's claim (a socket in the runtime folder) also takes over one left by a process
+    // that died, and hands the second launch's arguments to the first, which is where deep links
+    // will arrive. A headless render never claims, so two snapshots can run side by side.
+    let headless = std::env::args().any(|arg| arg == "--snap" || arg == "--tree");
+    if !headless && !rune::single_instance("io.github.lifk.Runefin") {
         return;
     }
     let startup = config::Config::load();

@@ -251,6 +251,9 @@ separate window. `scripts/check.sh` builds it; the player's contract is
 - **Copy link** on the item menu, and **MPRIS shuffle/loop** properties now have real
   setters (loop maps to the A–B range).
 - **Live channel favourites** filter the list and the guide; the set persists in the config.
+- **One window per app**: a second launch hands its place to the running one and brings it forward
+  (Rune's own instance claim, a socket in the runtime folder), so clicking the icon again never
+  starts a second player. Headless renders never claim, so two snapshots can run at once.
 - **Crash-safe navigation**: the last library or detail page is remembered in the config and
   reopened after the first Home load with a short “Returned to where you left off.” toast.
 - **Local watch history and stats**: one JSONL line per completed play under

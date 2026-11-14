@@ -3061,7 +3061,7 @@ dependencies = [
 [[package]]
 name = "rune"
 version = "0.0.1"
-source = "git+https://github.com/lifk/rune?rev=3fd8f44f8cfa4e0a355f42c78d624f053d539a71#3fd8f44f8cfa4e0a355f42c78d624f053d539a71"
+source = "git+https://github.com/lifk/rune?rev=0dbad3f0695c4e9ce11d1876491c2fb35e32e1b2#0dbad3f0695c4e9ce11d1876491c2fb35e32e1b2"
 dependencies = [
  "accesskit",
  "accesskit_macos",
@@ -3096,6 +3096,7 @@ dependencies = [
  "objc2-io-surface",
  "objc2-metal 0.3.2",
  "parley",
+ "parley_engine",
  "png 0.18.1",
  "pollster",
  "portable-atomic",
@@ -3109,8 +3110,10 @@ dependencies = [
  "serde",
  "serde_json",
  "skrifa",
+ "spellbook",
  "swash",
  "taffy",
+ "tiny-skia-path 0.11.4 (git+https://github.com/lifk/rune?rev=0dbad3f0695c4e9ce11d1876491c2fb35e32e1b2)",
  "tokio",
  "unicode-segmentation",
  "wasm-bindgen",
@@ -3138,12 +3141,12 @@ dependencies = [
 [[package]]
 name = "rune-motion"
 version = "0.1.0"
-source = "git+https://github.com/lifk/rune?rev=3fd8f44f8cfa4e0a355f42c78d624f053d539a71#3fd8f44f8cfa4e0a355f42c78d624f053d539a71"
+source = "git+https://github.com/lifk/rune?rev=0dbad3f0695c4e9ce11d1876491c2fb35e32e1b2#0dbad3f0695c4e9ce11d1876491c2fb35e32e1b2"
 
 [[package]]
 name = "rune-staging"
 version = "0.0.1"
-source = "git+https://github.com/lifk/rune?rev=3fd8f44f8cfa4e0a355f42c78d624f053d539a71#3fd8f44f8cfa4e0a355f42c78d624f053d539a71"
+source = "git+https://github.com/lifk/rune?rev=0dbad3f0695c4e9ce11d1876491c2fb35e32e1b2#0dbad3f0695c4e9ce11d1876491c2fb35e32e1b2"
 dependencies = [
  "wgpu",
 ]
@@ -3151,7 +3154,7 @@ dependencies = [
 [[package]]
 name = "rune-taffy"
 version = "0.0.1"
-source = "git+https://github.com/lifk/rune?rev=3fd8f44f8cfa4e0a355f42c78d624f053d539a71#3fd8f44f8cfa4e0a355f42c78d624f053d539a71"
+source = "git+https://github.com/lifk/rune?rev=0dbad3f0695c4e9ce11d1876491c2fb35e32e1b2#0dbad3f0695c4e9ce11d1876491c2fb35e32e1b2"
 dependencies = [
  "taffy",
 ]
@@ -3522,6 +3525,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "spellbook"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0d204abcbdf8e88729306a8d0ca01a79d8a49969fe1f84696909d6dbc4321c1a"
+dependencies = [
+ "foldhash 0.2.0",
+ "hashbrown 0.17.1",
+]
+
+[[package]]
 name = "spirv"
 version = "0.4.0+sdk-1.4.341.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3735,7 +3748,7 @@ dependencies = [
  "cfg-if",
  "log",
  "png 0.17.16",
- "tiny-skia-path",
+ "tiny-skia-path 0.11.4 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -3743,6 +3756,16 @@ name = "tiny-skia-path"
 version = "0.11.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9c9e7fc0c2e86a30b117d0462aa261b72b7a99b7ebd7deb3a14ceda95c5bdc93"
+dependencies = [
+ "arrayref",
+ "bytemuck",
+ "strict-num",
+]
+
+[[package]]
+name = "tiny-skia-path"
+version = "0.11.4"
+source = "git+https://github.com/lifk/rune?rev=0dbad3f0695c4e9ce11d1876491c2fb35e32e1b2#0dbad3f0695c4e9ce11d1876491c2fb35e32e1b2"
 dependencies = [
  "arrayref",
  "bytemuck",
@@ -4003,7 +4026,7 @@ dependencies = [
  "siphasher",
  "strict-num",
  "svgtypes",
- "tiny-skia-path",
+ "tiny-skia-path 0.11.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "xmlwriter",
 ]
 
@@ -4375,7 +4398,7 @@ dependencies = [
 [[package]]
 name = "wgpu-external-frame"
 version = "0.4.0"
-source = "git+https://github.com/lifk/rune?rev=3fd8f44f8cfa4e0a355f42c78d624f053d539a71#3fd8f44f8cfa4e0a355f42c78d624f053d539a71"
+source = "git+https://github.com/lifk/rune?rev=0dbad3f0695c4e9ce11d1876491c2fb35e32e1b2#0dbad3f0695c4e9ce11d1876491c2fb35e32e1b2"
 dependencies = [
  "ash",
  "glow",
