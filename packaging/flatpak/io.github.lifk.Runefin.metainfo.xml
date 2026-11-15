@@ -42,6 +42,25 @@
   </screenshots>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.1.37" date="2026-11-15">
+      <description>
+        <p>
+          A polish release. The library filters are exact again: missing, unaired, 4K and
+          subtitle filters are boolean query parameters in Jellyfin 12.4, not names inside
+          the Filters list, so they were silently ignored and a healthy library could report
+          every title missing. Home gains a Coming up rail from the server's air-date
+          lookahead, Live TV remembers the channel last tuned on this device, and detail shows
+          the server tagline and hides the next episode's title under the spoiler guard.
+          Search no longer offers fixture titles to a signed-in reader, and long card titles
+          wrap to two lines instead of being clipped. The visual pass raises secondary-text
+          contrast, draws a near-white focus ring, replaces the 500 ms bouncy motion default
+          with a 160/180 ms ladder, and rebuilds the detail loading state, filter sheet,
+          player gear, end card and card menu. Exiting is now a real path: SIGTERM/SIGINT,
+          Settings and the tray all save, stop playback and release the idle inhibitor; the
+          tray raises the window, and the Flatpak grants the tray and logind names.
+        </p>
+      </description>
+    </release>
     <release version="0.1.36" date="2026-11-12">
       <description>
         <p>
