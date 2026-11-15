@@ -1,6 +1,6 @@
 //! Settings: the facts about this install, plus the two actions that belong here.
 
-use rune::tok::{self, motion};
+use rune::tok;
 
 use crate::theme::FocusVisual;
 use crate::theme::SurfaceStyle;
@@ -30,15 +30,16 @@ fn arrows_leave(input: El) -> El {
 }
 
 fn stepper_button(label: &str, key: &str, t: &tok::Theme, on: impl Fn(&mut State) + 'static) -> El {
+    let big = crate::theme::is_big_screen();
     el().key(key)
         .role("button")
-        .h(32.0)
-        .w(36.0)
+        .h(if big { 40.0 } else { 32.0 })
+        .w(if big { 44.0 } else { 36.0 })
         .radius(8.0)
         .center()
         .fill(t.bg)
         .hover(t.hover)
-        .motion(motion::SNAPPY)
+        .motion(crate::theme::motion::CONTROL)
         .focusable(true)
         .focus_visual(2.0)
         .press_scale(0.95)
@@ -221,7 +222,7 @@ pub(super) fn settings_screen(s: &State) -> El {
                             .fill(t.bg)
                             .outline(1.0, 0.0, t.card_border)
                             .hover(t.hover)
-                            .motion(motion::SNAPPY)
+                            .motion(crate::theme::motion::CONTROL)
                             .focusable(true)
                             .focus_visual(2.0)
                             .press_scale(0.96)
@@ -539,42 +540,58 @@ pub(super) fn settings_screen(s: &State) -> El {
         let boolean = value == "On" || value == "Off";
         let control = theme::tv_focus(if boolean {
             let on = value == "On";
+            let big = crate::theme::is_big_screen();
             el().key(format!("{key}-value"))
                 .role("switch")
                 .label(label.to_string())
                 .checked(on)
-                .w(38.0)
-                .h(22.0)
-                .radius(11.0)
+                .w(if big { 56.0 } else { 38.0 })
+                .h(if big { 32.0 } else { 22.0 })
+                .radius(if big { 16.0 } else { 11.0 })
                 .fill(if on {
                     tok::accent(0, true)
                 } else {
                     t.control_off
                 })
-                .motion(motion::SNAPPY)
+                .motion(crate::theme::motion::CONTROL)
                 .focusable(true)
                 .focus_visual(2.0)
                 .press_scale(0.97)
                 .cursor(rune::Cursor::Pointer)
                 .child(
-                    el().absolute(if on { 18.0 } else { 2.0 }, 2.0)
-                        .size(18.0, 18.0)
-                        .radius(9.0)
-                        .fill(t.knob)
-                        .shadow(0.0, 2.0, t.shadow),
+                    el().absolute(
+                        if on {
+                            if big { 26.0 } else { 18.0 }
+                        } else {
+                            2.0
+                        },
+                        2.0,
+                    )
+                    .size(if big { 28.0 } else { 18.0 }, if big { 28.0 } else { 18.0 })
+                    .radius(if big { 14.0 } else { 9.0 })
+                    .fill(t.knob)
+                    .shadow(0.0, 2.0, t.shadow),
                 )
                 .on_press(action)
         } else {
             el().key(format!("{key}-value"))
                 .role("button")
-                .h(32.0)
-                .min_w(150.0)
+                .h(if crate::theme::is_big_screen() {
+                    40.0
+                } else {
+                    32.0
+                })
+                .min_w(if crate::theme::is_big_screen() {
+                    180.0
+                } else {
+                    150.0
+                })
                 .px(14.0)
                 .radius(10.0)
                 .center()
                 .fill(t.bg)
                 .hover(t.hover)
-                .motion(motion::SNAPPY)
+                .motion(crate::theme::motion::CONTROL)
                 .focusable(true)
                 .focus_visual(2.0)
                 .press_scale(0.97)
@@ -601,7 +618,15 @@ pub(super) fn settings_screen(s: &State) -> El {
                         .w(220.0),
                 )
                 .child(el().grow(1.0))
-                .child(el().w(150.0).justify_end().child(control)),
+                .child(
+                    el().w(if crate::theme::is_big_screen() {
+                        180.0
+                    } else {
+                        150.0
+                    })
+                    .justify_end()
+                    .child(control),
+                ),
         );
     }
     if s.ui_mode_restart && s.config.big_screen() != s.big_screen {
@@ -829,7 +854,7 @@ pub(super) fn settings_screen(s: &State) -> El {
                         t.bg
                     })
                     .hover(t.hover)
-                    .motion(motion::SNAPPY)
+                    .motion(crate::theme::motion::CONTROL)
                     .focusable(true)
                     .focus_visual(2.0)
                     .press_scale(0.97)
@@ -864,7 +889,7 @@ pub(super) fn settings_screen(s: &State) -> El {
                 .center()
                 .fill(t.bg)
                 .hover(t.hover)
-                .motion(motion::SNAPPY)
+                .motion(crate::theme::motion::CONTROL)
                 .focusable(true)
                 .focus_visual(2.0)
                 .press_scale(0.97)
@@ -960,7 +985,7 @@ pub(super) fn settings_screen(s: &State) -> El {
                         .center()
                         .fill(t.bg)
                         .hover(t.hover)
-                        .motion(motion::SNAPPY)
+                        .motion(crate::theme::motion::CONTROL)
                         .focusable(true)
                         .focus_visual(2.0)
                         .press_scale(0.97)
@@ -1168,11 +1193,11 @@ pub(super) fn settings_screen(s: &State) -> El {
                             .shadow(1.0, 2.0, Color::BLACK.alpha(0.30))
                             .shadow(4.0, 12.0, tok::accent(0, true).alpha(0.35))
                             .hover(t.hover)
-                            .motion(motion::SNAPPY)
+                            .motion(crate::theme::motion::CONTROL)
                             .focusable(true)
                             .focus_visual(2.0)
                             .press_scale(0.97)
-                            .child(text("Test").font(type_::label()).color(t.bg))
+                            .child(text("Test").font(type_::label()).color(theme::on_accent()))
                             .cursor(rune::Cursor::Pointer)
                             .on_press(|s: &mut State| s.test_seerr()),
                     )
@@ -1185,7 +1210,7 @@ pub(super) fn settings_screen(s: &State) -> El {
                             .center()
                             .fill(t.bg)
                             .hover(t.hover)
-                            .motion(motion::SNAPPY)
+                            .motion(crate::theme::motion::CONTROL)
                             .focusable(true)
                             .focus_visual(2.0)
                             .press_scale(0.97)
@@ -1202,7 +1227,7 @@ pub(super) fn settings_screen(s: &State) -> El {
                             .center()
                             .fill(t.bg)
                             .hover(t.hover)
-                            .motion(motion::SNAPPY)
+                            .motion(crate::theme::motion::CONTROL)
                             .focusable(true)
                             .focus_visual(2.0)
                             .press_scale(0.97)
@@ -1267,7 +1292,7 @@ pub(super) fn settings_screen(s: &State) -> El {
                         .center()
                         .fill(t.bg)
                         .hover(t.hover)
-                        .motion(motion::SNAPPY)
+                        .motion(crate::theme::motion::CONTROL)
                         .focusable(true)
                         .focus_visual(2.0)
                         .press_scale(0.97)
@@ -1288,7 +1313,7 @@ pub(super) fn settings_screen(s: &State) -> El {
                         .center()
                         .fill(t.bg)
                         .hover(t.hover)
-                        .motion(motion::SNAPPY)
+                        .motion(crate::theme::motion::CONTROL)
                         .focusable(true)
                         .focus_visual(2.0)
                         .press_scale(0.97)
@@ -1367,7 +1392,7 @@ pub(super) fn settings_screen(s: &State) -> El {
                         .surface_sheen()
                         .shadow(1.0, 2.0, t.shadow)
                         .hover(t.hover)
-                        .motion(motion::SNAPPY)
+                        .motion(crate::theme::motion::CONTROL)
                         .focusable(true)
                         .focus_visual(2.0)
                         .press_scale(0.97)
@@ -1390,7 +1415,7 @@ pub(super) fn settings_screen(s: &State) -> El {
                         .surface_sheen()
                         .shadow(1.0, 2.0, t.shadow)
                         .hover(t.hover)
-                        .motion(motion::SNAPPY)
+                        .motion(crate::theme::motion::CONTROL)
                         .focusable(true)
                         .focus_visual(2.0)
                         .press_scale(0.97)
@@ -1419,7 +1444,7 @@ pub(super) fn settings_screen(s: &State) -> El {
                         .center()
                         .fill(t.card)
                         .hover(t.hover)
-                        .motion(motion::SNAPPY)
+                        .motion(crate::theme::motion::CONTROL)
                         .focusable(true)
                         .focus_visual(2.0)
                         .press_scale(0.97)
@@ -1436,7 +1461,7 @@ pub(super) fn settings_screen(s: &State) -> El {
                         .center()
                         .fill(t.card)
                         .hover(t.hover)
-                        .motion(motion::SNAPPY)
+                        .motion(crate::theme::motion::CONTROL)
                         .focusable(true)
                         .focus_visual(2.0)
                         .press_scale(0.97)
@@ -1458,17 +1483,37 @@ pub(super) fn settings_screen(s: &State) -> El {
                 .center()
                 .fill(t.card)
                 .hover(t.hover)
-                .motion(motion::SNAPPY)
+                .motion(crate::theme::motion::CONTROL)
                 .focusable(true)
                 .focus_visual(2.0)
                 .press_scale(0.97)
                 .child(
                     text("Sign out")
                         .font(type_::label())
-                        .color(tok::accent(2, true)),
+                        .color(crate::theme::status::danger()),
                 )
                 .cursor(rune::Cursor::Pointer)
                 .on_press(|s: &mut State| s.sign_out()),
+        )
+        .child(
+            // The only in-app exit. On a Steam Machine, "Exit game" is the overlay's job, but
+            // a couch should still be able to leave without hunting for it.
+            el().key("settings-quit")
+                .role("button")
+                .h(36.0)
+                .w(160.0)
+                .radius(8.0)
+                .center()
+                .fill(t.card)
+                .hover(t.hover)
+                .motion(crate::theme::motion::CONTROL)
+                .focusable(true)
+                .focus_visual(2.0)
+                .press_scale(0.97)
+                .label("Quit Runefin")
+                .child(text("Quit Runefin").font(type_::label()).color(t.text))
+                .cursor(rune::Cursor::Pointer)
+                .on_press_tx(|_s: &mut State, tx: &mut rune::Tx| tx.quit()),
         );
     if let Some(notice) = &s.image_notice {
         content = content.child(

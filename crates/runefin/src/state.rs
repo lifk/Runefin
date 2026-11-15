@@ -378,6 +378,7 @@ pub struct State {
     home_rails: Latest<Result<HomeRails, String>>,
     pub home_data: HomeData,
     home_next_up: Latest<Vec<Item>>,
+    home_upcoming: Latest<Vec<Item>>,
     home_on_now: Latest<Vec<Item>>,
     home_recently_played: Latest<Vec<Item>>,
     home_collections: Latest<Vec<Item>>,
@@ -781,9 +782,18 @@ pub struct State {
     /// Reader text size applied to every type token.
     pub text_scale: f32,
     pub mpris_shuffle: bool,
+    /// The last poster path published to MPRIS, keyed by item id. Resolving it calls
+    /// `Path::exists`; doing that on every presented frame was a syscall per video frame.
+    mpris_art_cache: std::cell::RefCell<Option<(String, String)>>,
     tray: Option<rune::Tray>,
     tray_events: std::sync::Arc<std::sync::Mutex<std::collections::VecDeque<rune::TrayEvent>>>,
     tray_tooltip: String,
+    /// A tray/menu action the frame could not carry out itself; `main`'s poll applies it with a
+    /// `Tx` or the app handle.
+    pub quit_requested: bool,
+    pub open_requested: bool,
+    /// The last title handed to the window manager, so it is only set when it changes.
+    window_title: String,
     /// Local watch history, newest last.
     pub history: Vec<crate::history::HistoryEntry>,
     pub history_ms: i64,
@@ -856,6 +866,7 @@ impl State {
             home_rails: Latest::default(),
             home_data: HomeData::default(),
             home_next_up: Latest::default(),
+            home_upcoming: Latest::default(),
             home_on_now: Latest::default(),
             home_recently_played: Latest::default(),
             home_collections: Latest::default(),
@@ -1149,11 +1160,16 @@ impl State {
             high_contrast: false,
             text_scale: 1.0,
             mpris_shuffle: false,
+
+            mpris_art_cache: std::cell::RefCell::new(None),
             tray: None,
             tray_events: std::sync::Arc::new(std::sync::Mutex::new(
                 std::collections::VecDeque::new(),
             )),
             tray_tooltip: String::new(),
+            quit_requested: false,
+            open_requested: false,
+            window_title: "Runefin".into(),
             history: Vec::new(),
             history_ms: 0,
             pending_place: config.last_place.clone(),
@@ -1546,6 +1562,9 @@ impl State {
                 rune::TrayItem::action("previous", "Previous"),
                 rune::TrayItem::Separator,
                 rune::TrayItem::action("stop", "Stop"),
+                rune::TrayItem::Separator,
+                rune::TrayItem::action("show", "Show Runefin"),
+                rune::TrayItem::action("quit", "Quit"),
             ]);
         self.tray = rune::Tray::new(spec, move |event| {
             if let Ok(mut queue) = events.lock() {
@@ -1796,6 +1815,59 @@ impl State {
     /// Copy the session-local subtitle preferences into the config when the window closes.
     /// Called from `on_close`, not from a control handler: saving on every stepper click would
     /// put a file write on the UI thread.
+    /// Everything that must happen before the process ends, from any exit path: a window close,
+    /// a tray Quit, or a SIGTERM from Steam's "Exit game". Idempotent, so `on_quit` and
+    /// `on_close` may both run.
+    pub fn shutdown(&mut self) {
+        self.save_preferences();
+        self.stop_in_app();
+        self.stop_playback();
+    }
+
+    /// The window title for the current route, when it changed. A task switcher and a media
+    /// widget read this, so "Runefin" everywhere was a missed label on every screen.
+    pub fn sync_window_title(&mut self) -> Option<String> {
+        let title = if let Some(session) = &self.in_app {
+            format!("{} — Runefin", session.item.name)
+        } else {
+            match &self.route {
+                Route::Home => "Runefin".to_string(),
+                Route::Library { .. } => format!(
+                    "{} — Runefin",
+                    self.library
+                        .as_ref()
+                        .map(|library| library.name.as_str())
+                        .unwrap_or("Library")
+                ),
+                Route::Detail { .. } => format!(
+                    "{} — Runefin",
+                    self.detail
+                        .as_ref()
+                        .map(|detail| detail.item.name.as_str())
+                        .unwrap_or("Detail")
+                ),
+                Route::Person { .. } => format!(
+                    "{} — Runefin",
+                    self.person
+                        .as_ref()
+                        .map(|person| person.name.as_str())
+                        .unwrap_or("Person")
+                ),
+                Route::Search { .. } => "Search — Runefin".to_string(),
+                Route::Remote => "Remote — Runefin".to_string(),
+                Route::LiveTv => "Live TV — Runefin".to_string(),
+                Route::Settings => "Settings — Runefin".to_string(),
+                Route::Seerr => "Discover — Runefin".to_string(),
+                Route::SeerrDetail { .. } => "Discover — Runefin".to_string(),
+                Route::SeerrPerson { .. } => "Person — Runefin".to_string(),
+            }
+        };
+        (title != self.window_title).then(|| {
+            self.window_title.clone_from(&title);
+            title
+        })
+    }
+
     pub fn save_preferences(&mut self) {
         let omdb = self.omdb_key.text.trim().to_string();
         self.config.omdb_api_key = if omdb.is_empty() { None } else { Some(omdb) };
@@ -1882,6 +1954,7 @@ impl State {
         self.home_watching.set_waker(waker.clone());
         self.home_rails.set_waker(waker.clone());
         self.home_next_up.set_waker(waker.clone());
+        self.home_upcoming.set_waker(waker.clone());
         self.home_on_now.set_waker(waker.clone());
         self.home_recently_played.set_waker(waker.clone());
         self.home_collections.set_waker(waker.clone());
@@ -2057,10 +2130,23 @@ impl State {
                             self.play_in_app_previous();
                             true
                         }
+                        "show" => {
+                            self.open_requested = true;
+                            true
+                        }
+                        "quit" => {
+                            self.quit_requested = true;
+                            true
+                        }
                         _ => false,
                     };
                 }
-                rune::TrayEvent::Activate { .. } => {}
+                rune::TrayEvent::Activate { .. } => {
+                    // A click on the icon means "bring the app forward", the one thing a tray
+                    // icon must do. It was ignored.
+                    self.open_requested = true;
+                    changed = true;
+                }
                 _ => {}
             }
         }
@@ -2083,6 +2169,7 @@ impl State {
             // The slowest home query (337 ms against this server), and its rail is the last one:
             // asking for it after the rails land keeps it out of the first paint's way.
             self.load_recently_played();
+            self.load_upcoming();
         }
         if let Some((items, shuffle)) = self.queue_load.take() {
             if !items.is_empty() {
@@ -2157,6 +2244,14 @@ impl State {
         if let Some(next_up) = self.home_next_up.take() {
             if self.is_signed_in() {
                 self.home_data.next_up = next_up;
+                self.request_images();
+                self.save_home_snapshot();
+            }
+            changed = true;
+        }
+        if let Some(upcoming) = self.home_upcoming.take() {
+            if self.is_signed_in() {
+                self.home_data.upcoming = upcoming;
                 self.request_images();
                 self.save_home_snapshot();
             }
@@ -2722,6 +2817,23 @@ impl State {
         self.home_loaded = true;
         self.home_from_cache = false;
         self.home_error = Some(message);
+    }
+
+    /// The air-date lookahead rides behind the first paint: it is a whole extra query and its
+    /// rail sits below Next Up, so it must not compete with the rails the reader sees first.
+    fn load_upcoming(&mut self) {
+        if !self.fetch_home || !self.is_signed_in() {
+            return;
+        }
+        let Some(client) = self.client() else {
+            return;
+        };
+        self.home_upcoming.request((), move |()| {
+            let t = crate::bench::timer();
+            let answer = crate::home::load_upcoming(&client);
+            crate::bench::lap("upcoming", t);
+            answer
+        });
     }
 
     /// The trailing rail, asked for once the first paint is out of the way.
@@ -4652,6 +4764,7 @@ impl State {
         self.home_watching.cancel();
         self.home_rails.cancel();
         self.home_next_up.cancel();
+        self.home_upcoming.cancel();
         self.home_collections.cancel();
         self.playlists_load.cancel();
         self.library_page.cancel();
@@ -4745,6 +4858,7 @@ mod tests {
             home_rails: Latest::default(),
             home_data: HomeData::default(),
             home_next_up: Latest::default(),
+            home_upcoming: Latest::default(),
             home_on_now: Latest::default(),
             home_recently_played: Latest::default(),
             home_collections: Latest::default(),
@@ -5027,11 +5141,16 @@ mod tests {
             high_contrast: false,
             text_scale: 1.0,
             mpris_shuffle: false,
+
+            mpris_art_cache: std::cell::RefCell::new(None),
             tray: None,
             tray_events: std::sync::Arc::new(std::sync::Mutex::new(
                 std::collections::VecDeque::new(),
             )),
             tray_tooltip: String::new(),
+            quit_requested: false,
+            open_requested: false,
+            window_title: "Runefin".into(),
             history: Vec::new(),
             pending_place: None,
             history_ms: 0,

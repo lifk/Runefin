@@ -1,7 +1,7 @@
 //! What the app shows while mpv owns the screen: the poster, title, elapsed/remaining and the
 //! two controls that matter. mpv itself draws the video in its own window on Wayland.
 
-use rune::tok::{self, motion};
+use rune::tok;
 
 use crate::theme::FocusVisual;
 use crate::theme::{self, type_};
@@ -58,7 +58,7 @@ pub(super) fn now_playing(s: &State) -> El {
                 text(error.clone())
                     .key("now-error")
                     .font(subtitle_style())
-                    .color(tok::accent(2, true)),
+                    .color(theme::status::danger()),
             );
         }
         page = page.child(waiting);
@@ -188,7 +188,7 @@ pub(super) fn now_playing(s: &State) -> El {
             text(error.clone())
                 .key("now-error")
                 .font(subtitle_style())
-                .color(tok::accent(2, true)),
+                .color(theme::status::danger()),
         );
     }
 
@@ -221,7 +221,7 @@ fn control(
         .center()
         .fill(if selected { tok::accent(0, true) } else { t.bg })
         .hover(t.hover)
-        .motion(motion::SNAPPY)
+        .motion(crate::theme::motion::CONTROL)
         .focusable(true)
         .focus_visual(2.0)
         .press_scale(0.97)

@@ -96,6 +96,17 @@ pub mod type_ {
     }
 }
 
+/// The motion ladder from `docs/design.md`. Rune's `SNAPPY` is 500 ms with bounce 0.15 —
+/// three times the design's hover time — so every call site reads these instead.
+pub mod motion {
+    use rune::Spring;
+
+    /// Card hover in and out (the same spring both ways; 160 ms).
+    pub const HOVER: Spring = Spring::new(0.16, 0.0);
+    /// A control's wash, border and focus state (180 ms).
+    pub const CONTROL: Spring = Spring::new(0.18, 0.0);
+}
+
 /// The wordmark and the app mark, decoded once from the committed PNGs. Decoding is the same
 /// `image` crate the placeholder pipeline uses, so the app adds no second decoder. A broken
 /// asset draws nothing rather than panicking at startup.
@@ -140,33 +151,44 @@ pub const RAIL_GAP: f32 = 40.0;
 pub const GUTTER: f32 = 40.0;
 pub const SIDEBAR_W: f32 = 224.0;
 
-/// Visible over both themes; white disappears on a light surface.
+/// The accent's state blue, kept for the glows and washes that are not text.
 pub const FOCUS: Color = Color {
-    r: 0.0,
-    g: 0.20,
-    b: 0.80,
+    r: 0.26,
+    g: 0.57,
+    b: 0.97,
     a: 1.0,
 };
 
-/// A 2 pt ring is 3 px at 1080p. The neutral colour carries the visibility; a 4 pt solid blue
-/// read as a selection box over artwork.
+/// A 2 pt ring is 3 px at 1080p. A near-white ring is the only one that survives both a dark
+/// poster and the dark theme; on the light theme it flips to near-black.
 pub fn focus_width() -> f32 {
     2.0
 }
 
-/// The focus ring colour. A TV shows a thin neutral ring; the solid blue reads as a selection
-/// box over artwork. Desktop keeps the accent.
+/// The focus ring colour: near-white in the dark theme, near-black in the light one. Both clear
+/// the 3:1 non-text minimum against the surfaces they sit on; accent blue did not.
 pub fn ring() -> Color {
-    if is_big_screen() {
-        colors().text.alpha(0.85)
+    if is_light() {
+        Color::BLACK.alpha(0.82)
     } else {
-        FOCUS
+        Color::WHITE.alpha(0.92)
     }
 }
 
-/// The focus treatment on a control. Desktop keeps the accent ring; big screen uses the same
-/// wash the pointer gets, with no ring: a ring around a card or a sidebar row reads as a
-/// selection box, not as focus.
+/// Ink for a label on an accent fill. The state blue is mid-lightness: white measures 3.14:1 on
+/// it and the near-black background 5.2:1. The better redesign — a light primary with dark ink —
+/// is tracked in docs/research/19-professional-polish-gap-2026-11.md.
+pub fn on_accent() -> Color {
+    if is_light() {
+        colors().text
+    } else {
+        colors().bg
+    }
+}
+
+/// The focus treatment on a control. The ring is a neutral near-white (or near-black) on both
+/// modes; big screen adds the pointer's wash under it so a card answers the D-pad from a couch
+/// distance without turning into a selection box.
 pub trait FocusVisual {
     fn focus_visual(self, radius: f32) -> El;
     /// A lifted card shows focus by its scale alone; desktop keeps its ring.
@@ -175,11 +197,11 @@ pub trait FocusVisual {
 
 impl FocusVisual for El {
     fn focus_visual(self, radius: f32) -> El {
+        let el = self.focus_ring(focus_width(), radius, ring());
         if is_big_screen() {
-            // Without `no_focus_ring`, Rune falls back to its blue default ring.
-            self.focus_fill(colors().hover).no_focus_ring()
+            el.focus_fill(colors().hover)
         } else {
-            self.focus_ring(focus_width(), radius, ring())
+            el
         }
     }
 
@@ -246,9 +268,10 @@ pub fn focus_glow(rect: [f32; 4]) -> El {
 /// activation comes from `rune::set_return_activates`, not from a highlight colour.
 pub fn tv_focus(el: El) -> El {
     if is_big_screen() {
-        // The same neutral wash the pointer gets on the desktop, not an accent slab: focus and
-        // selection must not look alike. No ring, and none of Rune's blue default either.
-        el.focus_fill(colors().hover).no_focus_ring()
+        // The pointer's neutral wash plus the same ring the desktop draws: the wash alone was
+        // a 5 % lift, indistinguishable at couch distance.
+        el.focus_fill(colors().hover)
+            .focus_ring(focus_width(), 8.0, ring())
     } else {
         el
     }
@@ -308,6 +331,12 @@ pub fn readable_lines(
     shadowed(value.into(), style, color, Some(lines))
 }
 
+/// White text over artwork, in either theme. `readable_text` follows the theme's ink, so in
+/// the light theme it would put a white halo behind white resume-card titles and erase them.
+pub fn readable_text_on_art(value: impl Into<String>, style: rune::TextStyle, color: Color) -> El {
+    shadowed_with(value.into(), style, color, None, Color::BLACK.alpha(0.82))
+}
+
 fn shadowed(value: String, style: rune::TextStyle, color: Color, lines: Option<usize>) -> El {
     // On a light surface the text is dark, so the dark halo that separates white text
     // from a poster turns into a smudge. Use a light halo there, and keep the black one
@@ -317,6 +346,16 @@ fn shadowed(value: String, style: rune::TextStyle, color: Color, lines: Option<u
     } else {
         Color::BLACK.alpha(0.80)
     };
+    shadowed_with(value, style, color, lines, shadow_color)
+}
+
+fn shadowed_with(
+    value: String,
+    style: rune::TextStyle,
+    color: Color,
+    lines: Option<usize>,
+    shadow_color: Color,
+) -> El {
     let mut shadow = text(value.clone()).font(style).color(shadow_color);
     let mut main = text(value).font(style).color(color);
     let mut layer = el().items_start();
@@ -357,6 +396,14 @@ pub fn colors() -> Theme {
     theme.bg = theme.bg.mix(cool, 0.028);
     theme.card = theme.card.mix(cool, 0.038);
     theme.separator = theme.separator.mix(cool, 0.04);
+    // The secondary label is the app's most-used text: card meta, settings values, rail titles,
+    // captions on art. Rune's 0.72 lightness measured 3.27:1 on `bg`, below AA for 12–16 pt
+    // text. Raised to 0.80 (≈5.5:1) in the dark theme and to 0.44 in the light one.
+    theme.text_secondary = if is_light() {
+        rune::color::oklch(0.44, 0.01, 265.0)
+    } else {
+        rune::color::oklch(0.80, 0.01, 265.0)
+    };
     // Rune's dark default is a 1.6 % white wash, which is invisible on a card. A 10 % wash is
     // enough for a button to answer the pointer without turning into a second fill.
     theme.hover = Color::WHITE.alpha(0.10);
@@ -466,16 +513,16 @@ pub mod status {
     use super::{is_light, type_};
 
     pub fn success() -> Color {
-        tone(0.76, 0.12, 152.0, 0.52)
+        tone(0.78, 0.12, 152.0, 0.52)
     }
     pub fn warning() -> Color {
-        tone(0.82, 0.11, 78.0, 0.56)
+        tone(0.84, 0.11, 78.0, 0.56)
     }
     pub fn danger() -> Color {
-        tone(0.72, 0.16, 25.0, 0.55)
+        tone(0.76, 0.16, 25.0, 0.55)
     }
     pub fn info() -> Color {
-        tone(0.76, 0.07, 245.0, 0.50)
+        tone(0.80, 0.07, 245.0, 0.50)
     }
     pub fn neutral() -> Color {
         super::colors().text_secondary
@@ -491,7 +538,7 @@ pub mod status {
             .px(7.0)
             .radius(6.0)
             .center()
-            .fill(tone.alpha(0.14))
+            .fill(tone.alpha(0.16))
             .child(text(label.to_owned()).font(type_::caption()).color(tone))
     }
 

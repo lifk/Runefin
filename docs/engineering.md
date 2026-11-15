@@ -187,6 +187,8 @@ HTTP connection pool). Next Up arrives by **~490 ms** and Collections by **~21 m
 is streamed rather than folded into the first paint because enumerating 41 box sets walks every
 library on the server. Detail **54 ms**, search **66 ms**. The pool is one `ureq::Agent` in
 `Client`, cloned with it: a screenful of posters pays one TLS handshake, not one per image.
+The agent carries a 30 s global and 5 s connect timeout, so a request caught by a laptop or
+Steam Machine suspend can fail and retry instead of pinning a worker thread forever.
 Recommendations and cast on an open detail page are High priority, so a cold cache fills the
 visible rail before the hidden home rails that queued behind it.
 

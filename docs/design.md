@@ -106,15 +106,18 @@ library's icon comes from its collection type — film, TV, layers, antenna, lis
 folder for every entry; Watchlist keeps the heart and Discover the compass. Content area owns its
 own scroll.
 
-**Home.** The page heading *is* the Continue Watching rail's heading: the rail carries no second
-title, and its **See all** sits at the header's right. The server name lives in Settings, not
+**Home.** The page has its own heading and one line of context ("Pick up where you left off");
+rails carry their own titles, and a rail's **See all** sits at its right. The server name lives in Settings, not
 in a chip on the page or under the wordmark. A 360 pt card-to-transparent band lights the top of the page, so the
 header has depth and the rails sit on the page's own black — no artwork needed for it. Fixed order: Continue Watching (merged) → Next Up (the server's
-one-episode-per-series answer) → **one Recently Added rail for every video library** → Recently
+one-episode-per-series answer) → **Coming up** (air-date lookahead, deduped by series) → On now →
+**one Recently Added rail for every video library** → Recently
 Played → Collections. There is no rail cap: a server with many libraries gets many rails and Home
 scrolls. A rail hidden with “Not interested” is removed. Empty rails are suppressed, never rendered blank. Rails are horizontal,
 momentum-scrolled, snapped to card boundaries. Every card in a rail asks for its poster when the
 rail is built, not when it first scrolls into view, so swiping a rail never uncovers empty boxes.
+Coming up is requested after the first rails land: it is one more server query and its rail sits
+below the ones the reader sees first.
 
 **Compact hero (optional, off by default).** Settings → Interface adds one 180 pt card above
 Continue Watching with the first visible Continue Watching entry: its own backdrop, *Featured*,
@@ -520,6 +523,13 @@ blocks on a device. On Linux it builds against the system `libudev`. `RUNEFIN_GA
 the listener for a launch; a missing pad is not an error, the thread idles and picks one up later.
 It adds no async runtime, web view or second render stack.
 
+**Process lifecycle.** `signal-hook` 0.3 (`crates/runefin/src/main.rs`) turns SIGTERM and SIGINT —
+Steam's "Exit game", a logoff, Ctrl+C — into the app's own quit, so `on_quit` saves preferences,
+stops playback and releases the idle inhibitor. Rune has no Unix signal hook of its own. The idle
+inhibitor uses `systemd-inhibit` when present and otherwise calls `org.freedesktop.login1.Inhibit`
+through the `zbus` connection the MPRIS service already owns, because the Freedesktop runtime a
+Flatpak runs on does not ship the binary. Neither adds an async runtime, web view or render stack.
+
 ---
 
 ## 7. Designed-for extensions
@@ -747,6 +757,7 @@ created, added to, had a member removed and deleted. The only contract change fo
 | Quick Connect | `POST /QuickConnect/Initiate` → poll `GET /QuickConnect/Connect?secret=` → `POST /Users/AuthenticateWithQuickConnect {Secret}` | **`QuickConnectResult` carries no token.** The token only arrives from the third call — a detail most examples get wrong |
 | Libraries | `GET /UserViews?userId=` | returns each library's `Id` and `CollectionType` |
 | Browse | `GET /Items?userId=&parentId=&includeItemTypes=&recursive=true&sortBy=&startIndex=&limit=&fields=UserData` | `fields=UserData` is mandatory: without it watch state is silently omitted and no poster shows progress |
+| Browse filters | `…&is4K=true&hasSubtitles=true&isMissing=true&isUnaired=true` | these four are **boolean query parameters**, not members of `Filters`; the server accepts them in the list and silently ignores them, so every such filter returned the whole library until 2026-11-15 |
 | Item | `GET /Items/{itemId}?userId=` | full item incl. `UserData`; there is no `fields` param here |
 | Continue Watching | `GET /UserItems/Resume?userId=&limit=&mediaTypes=Video&fields=UserData` | the old `/Users/{userId}/Items/Resume` is **not** in 12.4.0 |
 | Recently added | `GET /Items/Latest?userId=&parentId=&limit=&fields=UserData` | |

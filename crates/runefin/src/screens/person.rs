@@ -3,7 +3,7 @@
 //! follow as a second rail, so a face can lead to something new to request.
 
 use jellyfin_api::Item;
-use rune::tok::{self, motion};
+use rune::tok;
 use rune::{El, ScrollSpec, SurfaceFit, col, el, row, text};
 
 use crate::state::{PersonPage, State};
@@ -99,7 +99,7 @@ pub(super) fn person_screen(s: &State, person: &PersonPage) -> El {
                         .surface_sheen()
                         .shadow(1.0, 2.0, t.shadow)
                         .hover(t.hover)
-                        .motion(motion::SNAPPY)
+                        .motion(crate::theme::motion::CONTROL)
                         .focusable(true)
                         .focus_visual(2.0)
                         .press_scale(0.97)
@@ -154,7 +154,11 @@ fn body(s: &State, person: &PersonPage, t: &tok::Theme) -> El {
             ));
         }
     } else {
-        if person.items.len() > 2 {
+        // "Known for" highlights the first five only when the library has more to show.
+        // Showing all three titles there and then repeating them under "In your library" made
+        // the page look like the same rail twice.
+        let highlighted = if person.items.len() > 5 { 5 } else { 0 };
+        if highlighted > 0 {
             body = body
                 .child(
                     text("Known for")
@@ -173,15 +177,22 @@ fn body(s: &State, person: &PersonPage, t: &tok::Theme) -> El {
                                 person
                                     .items
                                     .iter()
-                                    .take(5)
-                                    .map(|item| super::card(item, "person-known", s, t)),
+                                    .take(highlighted)
+                                    .map(|item| super::card(item, "person", s, t)),
                             ),
                     ),
                 );
         }
         body = body
-            .child(section_heading("In your library", t))
-            .child(grid(s, &person.items, t));
+            .child(section_heading(
+                if highlighted > 0 {
+                    "More in your library"
+                } else {
+                    "In your library"
+                },
+                t,
+            ))
+            .child(grid(s, &person.items[highlighted..], t));
     }
     if person.seerr_loading && person.seerr_credits.is_empty() {
         body = body.child(quiet(
@@ -325,7 +336,7 @@ fn error_card(error: &str, t: &tok::Theme) -> El {
                 .center()
                 .fill(t.card)
                 .hover(t.hover)
-                .motion(motion::SNAPPY)
+                .motion(crate::theme::motion::CONTROL)
                 .focusable(true)
                 .focus_visual(2.0)
                 .press_scale(0.97)
@@ -336,7 +347,11 @@ fn error_card(error: &str, t: &tok::Theme) -> El {
 }
 
 fn grid(s: &State, items: &[Item], t: &tok::Theme) -> El {
-    let mut grid = col().key("person-credits").w_full().gap(theme::CARD_GAP);
+    let mut grid = col()
+        .key("person-credits")
+        .focus_group()
+        .w_full()
+        .gap(theme::CARD_GAP);
     for chunk in items.chunks(5) {
         grid = grid.child(
             row()

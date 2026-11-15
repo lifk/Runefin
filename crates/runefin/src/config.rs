@@ -121,6 +121,9 @@ pub struct Config {
     pub saved_views: Option<Vec<SavedView>>,
     #[serde(default)]
     pub last_place: Option<LastPlace>,
+    /// The channel last tuned on this device, so Live TV can offer it again.
+    #[serde(default)]
+    pub last_channel: Option<String>,
     #[serde(default)]
     pub live_favorites: Option<Vec<String>>,
     /// Programs the reader asked to be reminded about, local to this client.

@@ -418,6 +418,9 @@ fn filters_zones(s: &State, library: &crate::library::LibraryState) -> Vec<Zone>
     if filtered {
         filters.push("filters-clear".into());
     }
+    // The sheet's header carries its own way out; it belongs to the first zone so the D-pad
+    // can reach it without opening another layer.
+    filters.push("library-filters-done".into());
     let sorts = [
         "filters-sort-name",
         "filters-sort-added",
@@ -831,34 +834,27 @@ fn person_zones(s: &State) -> Vec<Zone> {
             parent: Some(0),
         },
     ];
-    let known: Vec<String> = person
-        .items
-        .iter()
-        .take(5)
-        .map(|item| {
-            format!(
-                "person-known-{}",
-                item.series_id.as_deref().unwrap_or(&item.id)
-            )
-        })
-        .collect();
+    // The screen shows the first five as "Known for" only when more than five exist, and the
+    // rest as "More in your library". The zones have to split the same way, or the cards on one
+    // side of the split fall out of the D-pad graph.
+    let split = if person.items.len() > 5 { 5 } else { 0 };
+    let key = |item: &jellyfin_api::Item| {
+        format!("person-{}", item.series_id.as_deref().unwrap_or(&item.id))
+    };
+    let known: Vec<String> = person.items.iter().take(split).map(key).collect();
     if !known.is_empty() {
         zones.push(Zone {
             keys: known,
             columns: 0,
-            parent: Some(0),
+            parent: Some(1),
         });
     }
-    let grid: Vec<String> = person
-        .items
-        .iter()
-        .map(|item| format!("person-{}", item.series_id.as_deref().unwrap_or(&item.id)))
-        .collect();
+    let grid: Vec<String> = person.items.iter().skip(split).map(key).collect();
     if !grid.is_empty() {
         zones.push(Zone {
             keys: grid,
             columns: 5,
-            parent: Some(0),
+            parent: if split > 0 { Some(2) } else { Some(1) },
         });
     }
     zones
@@ -1508,9 +1504,13 @@ mod tests {
         };
         state.person = Some(crate::demo::person());
         let down = step(&state, Some("person-back"), TvAction::Down).expect("known for");
-        assert!(down.starts_with("person-known-"), "{down}");
+        assert!(down.starts_with("person-"), "{down}");
         let grid = step(&state, Some(&down), TvAction::Down).expect("the grid");
         assert!(grid.starts_with("person-"), "{grid}");
+        assert_ne!(
+            grid, down,
+            "the grid must be a different row from Known for"
+        );
     }
 
     #[test]

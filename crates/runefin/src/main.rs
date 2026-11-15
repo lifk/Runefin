@@ -237,6 +237,19 @@ fn setup(s: &mut State, waker: rune::Waker) {
 fn poll(s: &mut State, _clock: f64, tx: &mut Tx) -> bool {
     let started = std::time::Instant::now();
     let mut changed = s.poll();
+    if s.open_requested {
+        s.open_requested = false;
+        if let Some(handle) = APP_HANDLE.get() {
+            handle.open();
+        }
+    }
+    if s.quit_requested {
+        s.quit_requested = false;
+        tx.quit();
+    }
+    if let Some(title) = s.sync_window_title() {
+        tx.set_title(title);
+    }
     if s.home_loaded && !s.home_from_cache {
         crate::bench::landed("bench.home");
     }
@@ -1197,11 +1210,18 @@ fn in_app_audio_scene(s: &mut State) {
 #[cfg(not(debug_assertions))]
 fn in_app_audio_scene(_s: &mut State) {}
 
+/// The live app handle, for frame-time requests the tray can raise but only `main` can carry
+/// out (opening the window). Set once, right after the app is built.
+static APP_HANDLE: std::sync::OnceLock<rune::AppHandle<State>> = std::sync::OnceLock::new();
+
 /// Refuse a second full instance. The socket is only a lease: a live connection means another
 /// process owns it; a stale socket is removed and reclaimed. `--snap` is exempt because it is a
 /// headless tool, not a desktop session.
 fn main() {
     crate::bench::start();
+    // A stable Wayland app id is what the launcher, the window icon and the media widget group
+    // by. Without it the compositor falls back to the executable name.
+    rune::set_app_id("io.github.lifk.Runefin");
     // GPU setup (adapter, device, the uber pipeline) takes 40-60 ms behind a window's first
     // frame, and Rune only starts it once the event loop is being built. Starting it here, before
     // the instance claim and the config read, overlaps it with everything a launch does first.
@@ -2229,15 +2249,37 @@ fn main() {
             }
         });
     })
+    .on_quit(|s: &mut State, _tx: &mut Tx| {
+        // Every quit path — this app's Quit row, the tray, Steam's "Exit game", a logoff —
+        // saves and stops here. `on_close` does not run for an app quit.
+        s.shutdown();
+    })
     .on_close(|s: &mut State, _tx: &mut Tx| {
-        s.save_preferences();
-        s.stop_in_app();
-        s.stop_playback();
+        s.shutdown();
     });
     // The host can start polling before the window has focus and its worker wake lane is live.
     // Keep a short UI-thread heartbeat through the first fetch; after that, the window's own
     // waker and playback face are enough.
     let handle = app.handle();
+    let _ = APP_HANDLE.set(handle.clone());
+    // SteamOS's "Exit game" and a terminal Ctrl+C both send a signal, not a window close. Rune
+    // has no Unix signal hook, so without this the process dies with unsaved preferences, no
+    // playback stop and, worse, the idle inhibitor child left holding the machine awake.
+    #[cfg(unix)]
+    {
+        let signal_handle = handle.clone();
+        let _ = std::thread::Builder::new()
+            .name("runefin-signals".into())
+            .spawn(move || {
+                use signal_hook::consts::{SIGINT, SIGTERM};
+                let Ok(mut signals) = signal_hook::iterator::Signals::new([SIGINT, SIGTERM]) else {
+                    return;
+                };
+                if signals.forever().next().is_some() {
+                    signal_handle.quit();
+                }
+            });
+    }
     pad::start(handle.clone());
     // A launch from a terminal can leave the new window behind the terminal or browser. Ask
     // for it once; a user launch should land in the app, not a skeleton behind another window.
@@ -6713,9 +6755,9 @@ mod tests {
         assert!(query.contains("years=2024"), "{query}");
         assert!(query.contains("minCommunityRating=8.0"), "{query}");
         assert!(query.contains("audioLanguages=eng"), "{query}");
-        assert!(query.contains("Is4K"), "{query}");
-        assert!(query.contains("IsMissing"), "{query}");
-        assert!(query.contains("IsUnaired"), "{query}");
+        assert!(query.contains("is4K=true"), "{query}");
+        assert!(query.contains("isMissing=true"), "{query}");
+        assert!(query.contains("isUnaired=true"), "{query}");
     }
 
     #[test]
@@ -6893,8 +6935,8 @@ mod tests {
         assert!(query.contains("minCommunityRating=7.0"), "{query}");
         assert!(query.contains("audioLanguages=eng"), "{query}");
         assert!(query.contains("subtitleLanguages=eng"), "{query}");
-        assert!(query.contains("HasSubtitles"), "{query}");
-        assert!(query.contains("Is4K"), "{query}");
+        assert!(query.contains("hasSubtitles=true"), "{query}");
+        assert!(query.contains("is4K=true"), "{query}");
     }
 
     #[test]

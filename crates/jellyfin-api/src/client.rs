@@ -133,7 +133,14 @@ impl Client {
             user_id: None,
             device_id: device_id.into(),
             app_version: env!("CARGO_PKG_VERSION"),
-            agent: ureq::Agent::new_with_defaults(),
+            // A request that outlives a suspend-resume must not wedge a worker thread forever.
+            // Thirty seconds is generous for a LAN server and still bounds a dead connection.
+            agent: ureq::Agent::new_with_config(
+                ureq::Agent::config_builder()
+                    .timeout_global(Some(std::time::Duration::from_secs(30)))
+                    .timeout_connect(Some(std::time::Duration::from_secs(5)))
+                    .build(),
+            ),
         }
     }
 
@@ -1472,7 +1479,7 @@ pub struct ItemQuery {
     pub audio_languages: Vec<String>,
     pub subtitle_languages: Vec<String>,
     pub has_subtitles: bool,
-    /// `filters=Is4K`: the server's own 4K flag, not a client-side guess from width.
+    /// `is4K=true`: the server's own 4K flag, not a client-side guess from width.
     pub is_4k: bool,
     pub missing_only: bool,
     pub unaired_only: bool,
@@ -1550,17 +1557,20 @@ impl ItemQuery {
         if self.played_only {
             filters.push("IsPlayed");
         }
+        // These four are their own booleans in the 12.4 OpenAPI, not members of `Filters`.
+        // Jellyfin accepts `HasSubtitles`/`Is4K`/`IsMissing`/`IsUnaired` in the list and then
+        // silently ignores them, which made every filtered query return the whole library.
         if self.has_subtitles {
-            filters.push("HasSubtitles");
+            push("hasSubtitles", "true");
         }
         if self.is_4k {
-            filters.push("Is4K");
+            push("is4K", "true");
         }
         if self.missing_only {
-            filters.push("IsMissing");
+            push("isMissing", "true");
         }
         if self.unaired_only {
-            filters.push("IsUnaired");
+            push("isUnaired", "true");
         }
         if !self.studio_ids.is_empty() {
             push("studioIds", &self.studio_ids.join(","));

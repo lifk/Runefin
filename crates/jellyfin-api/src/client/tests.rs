@@ -83,8 +83,8 @@ fn deep_library_filters_go_on_the_wire() {
     assert!(q.contains("minCommunityRating=7.5"), "{q}");
     assert!(q.contains("audioLanguages=eng"), "{q}");
     assert!(q.contains("subtitleLanguages=spa"), "{q}");
-    assert!(q.contains("HasSubtitles"), "{q}");
-    assert!(q.contains("Is4K"), "{q}");
+    assert!(q.contains("hasSubtitles=true"), "{q}");
+    assert!(q.contains("is4K=true"), "{q}");
     assert!(q.contains("sortBy=Runtime"), "{q}");
 }
 

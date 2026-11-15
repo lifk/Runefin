@@ -1,6 +1,6 @@
 # Runefin — implemented features
 
-Inventory of what the app does today, as of **2026-11-07** on `main`. This is the user-facing
+Inventory of what the app does today, as of **2026-11-15** on `main`. This is the user-facing
 list; the contract is [`design.md`](design.md), the evidence against other clients is
 [`research/06-parity-audit-2026-11.md`](research/06-parity-audit-2026-11.md), the forward-looking
 opportunity brief is [`research/07-feature-opportunities-2026-11.md`](research/07-feature-opportunities-2026-11.md),
@@ -33,10 +33,13 @@ web wrapper and does not embed a second render stack.
 
 ## 2. Shell, navigation and window
 
-- Collapsible sidebar: Home, one entry per server library in server order, Live TV, Playlists,
+- Collapsible sidebar: Home, one entry per server library in server order, Watchlist, Live TV, Playlists,
   **Discover** (only when Seerr is configured), then Search, Remote and Settings; server name and
   connection state; user chip with sign-out.
-- One navigation stack of `(route, scroll offset, focused key)`; **Esc** pops and restores both.
+- A **window title** that follows the screen (library name, film title, "Live TV") and the
+  playing episode, so a task switcher and the media widget have something to show.
+- One navigation stack of `(route, scroll offset, focused key)` for libraries and detail;
+  **Esc** pops and restores both.
 - Shared-element morph from a card's poster into the detail page, and back.
 - Window content size and positive screen position are remembered on close and requested on the
   next launch; the compositor may ignore placement on Wayland.
@@ -75,9 +78,10 @@ web wrapper and does not embed a second render stack.
   holds real content ~150 ms after a cold launch instead of waiting for the library list and one
   Recently Added query per library (~300 ms more). The remaining rails append as they arrive.
 - **Next Up** streamed beside the first paint, so a slow answer never delays Home.
-- One **Recently Added** rail for every video library, then a **Recently Played** rail. That
-  rail is deduplicated by series and never repeats a Continue Watching card. Home has no rail
-  cap; it scrolls.
+- One **Recently Added** rail for every video library, then **Recently Played**. A **Coming up**
+  rail follows Next Up: the server's air-date lookahead (`/Shows/Upcoming`), one card per series,
+  labelled `Airs 4 Dec · S2E06`. That rail is deduplicated by series and never repeats a
+  Continue Watching card. Home has no rail cap; it scrolls.
 - **See all** on Continue Watching, Next Up and Recently Played opens a full grid; a Continue
   Watching card has a hover **Remove** action with Undo.
 - Collections rail so box sets are reachable without opening a library.
@@ -107,7 +111,8 @@ web wrapper and does not embed a second render stack.
 - Filters: All / Unwatched / Favourites; a Genre menu; an A–Z letter rail when sorted by name.
 - The Filters sheet adds year, minimum rating, audio/subtitle language, has-subtitles, 4K,
   missing, unaired, **studio**, **tag**, and **Continuing/Ended** for series; the button counts
-  the active ones.
+  the active ones. It is a bounded panel with its own Done control and two chip rows, so the last
+  control is never cut by the grid. An empty library hides Select and Grid/List.
 - Every active filter is a removable chip above the grid, with **Clear all**.
 - Optional **hover preview** (Settings → Interface, off by default): after 1.1 s on a poster,
   its silent trickplay frames cycle with a `PREVIEW` timestamp. No audio and no player; a title
@@ -151,7 +156,7 @@ web wrapper and does not embed a second render stack.
 - Primary action (**Play** / **Resume 42:13**), **Start over**, **Trailer**, **Favorite**,
   **Watched**, **Playlist**, **Collection**.
 - Overview clamped/expandable.
-- Series: season chips, virtualized episode rows, Play season / Shuffle, next-up episode with
+- Series: season chips, episode rows, Play season / Shuffle, next-up episode with
   its own resume action.
 - Extras rail grouped by server `ExtraType` (behind the scenes, deleted scenes, interviews, …); an extra plays in-app without reporting and outside the queue.
 - Cast and crew rail with portraits; a cast card opens the person page. On TV the focused
@@ -161,8 +166,9 @@ web wrapper and does not embed a second render stack.
 - Playlist picker and a **New playlist** prompt that starts with the current item.
 - Availability aware: a missing stream disables playback with a reason.
 - Back restores the card, the library offset and the detail page's own nested state.
-- Person page: portrait, name, credit count and the same poster grid, so an actor is a browse
-  path.
+- Person page: portrait, name, credit count, **Known for** (only when there are more than five
+  library titles) and **More in your library**, so an actor is a browse path without seeing the
+  same five cards twice.
 
 ## 7. Playlists
 
@@ -208,7 +214,8 @@ separate window. `scripts/check.sh` builds it; the player's contract is
 - Resume starts 0/5/10/15 s before the server position (setting), and the worker confirms the
   seek before the session begins (a direct play seeks and waits; a transcode URL without
   `StartTimeTicks` is seeked too; a failed seek starts at zero truthfully). A local checkpoint under
-  `~/.cache/runefin/positions.json` covers a crash; a newer local position wins.
+  `~/.cache/runefin/positions.json` covers a crash; when it is newer than the server's, the app
+  offers "This device / Server" instead of silently choosing.
 - **Skip intro / credits from the server**: a play start asks `/MediaSegments/{itemId}`; an Intro
   segment offers "Skip intro" five seconds early (Ask) or skips itself (Always), and the `S` key
   takes it. The data comes from a server-side segment provider (the Intro Skipper plugin — not in
@@ -256,7 +263,8 @@ separate window. `scripts/check.sh` builds it; the player's contract is
   starts a second player. Headless renders never claim, so two snapshots can run at once.
 - **Crash-safe navigation**: the last library or detail page is remembered in the config and
   reopened after the first Home load with a short “Returned to where you left off.” toast.
-- **Local watch history and stats**: one JSONL line per completed play under
+- **Local watch history and stats**: one JSONL line per finished or stopped session with at
+  least 30 s played, including partial plays, under
   `~/.cache/runefin/history.jsonl`; Settings shows sessions, minutes and the last five, with a
   clear action and a Letterboxd CSV export. No server call and no database.
 - **Saved views**: name the current sort/filters and re-apply them later; local config.
@@ -275,9 +283,9 @@ separate window. `scripts/check.sh` builds it; the player's contract is
 - **Images fetch in parallel** (four workers, high before low), library columns follow the window
   width up to twelve, and capability badges cap at three plus a `+N` count.
 - **Richer list view**: year, rating, runtime, date added, play count, file size and 4K/HDR/CC
-  facts on one row.
-- **Detail metadata** adds original title, release date, series status, studio and tags when the
-  server sends them; episode rows show their air date, and the season header can mark the whole
+  facts on one row; a resume bar appears only when the item has one.
+- **Detail metadata** adds original title, release date, series status, studio, tags and the
+  server's tagline when it sends them; episode rows show their air date, and the season header can mark the whole
   season watched.
 - **Recently Added** for every video library, and **Part of …** collection links on detail.
 - **Not interested / Why this?** on a Home card hides it locally (persisted, with Undo) or names
@@ -293,8 +301,9 @@ separate window. `scripts/check.sh` builds it; the player's contract is
 - Play/pause, ±10 s, volume, mute, pitch-corrected playback speed (0.5×–2×), Fit/Fill,
   previous/next episode.
 - **End-of-episode card** in the last 30 seconds: the episode shrinks to a corner over a
-  dimmed next still, with runtime, overview, countdown, Play now, Watch credits and Dismiss;
-  the card takes focus. Auto-roll at EOS unless dismissed. A run's queue is shown by a
+  dimmed next still, with runtime, overview, a countdown pill beside Play now, a shrinking
+  accent rail and Watch credits / Dismiss; the card takes focus. Auto-roll at EOS unless
+  dismissed. A run's queue is shown by a
   `3 of 12` chip that opens the queue panel.
 - Buffering percentage; it wakes above the OSD and never flashes on a healthy start.
 - Diagnostics overlay: sink path, codec/resolution/range, active audio/subtitle, speed, position,
@@ -333,14 +342,16 @@ separate window. `scripts/check.sh` builds it; the player's contract is
 ## 9. Live TV
 
 - Channel list (`/LiveTv/Channels`) with the current program and the next one when the guide
-  has it.
+  has it. A **Last: <channel>** chip reopens the channel tuned last on this device; the id is
+  kept in the config across restarts.
 - Guide mode: 15-minute slices over three hours, one row per channel, Now/+30m markers, the
   current program tinted; clicking a row tunes it.
 - `/LiveStreams/Open` and `/LiveStreams/Close` on every path; the tuner is closed before the
   next channel opens.
 - In the player: LIVE marker, program name, no seek/remaining, `PgUp`/`PgDn` and the OSD's
   `⏮ CH`/`CH ⏭` zapping, wrapping at the ends.
-- Recordings open as a library.
+- Recordings: the `/LiveTv/Recordings` endpoint is not called yet, so the client does not list
+  them; the guide and channel list are the Live TV surfaces.
 - **Program reminders**: the bell beside a channel's next program stores a local reminder and
   shows an in-app toast when it starts; Settings can add a desktop notification through
   `notify-send`. No server timer is involved.
@@ -365,16 +376,27 @@ separate window. `scripts/check.sh` builds it; the player's contract is
   timeline reports as a slider with "12:34 of 48:00" and a numeric range, and so does the volume
   slider; the end-of-episode card is announced once through a polite live region.
 - Reduced motion, text size 85–130 %, high contrast, remappable keys, audio-description and SDH
-  badges, and text-only capability badges are the non-screen-reader half of the story; see
+  badges, and text-only capability badges are the non-screen-reader half of the story. On the big
+  screen, settings switches (56×32), selects and steppers scale with the gear sheet; see
   `docs/accessibility.md`.
 
 ## 12. Desktop integration
 
 - **Fullscreen** from `F11` or the OSD chip (§2).
+- **Quit anywhere**: a Settings → Account row, a tray **Quit**, and SIGTERM/SIGINT (Steam's
+  "Exit game", a logoff, Ctrl+C) all run the same shutdown: preferences saved, playback stopped
+  and reported, the idle inhibitor released. A second launch brings the running window forward.
+- **A stable app id** (`io.github.lifk.Runefin`) for the launcher, the window icon and the media
+  widget. The Flatpak grants the tray's StatusNotifierWatcher name and logind on the system bus,
+  so the tray and the idle inhibitor actually work inside the sandbox; where `systemd-inhibit` is
+  missing, an `org.freedesktop.login1.Inhibit` call through D-Bus takes its place.
+- **Tray icon**: play/pause, next, previous, stop, **Show Runefin** and **Quit**; clicking the
+  icon raises the window.
 - **MPRIS2** on the session bus: identity, PlaybackStatus, title/series/album, length,
-  position, volume, rate, seek, next/previous, and the root `Fullscreen` property. Commands
-  from the desktop are queued and applied on the UI thread; the art URL is the cached poster's
-  `file://` path, never a token-bearing server URL.
+  position, volume, rate, seek, next/previous, and the root `Fullscreen`, `Quit` and `Raise`
+  actions. The desktop-entry id matches the installed `io.github.lifk.Runefin.desktop`.
+  Commands from the desktop are queued and applied on the UI thread; the art URL is the cached
+  poster's `file://` path, never a token-bearing server URL.
 - The service runs only with a session bus; headless renders and a bare TTY simply have no
   MPRIS. MPRIS changes are read on demand rather than pushed as `PropertiesChanged`.
 - Keyboard-first and mouse-first both work: one focus ring, roving focus, Tab between regions,
@@ -442,7 +464,7 @@ holds the address, the masked admin key and an optional user id; **Test** proves
   from a Seerr cast is matched to the server's person by TMDB id (name search, then
   `ProviderIds.Tmdb`), so the library section appears there too.
 - Polling is 5 s and only while the Requests tab is visible; leaving stops it. No background
-  poll, no web view, no async runtime.
+  poll, no web view, and no async runtime on the Seerr path (the MPRIS service has its own small tokio runtime).
 
 ## 15. Limits and deliberate non-features
 
@@ -457,7 +479,7 @@ holds the address, the masked admin key and an optional user id; **Test** proves
 | **Frame screenshot** | The DMA-BUF sink keeps the decoded frame on the GPU and exposes no CPU readback. A screenshot needs a tee/readback branch in the player, so there is no UI action yet. |
 | **Trakt scrobbling** | Needs an account and OAuth credentials; the local watch history and Letterboxd CSV export work without them. |
 | **Desktop notifications** | Only live program reminders use `notify-send`. Next-episode, download and error notifications are not implemented. |
-| **Music, photos, books** | No such libraries on the server; not the product. |
+| **Music, photos, books** | Music, photo, book and audiobook libraries are skipped in the sidebar rather than opened into a grid that cannot play them; the product is video. |
 | **SyncPlay** | Needs a WebSocket client; the design excludes that dependency. |
 | **Downloads/offline** | Planned (Q9): a Settings-chosen storage path, a download queue and offline playback. Not implemented yet. |
 | **Seerr companion** | Optional. Without a URL/key the app is unchanged. Progress needs **Sync Enabled** on Seerr's Radarr/Sonarr entries; 4K requests, Seerr administration, issues and deletion are out of scope. |
@@ -496,9 +518,9 @@ keys the player already uses.
 ## Verification
 
 ```sh
-cargo test -p jellyfin-api        # 45 API tests, no network
-cargo test -p seerr-api           # 25 Seerr API tests, no network
-cargo test -p runefin             # 431 app tests (26 ignored), headless
+cargo test -p jellyfin-api        # 26 API tests, no network
+cargo test -p seerr-api           # 26 Seerr API tests, no network
+cargo test -p runefin             # 434 app tests (26 ignored), headless
 scripts/check.sh                  # fmt, clippy, all three suites, release build
 scripts/snapshots.sh              # the committed views, in place
 JELLYFIN_URL=... JELLYFIN_USER_ID=... JELLYFIN_TOKEN=... \

@@ -48,8 +48,15 @@ Anything not listed here is not claimed.
 ## Focus (A9)
 
 - Every interactive element added in Phases 0–2 has a stable `.key(..)`, `focusable(true)` and a
-  2 px `focus_ring` (`theme::FOCUS`); the ring is drawn outside the fill so a dark card still
+  2 px `focus_ring` (`theme::ring()`); the ring is drawn outside the fill so a dark card still
   shows it.
+- **2026-11-15:** the ring is near-white (dark theme) or near-black (light theme) instead of
+  accent blue, which measured 2.30:1 on `bg` — below the 3:1 non-text minimum. Big screen adds
+  the pointer wash under the ring; a 5 % lift alone was invisible at couch distance.
+- **Contrast record:** `text_secondary` is 0.80 lightness in the dark theme (about 5.5:1 on
+  `bg`) and 0.44 in the light one; primary ink on the state blue is white (6.5:1), not `bg`
+  (3.18:1); the resume card's scrim starts at 38 % at mid-height and its title/lines carry the
+  readable-text shadow.
 - Focus is supplied in addition to hover/press washes and a press scale, never instead of them.
 - The audit covered: sidebar and watchlist, library toolbar/filter sheet/select mode, card
   menu and its new Like/Dislike rows, detail actions/versions/extras/theme toggles, pre-playback
@@ -57,9 +64,8 @@ Anything not listed here is not claimed.
   transfer picker, settings search/reset/export, the Playback/Subtitles & audio/Keyboard split,
   collection sort and pickers, the live reminder bell, the Requests (Seerr) connection card, and
   the Discover/Requests/request-panel pages.
-- **Not yet audited:** measured contrast ratios for every token pair, and a keyboard-only pass
-  across all 121 snapshots. The visible focus ring is present; the numeric contrast record is
-  still a follow-up.
+- **Not yet audited:** a keyboard-only pass across all 121 snapshots, and a measured ratio for
+  every remaining token pair (status pills on their tinted fills are the next set).
 
 ## Screen readers
 

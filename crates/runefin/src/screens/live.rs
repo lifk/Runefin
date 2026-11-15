@@ -2,7 +2,7 @@
 //! and hands the stream to the same in-app player, which switches to a LIVE OSD.
 
 use jellyfin_api::Item;
-use rune::tok::{self, motion};
+use rune::tok;
 use rune::{Color, El, SurfaceFit, col, el, icon, row, text};
 
 use crate::state::State;
@@ -13,6 +13,14 @@ use crate::theme::{self, type_};
 pub(super) fn live_tv_screen(s: &State) -> El {
     let t = theme::colors();
     let count = s.live.channels.len();
+    // The channel last tuned here, if the tuner still lists it. One click reopens it; the id
+    // survives a restart in the config.
+    let last_channel = s
+        .config
+        .last_channel
+        .as_deref()
+        .and_then(|id| s.live.channels.iter().find(|channel| channel.id == id))
+        .cloned();
     let header = row()
         .w_full()
         .items_end()
@@ -38,11 +46,23 @@ pub(super) fn live_tv_screen(s: &State) -> El {
                     .color(t.text_secondary),
                 ),
         )
+        .children(last_channel.map(|channel| {
+            let label = format!("Last: {}", channel.name);
+            button(
+                &label,
+                "live-last-channel",
+                false,
+                &t,
+                move |s: &mut State| s.play_live_channel(channel.clone()),
+            )
+        }))
         .child(button(
+            // The chip names the window it switches to, and the accent names the current one:
+            // the old label was the other value, so "List" was highlighted in Guide mode.
             if s.live.guide_hours >= 24 {
-                "3 hours"
+                "24 hours"
             } else {
-                "Day"
+                "3 hours"
             },
             "live-guide-window",
             s.live.guide_hours >= 24,
@@ -50,18 +70,14 @@ pub(super) fn live_tv_screen(s: &State) -> El {
             |s: &mut State| s.toggle_guide_window(),
         ))
         .child(button(
-            if s.live.guide_open { "List" } else { "Guide" },
+            "Guide",
             "live-guide-toggle",
             s.live.guide_open,
             &t,
             |s: &mut State| s.toggle_live_guide(),
         ))
         .child(button(
-            if s.live.favorites_only {
-                "All channels"
-            } else {
-                "Favourites"
-            },
+            "Favourites",
             "live-favorites",
             s.live.favorites_only,
             &t,
@@ -227,7 +243,7 @@ fn channel_row(s: &State, channel: &jellyfin_api::Item, t: &tok::Theme) -> El {
         .shadow(1.0, 2.0, Color::BLACK.alpha(0.25))
         .shadow(6.0, 18.0, Color::BLACK.alpha(0.16))
         .hover(t.hover)
-        .motion(motion::SNAPPY)
+        .motion(crate::theme::motion::CONTROL)
         .focusable(true)
         .focus_visual(2.0)
         .press_scale(0.99)
@@ -265,11 +281,11 @@ fn channel_row(s: &State, channel: &jellyfin_api::Item, t: &tok::Theme) -> El {
                                 .px(8.0)
                                 .radius(6.0)
                                 .center()
-                                .fill(tok::accent(2, true).alpha(0.16))
+                                .fill(theme::status::danger().alpha(0.16))
                                 .child(
                                     text("● LIVE")
                                         .font(type_::caption())
-                                        .color(tok::accent(2, true)),
+                                        .color(theme::status::danger()),
                                 ),
                         )
                         .child(
@@ -336,7 +352,7 @@ fn channel_row(s: &State, channel: &jellyfin_api::Item, t: &tok::Theme) -> El {
                     },
                 )
                 .hover(t.hover)
-                .motion(motion::SNAPPY)
+                .motion(crate::theme::motion::CONTROL)
                 .focusable(true)
                 .focus_visual(2.0)
                 .press_scale(0.94)
@@ -371,7 +387,7 @@ fn channel_row(s: &State, channel: &jellyfin_api::Item, t: &tok::Theme) -> El {
                     t.bg
                 })
                 .hover(t.hover)
-                .motion(motion::SNAPPY)
+                .motion(crate::theme::motion::CONTROL)
                 .focusable(true)
                 .focus_visual(2.0)
                 .press_scale(0.94)
@@ -399,7 +415,7 @@ fn channel_row(s: &State, channel: &jellyfin_api::Item, t: &tok::Theme) -> El {
                 .gradient(Color::WHITE.alpha(0.18), Color::TRANSPARENT)
                 .shadow(1.0, 2.0, Color::BLACK.alpha(0.30))
                 .shadow(4.0, 12.0, tok::accent(0, true).alpha(0.35))
-                .child(text("Watch").font(type_::label()).color(t.bg)),
+                .child(text("Watch").font(type_::label()).color(theme::on_accent())),
         )
 }
 
@@ -429,7 +445,7 @@ fn loading(t: &tok::Theme) -> El {
 }
 
 fn button(
-    label: &'static str,
+    label: &str,
     key: &'static str,
     selected: bool,
     t: &tok::Theme,
@@ -456,7 +472,7 @@ fn button(
             },
         )
         .hover(t.hover)
-        .motion(motion::SNAPPY)
+        .motion(crate::theme::motion::CONTROL)
         .focusable(true)
         .focus_visual(2.0)
         .press_scale(0.97)
@@ -498,6 +514,9 @@ fn guide_grid(s: &State, t: &tok::Theme) -> El {
             row()
                 .grow(1.0)
                 .min_w(0.0)
+                // The same gap the timeline rows use: without it the ruler and the blocks
+                // drift apart by a gap per slice, which is visible at +45 m.
+                .gap(2.0)
                 .children((0..SLICES).map(|index| {
                     el().grow(2.0).child(
                         text(marker(index))
@@ -585,9 +604,13 @@ fn guide_row(s: &State, channel: &Item, now: i64, slice_seconds: i64, t: &tok::T
                 .fill(Color::WHITE.alpha(0.025))
                 .center()
                 .child(
-                    text("No guide data")
-                        .font(type_::caption())
-                        .color(t.text_secondary.alpha(0.6)),
+                    text(if s.live.loading {
+                        "Loading guide…"
+                    } else {
+                        "No guide data"
+                    })
+                    .font(type_::caption())
+                    .color(t.text_secondary.alpha(0.6)),
                 ),
         );
     }
@@ -648,7 +671,7 @@ fn guide_row(s: &State, channel: &Item, now: i64, slice_seconds: i64, t: &tok::T
         .gap(12.0)
         .items_center()
         .hover(t.hover)
-        .motion(motion::SNAPPY)
+        .motion(crate::theme::motion::CONTROL)
         .focusable(true)
         .focus_visual(2.0)
         .press_scale(0.995)

@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
 use jellyfin_api::Item;
-use rune::tok::{self, motion};
+use rune::tok;
 
 use crate::theme::FocusVisual;
 use crate::theme::SurfaceStyle;
@@ -199,7 +199,7 @@ fn play_queue_button(label: &str, key: &str, t: &tok::Theme, shuffle: bool) -> E
             },
         )
         .hover(t.hover)
-        .motion(motion::SNAPPY)
+        .motion(crate::theme::motion::CONTROL)
         .focusable(true)
         .focus_visual(2.0)
         .press_scale(0.97)
@@ -229,7 +229,7 @@ fn back_button(t: &tok::Theme) -> El {
         .surface_sheen()
         .shadow(1.0, 2.0, t.shadow)
         .hover(t.hover)
-        .motion(motion::SNAPPY)
+        .motion(crate::theme::motion::CONTROL)
         .focusable(true)
         .focus_visual(2.0)
         .press_scale(0.97)
@@ -242,7 +242,7 @@ fn library_toolbar(s: &State, library: &LibraryState, t: &tok::Theme) -> El {
     // A playlist is an ordered list: the server's order is the playlist's meaning, so sorting,
     // the unwatched/favourite filters and genres do not apply.
     let playlist = library.collection_type.as_deref() == Some("playlists");
-    let mut bar = row()
+    let mut lead = row()
         .key("library-toolbar")
         .focus_group()
         .w_full()
@@ -252,7 +252,7 @@ fn library_toolbar(s: &State, library: &LibraryState, t: &tok::Theme) -> El {
         // A narrow window gets a second line instead of half a button.
         .flex_wrap();
     if !playlist {
-        bar = bar.child(
+        lead = lead.child(
             el().key("library-search-box")
                 .h(30.0)
                 .w(180.0)
@@ -313,7 +313,7 @@ fn library_toolbar(s: &State, library: &LibraryState, t: &tok::Theme) -> El {
                 ),
         );
         if library.search.is_some() {
-            bar = bar.child(toolbar_button(
+            lead = lead.child(toolbar_button(
                 "×",
                 "library-search-clear",
                 false,
@@ -323,7 +323,7 @@ fn library_toolbar(s: &State, library: &LibraryState, t: &tok::Theme) -> El {
         }
         for sort in [SortMode::Name, SortMode::Added, SortMode::Rating] {
             let key = format!("sort-{}", sort.label().to_ascii_lowercase());
-            bar = bar.child(toolbar_button(
+            lead = lead.child(toolbar_button(
                 sort.label(),
                 &key,
                 library.sort == sort,
@@ -331,7 +331,7 @@ fn library_toolbar(s: &State, library: &LibraryState, t: &tok::Theme) -> El {
                 move |s: &mut State| s.set_sort(sort),
             ));
         }
-        bar = bar.child(toolbar_button(
+        lead = lead.child(toolbar_button(
             if library.ascending {
                 "↑ Asc"
             } else {
@@ -344,7 +344,7 @@ fn library_toolbar(s: &State, library: &LibraryState, t: &tok::Theme) -> El {
         ));
     }
     if playlist {
-        bar = bar.child(toolbar_button(
+        lead = lead.child(toolbar_button(
             if s.playlist_editing { "Done" } else { "Edit" },
             "playlist-edit",
             s.playlist_editing,
@@ -352,7 +352,7 @@ fn library_toolbar(s: &State, library: &LibraryState, t: &tok::Theme) -> El {
             |s: &mut State| s.toggle_playlist_editing(),
         ));
         if s.playlist_editing {
-            bar = bar.child(
+            lead = lead.child(
                 text("Drag a poster to reorder")
                     .key("playlist-drag-hint")
                     .font(type_::caption())
@@ -360,9 +360,18 @@ fn library_toolbar(s: &State, library: &LibraryState, t: &tok::Theme) -> El {
             );
         }
     }
-    bar = bar.child(el().grow(1.0));
+    // Two lines, fixed membership: the summary length and a narrow window used to decide
+    // where the row wrapped, which once left "List" alone under the search field.
+    let mut tools = row()
+        .key("library-toolbar-tools")
+        .focus_group()
+        .w_full()
+        .px(theme::gutter())
+        .pb(12.0)
+        .gap(8.0)
+        .flex_wrap();
     if !playlist {
-        bar = bar
+        tools = tools
             .child(toolbar_button(
                 "Unwatched",
                 "filter-unwatched",
@@ -371,7 +380,7 @@ fn library_toolbar(s: &State, library: &LibraryState, t: &tok::Theme) -> El {
                 |s: &mut State| s.toggle_unwatched(),
             ))
             .child(toolbar_button(
-                "Favorites",
+                "Favourites",
                 "filter-favorites",
                 library.favorites,
                 t,
@@ -408,28 +417,34 @@ fn library_toolbar(s: &State, library: &LibraryState, t: &tok::Theme) -> El {
                     )
                 })
             })
+            .children((library.total > 0).then(|| {
+                toolbar_button(
+                    "Select",
+                    "library-select",
+                    s.library_selecting,
+                    t,
+                    |s: &mut State| s.toggle_library_selecting(),
+                )
+            }));
+    }
+    if library.total > 0 {
+        tools = tools
             .child(toolbar_button(
-                "Select",
-                "library-select",
-                s.library_selecting,
+                "Grid",
+                "view-grid",
+                library.view == ViewMode::Grid,
                 t,
-                |s: &mut State| s.toggle_library_selecting(),
+                |s: &mut State| s.set_view(ViewMode::Grid),
+            ))
+            .child(toolbar_button(
+                "List",
+                "view-list",
+                library.view == ViewMode::List,
+                t,
+                |s: &mut State| s.set_view(ViewMode::List),
             ));
     }
-    bar.child(toolbar_button(
-        "Grid",
-        "view-grid",
-        library.view == ViewMode::Grid,
-        t,
-        |s: &mut State| s.set_view(ViewMode::Grid),
-    ))
-    .child(toolbar_button(
-        "List",
-        "view-list",
-        library.view == ViewMode::List,
-        t,
-        |s: &mut State| s.set_view(ViewMode::List),
-    ))
+    col().w_full().min_w(0.0).child(lead).child(tools)
 }
 
 /// A horizontally scrolling chip rail of the library's genres. It appears only when the Genre
@@ -437,14 +452,27 @@ fn library_toolbar(s: &State, library: &LibraryState, t: &tok::Theme) -> El {
 /// The full filter and sort sheet. It is inline, not a modal, so the grid stays visible while
 /// a filter is chosen; every control re-reads the server's first page.
 fn filters_panel(s: &State, library: &LibraryState, t: &tok::Theme) -> El {
-    let max_height = (s.window_size.1 - 240.0).clamp(220.0, 520.0);
+    // Headless renders have no measured window yet; a 0 would clamp the sheet to its 240 pt
+    // floor and cut the advanced filters in half. A desktop default keeps the snapshot honest.
+    let viewport_h = if s.window_size.1 >= 600.0 {
+        s.window_size.1
+    } else {
+        800.0
+    };
+    let max_height = (viewport_h - 220.0).clamp(240.0, 560.0);
+    // A bounded sheet, not page content: the controls below the fold used to be cut by the
+    // grid with no edge to say the panel scrolls.
     let mut panel = col()
         .key("library-filters-panel")
         .focus_group()
         .w_full()
         .max_h(max_height)
         .px(theme::gutter())
-        .pb(10.0)
+        .py(12.0)
+        .radius(12.0)
+        .fill(t.bg)
+        .shadow(0.0, 12.0, t.shadow_soft)
+        .outline(1.0, 0.0, t.card_border)
         .gap(10.0)
         .scroll(ScrollSpec {
             stick_bottom: false,
@@ -478,9 +506,23 @@ fn filters_panel(s: &State, library: &LibraryState, t: &tok::Theme) -> El {
     }
     panel = panel
         .child(
-            text("Filters")
-                .font(type_::section())
-                .color(t.text_secondary),
+            row()
+                .w_full()
+                .items_center()
+                .gap(10.0)
+                .child(
+                    text("Filters")
+                        .font(type_::section())
+                        .color(t.text)
+                        .grow(1.0),
+                )
+                .child(toolbar_button(
+                    "Done",
+                    "library-filters-done",
+                    false,
+                    t,
+                    |s: &mut State| s.toggle_library_filters(),
+                )),
         )
         .child(filters)
         .child(
@@ -552,6 +594,9 @@ fn filters_panel(s: &State, library: &LibraryState, t: &tok::Theme) -> El {
         |s: &mut State| s.save_library_view(),
     ));
     panel = panel.child(views);
+    // Two semantic rows rather than one long wrap: a scroll container gives `w_full` the
+    // content width, so a wrapping row either cut its last chip or measured the window before
+    // layout. Each row fits a 1024 window without relying on either.
     let mut deep = row().w_full().gap(8.0).flex_wrap().items_center();
     deep = deep
         .child(text("Year").font(type_::caption()).color(t.text_secondary))
@@ -624,7 +669,9 @@ fn filters_panel(s: &State, library: &LibraryState, t: &tok::Theme) -> El {
             library.only_4k,
             t,
             |s: &mut State| s.toggle_library_4k(),
-        ))
+        ));
+    let mut availability = row().w_full().gap(8.0).flex_wrap().items_center();
+    availability = availability
         .child(toolbar_button(
             "Missing",
             "filter-missing",
@@ -673,7 +720,7 @@ fn filters_panel(s: &State, library: &LibraryState, t: &tok::Theme) -> El {
             t,
             |s: &mut State| s.toggle_library_tags(),
         ));
-    panel = panel.child(deep);
+    panel = panel.child(deep).child(availability);
     panel = panel.children((library.studios_open).then(|| studio_panel(library, t)));
     panel = panel.children((library.tags_open).then(|| tag_panel(library, t)));
     if !library.genres.is_empty() {
@@ -708,7 +755,7 @@ fn filters_panel(s: &State, library: &LibraryState, t: &tok::Theme) -> El {
                         },
                     )
                     .hover(t.hover)
-                    .motion(motion::SNAPPY)
+                    .motion(crate::theme::motion::CONTROL)
                     .focusable(true)
                     .focus_visual(2.0)
                     .press_scale(0.97)
@@ -766,7 +813,7 @@ fn active_filter_chips(library: &LibraryState, t: &tok::Theme) -> Option<El> {
                 .fill(t.card)
                 .outline(1.0, 0.0, t.card_border)
                 .hover(t.hover)
-                .motion(motion::SNAPPY)
+                .motion(crate::theme::motion::CONTROL)
                 .focusable(true)
                 .focus_visual(2.0)
                 .press_scale(0.96)
@@ -929,7 +976,7 @@ fn genre_chip(
             t.card
         })
         .hover(t.hover)
-        .motion(motion::SNAPPY)
+        .motion(crate::theme::motion::CONTROL)
         .focusable(true)
         .focus_visual(2.0)
         .press_scale(0.96)
@@ -961,7 +1008,7 @@ fn toolbar_button(
             t.card
         })
         .hover(t.hover)
-        .motion(motion::SNAPPY)
+        .motion(crate::theme::motion::CONTROL)
         .focusable(true)
         .focus_visual(2.0)
         .press_scale(0.96)
@@ -1086,7 +1133,7 @@ fn library_body(s: &State, library: &LibraryState, t: &tok::Theme) -> El {
                         .shadow(1.0, 3.0, t.shadow)
                         .shadow(6.0, 18.0, t.shadow_soft)
                         .hover(t.hover)
-                        .motion(motion::SNAPPY)
+                        .motion(crate::theme::motion::CONTROL)
                         .focusable(true)
                         .focus_visual(2.0)
                         .press_scale(0.96)
@@ -1254,7 +1301,7 @@ fn library_list_row(item: &Item, s: &State, t: &tok::Theme) -> El {
             .gap(12.0)
             .radius(8.0)
             .hover(t.hover)
-            .motion(motion::SNAPPY)
+            .motion(crate::theme::motion::CONTROL)
             .role("button")
             .focusable(true)
             .focus_visual(2.0)
@@ -1290,14 +1337,16 @@ fn library_list_row(item: &Item, s: &State, t: &tok::Theme) -> El {
                                     .font(type_::mono_caption())
                                     .color(t.text_secondary),
                             )
-                            .child(
+                            // A resume bar only when there is a resume point: an 80×3 empty
+                            // track under every year read as a stray dash.
+                            .children((watched > 0.0).then(|| {
                                 el().w(80.0).h(3.0).radius(1.5).fill(t.control_track).child(
                                     el().w(80.0 * watched)
                                         .h(3.0)
                                         .radius(1.5)
                                         .fill(tok::accent(0, true)),
-                                ),
-                            ),
+                                )
+                            })),
                     )
                     .children((!facts.is_empty()).then(|| {
                         text(facts)
@@ -1308,12 +1357,15 @@ fn library_list_row(item: &Item, s: &State, t: &tok::Theme) -> El {
             )
             .children(crate::home::is_watched(item).then(|| {
                 el().key(format!("played-{}", item.id))
+                    .role("img")
+                    .label("Watched")
                     .w(20.0)
                     .h(20.0)
                     .radius(10.0)
                     .center()
-                    .fill(tok::accent(0, true))
-                    .child(text("✓").font(type_::caption()).color(t.bg))
+                    .fill(rune::Color::BLACK.alpha(0.72))
+                    .outline(1.0, 0.0, rune::Color::WHITE.alpha(0.24))
+                    .child(text("✓").font(type_::caption()).color(rune::Color::WHITE))
             }))
             .child(icon(&theme::icon::CHEVRON_RIGHT, 14.0).color(t.text_secondary.alpha(0.45))),
     )
@@ -1335,7 +1387,7 @@ fn letter_rail(library: &LibraryState, t: &tok::Theme) -> El {
                 .center()
                 .fill(if selected { tok::accent(0, true) } else { t.bg })
                 .hover(t.hover)
-                .motion(motion::SNAPPY)
+                .motion(crate::theme::motion::CONTROL)
                 .focusable(true)
                 .focus_visual(1.0)
                 .press_scale(0.94)
@@ -1408,7 +1460,9 @@ fn library_empty(library: &LibraryState, t: &tok::Theme) -> El {
         .padding(theme::gutter())
         .child(text("No items here").font(type_::page()).color(t.text))
         .child(
-            text(if library.genre.is_some() {
+            text(if !library.active_filters().is_empty() {
+                "No items match these filters."
+            } else if library.genre.is_some() {
                 "Nothing in this genre here."
             } else if library.favorites && library.unwatched {
                 "Nothing unwatched in your favourites."
@@ -1445,7 +1499,7 @@ fn library_error(message: &str, t: &tok::Theme) -> El {
             text(message.to_string())
                 .key("library-error-message")
                 .font(subtitle_style())
-                .color(tok::accent(2, true)),
+                .color(theme::status::danger()),
         )
         .child(toolbar_button(
             "Try again",

@@ -146,6 +146,14 @@ impl State {
                     true
                 }
             },
+            Command::Raise => {
+                self.open_requested = true;
+                true
+            }
+            Command::Quit => {
+                self.quit_requested = true;
+                true
+            }
         }
     }
 
@@ -204,15 +212,36 @@ impl State {
     /// A `file://` URL for the poster already in the image cache. The server URL would carry
     /// the access token, which an MPRIS reader must never see.
     fn mpris_art(&self, item: &Item) -> Option<String> {
+        if let Some((id, url)) = self.mpris_art_cache.borrow().as_ref()
+            && id == &item.id
+        {
+            return Some(url.clone());
+        }
         let key = self.image_key(item)?;
         let path = crate::image::cache_path(&key)?;
-        path.exists().then(|| format!("file://{}", path.display()))
+        if !path.exists() {
+            // The poster is still landing. Try again next publish; only a hit is cached, so a
+            // late image is never hidden by an earlier miss.
+            return None;
+        }
+        let url = format!("file://{}", path.display());
+        *self.mpris_art_cache.borrow_mut() = Some((item.id.clone(), url.clone()));
+        Some(url)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn mpris_quit_and_raise_use_the_shared_lifecycle_requests() {
+        let mut state = State::from_config(Config::fresh());
+        assert!(state.apply_mpris(crate::mpris::Command::Raise));
+        assert!(state.open_requested);
+        assert!(state.apply_mpris(crate::mpris::Command::Quit));
+        assert!(state.quit_requested);
+    }
 
     #[test]
     fn the_snapshot_names_the_playing_episode() {

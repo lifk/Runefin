@@ -1,7 +1,7 @@
 //! The search screen: one field, grouped rails, and cards that open detail.
 
 use jellyfin_api::Item;
-use rune::tok::{self, motion};
+use rune::tok;
 
 use crate::theme::FocusVisual;
 use crate::theme::{self, type_};
@@ -125,7 +125,7 @@ pub(super) fn search_screen(s: &State) -> El {
                     text(error.clone())
                         .key("search-error")
                         .font(type_::meta())
-                        .color(tok::accent(2, true)),
+                        .color(theme::status::danger()),
                 )
                 .child(
                     el().key("search-retry")
@@ -145,15 +145,10 @@ pub(super) fn search_screen(s: &State) -> El {
                 ),
         );
     } else if s.search.query.text.trim().chars().count() < 2 {
+        // Never suggest fixture titles to a signed-in reader: that was a demo scene leaking
+        // into the real app. With no history, show the empty hint and nothing to click.
         let has_recents = !s.search.recents.is_empty();
-        let terms: Vec<String> = if has_recents {
-            s.search.recents.clone()
-        } else {
-            ["The Quiet Floor", "Nosferatu", "Service", "Harbour"]
-                .into_iter()
-                .map(str::to_string)
-                .collect()
-        };
+        let terms: Vec<String> = s.search.recents.clone();
         let idle = col()
             .key("search-idle")
             .gap(14.0)
@@ -165,30 +160,18 @@ pub(super) fn search_screen(s: &State) -> El {
                     .font(type_::meta())
                     .color(t.text_secondary),
             )
-            .child(
-                text(if has_recents {
-                    "Recent searches"
-                } else {
-                    "Try a search"
-                })
-                .font(type_::caption())
-                .color(t.text_secondary),
-            )
+            .children(has_recents.then(|| {
+                text("Recent searches")
+                    .font(type_::caption())
+                    .color(t.text_secondary)
+            }))
             .child(
                 row()
                     .key("search-suggestions")
                     .gap(8.0)
                     .focus_group()
                     .children(terms.into_iter().map(|term| {
-                        let key = format!(
-                            "{}-{}",
-                            if has_recents {
-                                "search-recent"
-                            } else {
-                                "search-suggestion"
-                            },
-                            term
-                        );
+                        let key = format!("search-recent-{term}");
                         el().key(key)
                             .role("button")
                             .h(32.0)
@@ -204,7 +187,13 @@ pub(super) fn search_screen(s: &State) -> El {
                             .cursor(rune::Cursor::Pointer)
                             .on_press(move |s: &mut State| s.search_for(&term))
                     })),
-            );
+            )
+            .children((!has_recents).then(|| {
+                text("Recent searches will appear here.")
+                    .key("search-no-recents")
+                    .font(type_::caption())
+                    .color(t.text_secondary.alpha(0.8))
+            }));
         body = body.child(idle);
     } else if s.search.searching && results.is_empty() {
         body = body.child(
@@ -401,7 +390,7 @@ fn search_hints(s: &State, t: &tok::Theme) -> Option<El> {
                 .fill(t.card)
                 .outline(1.0, 0.0, t.card_border)
                 .hover(t.hover)
-                .motion(motion::SNAPPY)
+                .motion(crate::theme::motion::CONTROL)
                 .focusable(true)
                 .focus_visual(2.0)
                 .press_scale(0.97)
@@ -451,7 +440,7 @@ fn rail(title: &str, key: &str, items: &[Item], s: &State, t: &tok::Theme) -> El
                 .center()
                 .fill(t.bg)
                 .hover(t.hover)
-                .motion(motion::SNAPPY)
+                .motion(crate::theme::motion::CONTROL)
                 .focusable(true)
                 .focus_visual(2.0)
                 .press_scale(0.96)

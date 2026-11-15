@@ -16,8 +16,8 @@ everything from a gamepad or an HDMI-CEC remote.
 ## What it does
 
 - **Connect**: password sign-in, Quick Connect, LAN discovery, a session persisted with `0600`.
-- **Home**: Continue Watching merged per series, Next Up, one Recently Added rail per library,
-  Recently Played, Collections and an ambient backdrop.
+- **Home**: Continue Watching merged per series, Next Up, Coming up (air dates), one Recently
+  Added rail per library, Recently Played, Collections and an ambient backdrop.
 - **Libraries**: virtualized grid and list views, sort, filters, genres, an A–Z rail, paged fetch
   with one-page prefetch and scroll restored on back.
 - **Search**: `Ctrl+K` anywhere and `Ctrl+F` in a library, grouped Movies/Shows/Episodes/People
@@ -131,7 +131,7 @@ Return as OK. Only the Menu buttons need a cecd mapping:
 cargo test -p jellyfin-api    # wire types and URLs, no network
 cargo test -p seerr-api       # the Seerr client, no network
 cargo test -p runefin         # headless UI tests through the real layout and springs
-scripts/check.sh              # fmt, clippy, both suites, release build
+scripts/check.sh              # fmt, clippy, all three suites, release build
 scripts/snapshots.sh          # the committed views, in place
 scripts/snapshots.sh --all    # every scene, into /tmp/runefin-snapshots
 scripts/install-hooks.sh      # once per clone: refuse tokens and private hosts in a commit

@@ -18,6 +18,9 @@ pub struct HomeData {
     pub resume: Vec<Item>,
     /// One next episode per series, from `/Shows/NextUp`.
     pub next_up: Vec<Item>,
+    /// Episodes and films the server expects next, by air date.
+    #[serde(default)]
+    pub upcoming: Vec<Item>,
     /// Live channels with a current program.
     pub on_now: Vec<Item>,
     /// Box sets, so collections are reachable without opening their library first.
@@ -32,6 +35,7 @@ impl HomeData {
     pub fn is_empty(&self) -> bool {
         self.resume.is_empty()
             && self.next_up.is_empty()
+            && self.upcoming.is_empty()
             && self.on_now.is_empty()
             && self.collections.is_empty()
             && self.recently_played.is_empty()
@@ -114,6 +118,24 @@ pub fn load_collections(client: &Client) -> Vec<Item> {
 /// first paint. A failure is a missing rail, not a broken Home.
 pub fn load_next_up(client: &Client) -> Vec<Item> {
     client.next_up_all(12).unwrap_or_default()
+}
+
+/// What the server expects next, by air date. Deduplicated by series: two announced episodes of
+/// one show are one card, and the rail is about "when is the next thing", not a calendar dump.
+pub fn load_upcoming(client: &Client) -> Vec<Item> {
+    let items = client.upcoming(24).unwrap_or_default();
+    let mut seen = HashSet::new();
+    let mut out = Vec::new();
+    for item in items {
+        let key = item.series_id.as_deref().unwrap_or(item.id.as_str());
+        if seen.insert(key.to_string()) {
+            out.push(item);
+        }
+        if out.len() == 12 {
+            break;
+        }
+    }
+    out
 }
 
 /// Live channels that have a current program. A tuner-less server returns nothing.
@@ -230,12 +252,44 @@ pub fn remaining(item: &Item) -> Option<i64> {
 
 /// The line under a card's title: `S2E04 · Overtime`, or the year for a film.
 pub fn subtitle(item: &Item) -> String {
+    // An unaired episode's most useful fact is when it airs, not its number.
+    if let Some(date) = item.premiere_date.as_deref()
+        && let Some(days) = days_from_iso_date(date)
+        && days > now_days()
+    {
+        let day = pretty_date(date);
+        return match item.episode_label() {
+            Some(episode) => format!("Airs {day} · {episode}"),
+            None => format!("Airs {day}"),
+        };
+    }
     if let Some(episode) = item.episode_label() {
         return format!("{episode} · {}", item.name);
     }
     item.production_year
         .map(|year| year.to_string())
         .unwrap_or_default()
+}
+
+/// `2026-11-20` -> `20 Nov`. The server's dates are ISO; the app adds no calendar crate.
+pub fn pretty_date(date: &str) -> String {
+    const MONTHS: [&str; 12] = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    ];
+    let Some(rest) = date.get(..10) else {
+        return date.to_string();
+    };
+    let mut parts = rest.split('-');
+    let (Some(_year), Some(month), Some(day)) = (parts.next(), parts.next(), parts.next()) else {
+        return rest.to_string();
+    };
+    let month = month
+        .parse::<usize>()
+        .ok()
+        .and_then(|month| MONTHS.get(month.saturating_sub(1)))
+        .copied()
+        .unwrap_or("");
+    format!("{} {month}", day.trim_start_matches('0'))
 }
 
 /// `0.0..=1.0` watched share for the progress bar; the server sends the percentage for resume
@@ -471,5 +525,13 @@ mod tests {
             .expect("the fixture has user data")
             .played_percentage = None;
         assert!((progress(&i) - 0.5).abs() < 1e-5);
+    }
+
+    #[test]
+    fn an_upcoming_date_reads_as_a_day_and_month() {
+        assert_eq!(pretty_date("2026-12-04T00:00:00.0000000Z"), "4 Dec");
+        assert_eq!(pretty_date("2026-01-09"), "9 Jan");
+        // A malformed date is passed through rather than turned into an empty line.
+        assert_eq!(pretty_date("soon"), "soon");
     }
 }

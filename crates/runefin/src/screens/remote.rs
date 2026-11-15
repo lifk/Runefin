@@ -1,7 +1,7 @@
 //! Remote control: the other Jellyfin sessions, with pause/resume and stop.
 
 use jellyfin_api::SessionInfo;
-use rune::tok::{self, motion};
+use rune::tok;
 
 use crate::theme::FocusVisual;
 use crate::theme::SurfaceStyle;
@@ -42,7 +42,7 @@ pub(super) fn remote_screen(s: &State) -> El {
                         .center()
                         .fill(t.card)
                         .hover(t.hover)
-                        .motion(motion::SNAPPY)
+                        .motion(crate::theme::motion::CONTROL)
                         .focusable(true)
                         .focus_visual(2.0)
                         .press_scale(0.97)
@@ -62,7 +62,7 @@ pub(super) fn remote_screen(s: &State) -> El {
             text(error.clone())
                 .key("remote-error")
                 .font(subtitle_style())
-                .color(tok::accent(2, true)),
+                .color(theme::status::danger()),
         );
     }
 
@@ -143,7 +143,7 @@ fn session_row(session: &SessionInfo, t: &tok::Theme) -> El {
                     .surface_sheen()
                     .shadow(1.0, 2.0, t.shadow)
                     .hover(t.hover)
-                    .motion(motion::SNAPPY)
+                    .motion(crate::theme::motion::CONTROL)
                     .focusable(true)
                     .focus_visual(2.0)
                     .press_scale(0.97)
@@ -171,7 +171,7 @@ fn session_row(session: &SessionInfo, t: &tok::Theme) -> El {
                     .surface_sheen()
                     .shadow(1.0, 2.0, t.shadow)
                     .hover(t.hover)
-                    .motion(motion::SNAPPY)
+                    .motion(crate::theme::motion::CONTROL)
                     .focusable(true)
                     .focus_visual(2.0)
                     .press_scale(0.97)
@@ -190,7 +190,7 @@ fn session_row(session: &SessionInfo, t: &tok::Theme) -> El {
                     .surface_sheen()
                     .shadow(1.0, 2.0, t.shadow)
                     .hover(t.hover)
-                    .motion(motion::SNAPPY)
+                    .motion(crate::theme::motion::CONTROL)
                     .focusable(true)
                     .focus_visual(2.0)
                     .press_scale(0.97)

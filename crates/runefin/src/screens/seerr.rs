@@ -4,7 +4,7 @@
 //! fills titles/posters from a cached `/movie` or `/tv` summary, because the request row has
 //! neither. A season pack is one download with many episode rows, so the size is shown once.
 
-use rune::tok::{self, motion};
+use rune::tok;
 use rune::{El, ScrollSpec, SurfaceFit, col, el, row, text, text_input};
 
 use crate::state::{
@@ -73,7 +73,7 @@ fn page_header(s: &State, t: &tok::Theme) -> El {
                 .surface_sheen()
                 .shadow(1.0, 2.0, t.shadow)
                 .hover(t.hover)
-                .motion(motion::SNAPPY)
+                .motion(crate::theme::motion::CONTROL)
                 .focusable(true)
                 .focus_visual(2.0)
                 .press_scale(0.97)
@@ -109,7 +109,7 @@ fn page_header(s: &State, t: &tok::Theme) -> El {
                 .center()
                 .fill(t.card)
                 .hover(t.hover)
-                .motion(motion::SNAPPY)
+                .motion(crate::theme::motion::CONTROL)
                 .focusable(true)
                 .focus_visual(2.0)
                 .press_scale(0.97)
@@ -171,7 +171,7 @@ fn tab_button(
             t.card
         })
         .hover(t.hover)
-        .motion(motion::SNAPPY)
+        .motion(crate::theme::motion::CONTROL)
         .focusable(true)
         .focus_visual(2.0)
         .press_scale(0.97)
@@ -218,13 +218,13 @@ fn setup_card(s: &State, t: &tok::Theme) -> El {
                 .center()
                 .fill(tok::accent(0, true))
                 .hover(t.hover)
-                .motion(motion::SNAPPY)
+                .motion(crate::theme::motion::CONTROL)
                 .focusable(true)
                 .focus_visual(2.0)
                 .press_scale(0.97)
                 .cursor(rune::Cursor::Pointer)
                 .on_press(|s: &mut State| s.open_settings())
-                .child(text("Open Settings").font(type_::label()).color(t.bg)),
+                .child(text("Open Settings").font(type_::label()).color(theme::on_accent())),
         )
 }
 
@@ -521,7 +521,7 @@ fn browse_grid(s: &State, t: &tok::Theme) -> El {
                 .center()
                 .fill(t.card)
                 .hover(t.hover)
-                .motion(motion::SNAPPY)
+                .motion(crate::theme::motion::CONTROL)
                 .focusable(true)
                 .focus_visual(2.0)
                 .press_scale(0.97)
@@ -627,11 +627,11 @@ pub(super) fn discover_card(item: &seerr_api::DiscoverItem, s: &State, t: &tok::
         .gap(6.0)
         .radius(10.0)
         .hover_group_focus()
-        .hover_motion(motion::SNAPPY, motion::SNAPPY)
+        .hover_motion(crate::theme::motion::HOVER, crate::theme::motion::HOVER)
         .focusable(true)
         .focus_lift_only(4.0)
         .press_scale(0.985)
-        .motion(motion::SNAPPY)
+        .motion(crate::theme::motion::CONTROL)
         .label(item.title().to_string())
         .cursor(rune::Cursor::Pointer)
         .on_press(move |s: &mut State| s.open_seerr_detail(media_type.clone(), tmdb_id))
@@ -791,7 +791,7 @@ fn filter_button(
             rune::Color::TRANSPARENT
         })
         .hover(t.hover)
-        .motion(motion::SNAPPY)
+        .motion(crate::theme::motion::CONTROL)
         .focusable(true)
         .focus_visual(2.0)
         .press_scale(0.97)
@@ -948,7 +948,7 @@ fn request_row(request: &seerr_api::MediaRequest, s: &State, t: &tok::Theme) -> 
                 .center()
                 .fill(t.bg)
                 .hover(t.hover)
-                .motion(motion::SNAPPY)
+                .motion(crate::theme::motion::CONTROL)
                 .focusable(true)
                 .focus_visual(2.0)
                 .press_scale(0.97)
@@ -1141,7 +1141,7 @@ fn detail_header(s: &State, t: &tok::Theme) -> El {
                 .center()
                 .fill(t.card)
                 .hover(t.hover)
-                .motion(motion::SNAPPY)
+                .motion(crate::theme::motion::CONTROL)
                 .focusable(true)
                 .focus_visual(2.0)
                 .press_scale(0.97)
@@ -1442,7 +1442,7 @@ fn detail_action(
                 .center()
                 .fill(t.card)
                 .hover(t.hover)
-                .motion(motion::SNAPPY)
+                .motion(crate::theme::motion::CONTROL)
                 .focusable(true)
                 .focus_visual(2.0)
                 .press_scale(0.97)
@@ -1508,7 +1508,7 @@ fn detail_action(
             .center()
             .fill(tok::accent(0, true))
             .hover(t.hover)
-            .motion(motion::SNAPPY)
+            .motion(crate::theme::motion::CONTROL)
             .focusable(true)
             .focus_visual(2.0)
             .press_scale(0.97)
@@ -1520,7 +1520,7 @@ fn detail_action(
                     seerr_api::Details::Tv(_) => "Request seasons",
                 })
                 .font(type_::label())
-                .color(t.bg),
+                .color(theme::on_accent()),
             ),
     )
 }
@@ -1547,7 +1547,7 @@ fn season_picker(s: &State, tv: &seerr_api::TvDetails, t: &tok::Theme) -> El {
                     .center()
                     .fill(t.card)
                     .hover(t.hover)
-                    .motion(motion::SNAPPY)
+                    .motion(crate::theme::motion::CONTROL)
                     .focusable(true)
                     .focus_visual(2.0)
                     .press_scale(0.97)
@@ -1573,7 +1573,7 @@ fn season_picker(s: &State, tv: &seerr_api::TvDetails, t: &tok::Theme) -> El {
                 .center_y()
                 .fill(if on { t.card } else { rune::Color::TRANSPARENT })
                 .hover(t.hover)
-                .motion(motion::SNAPPY)
+                .motion(crate::theme::motion::CONTROL)
                 .focusable(true)
                 .focus_visual(2.0)
                 .press_scale(0.98)

@@ -2,7 +2,7 @@
 //! and episode rows. The poster is a shared element with the card that opened it.
 
 use jellyfin_api::Item;
-use rune::tok::{self, motion};
+use rune::tok;
 
 use crate::theme::FocusVisual;
 use crate::theme::SurfaceStyle;
@@ -69,7 +69,7 @@ pub(super) fn detail_screen(s: &State, detail: &DetailState) -> El {
                 .surface_sheen()
                 .shadow(1.0, 2.0, t.shadow)
                 .hover(t.hover)
-                .motion(motion::SNAPPY)
+                .motion(crate::theme::motion::CONTROL)
                 .focusable(true)
                 .focus_visual(2.0)
                 .press_scale(0.97)
@@ -256,7 +256,14 @@ fn preplay_sheet(s: &State, detail: &DetailState, t: &tok::Theme) -> El {
             ),
             ("Video", video_label),
             ("Audio", audio_label),
-            ("Subtitles", format!("{subtitles} track(s)")),
+            (
+                "Subtitles",
+                match subtitles {
+                    0 => "None".to_string(),
+                    1 => "1 track".to_string(),
+                    count => format!("{count} tracks"),
+                },
+            ),
             ("Size", size),
             ("Decision", decision),
             ("Why", reason.to_string()),
@@ -290,13 +297,36 @@ fn preplay_sheet(s: &State, detail: &DetailState, t: &tok::Theme) -> El {
             .gap(8.0)
             .items_center()
             .child(
-                text(format!("Quality: {}", s.playback_quality.label()))
+                // Quality was a caption in the footer, easy to miss and hard to change on a
+                // TV. It is a control with a visible current value now.
+                row()
                     .key("preplay-quality")
                     .role("button")
-                    .font(type_::caption())
-                    .color(t.text_secondary)
+                    .label("Change playback quality")
+                    .h(34.0)
+                    .px(10.0)
+                    .radius(8.0)
+                    .items_center()
+                    .gap(8.0)
                     .grow(1.0)
+                    .fill(t.card)
+                    .outline(1.0, 0.0, t.card_border)
+                    .hover(t.hover)
+                    .motion(crate::theme::motion::CONTROL)
+                    .focusable(true)
+                    .focus_visual(2.0)
+                    .press_scale(0.98)
                     .cursor(rune::Cursor::Pointer)
+                    .child(
+                        text("Quality")
+                            .font(type_::caption())
+                            .color(t.text_secondary),
+                    )
+                    .child(
+                        text(s.playback_quality.label())
+                            .font(type_::label())
+                            .color(t.text),
+                    )
                     .on_press(|s: &mut State| s.cycle_playback_quality()),
             )
             .child(
@@ -328,7 +358,7 @@ fn preplay_sheet(s: &State, detail: &DetailState, t: &tok::Theme) -> El {
                     .focus_visual(2.0)
                     .press_scale(0.97)
                     .cursor(rune::Cursor::Pointer)
-                    .child(text("Play").font(type_::label()).color(t.bg))
+                    .child(text("Play").font(type_::label()).color(theme::on_accent()))
                     .on_press(|s: &mut State| s.play_detail()),
             ),
     );
@@ -394,7 +424,7 @@ pub(super) fn playlist_create_modal(s: &State, item: &Item, t: &tok::Theme) -> E
                         .center()
                         .fill(t.bg)
                         .hover(t.hover)
-                        .motion(motion::SNAPPY)
+                        .motion(crate::theme::motion::CONTROL)
                         .focusable(true)
                         .focus_visual(2.0)
                         .press_scale(0.97)
@@ -411,11 +441,15 @@ pub(super) fn playlist_create_modal(s: &State, item: &Item, t: &tok::Theme) -> E
                         .center()
                         .fill(tok::accent(0, true))
                         .hover(t.hover)
-                        .motion(motion::SNAPPY)
+                        .motion(crate::theme::motion::CONTROL)
                         .focusable(true)
                         .focus_visual(2.0)
                         .press_scale(0.97)
-                        .child(text("Create").font(type_::label()).color(t.bg))
+                        .child(
+                            text("Create")
+                                .font(type_::label())
+                                .color(theme::on_accent()),
+                        )
                         .cursor(rune::Cursor::Pointer)
                         .on_press(|s: &mut State| s.create_playlist_with_detail()),
                 ),
@@ -464,7 +498,7 @@ pub(super) fn playlist_picker(s: &State, item: &Item, t: &tok::Theme) -> El {
                         .center()
                         .fill(Color::TRANSPARENT)
                         .hover(t.hover)
-                        .motion(motion::SNAPPY)
+                        .motion(crate::theme::motion::CONTROL)
                         .focusable(true)
                         .focus_visual(2.0)
                         .press_scale(0.96)
@@ -502,7 +536,7 @@ pub(super) fn playlist_picker(s: &State, item: &Item, t: &tok::Theme) -> El {
                 .gap(8.0)
                 .fill(Color::TRANSPARENT)
                 .hover(t.hover)
-                .motion(motion::SNAPPY)
+                .motion(crate::theme::motion::CONTROL)
                 .focusable(true)
                 .focus_visual(2.0)
                 .press_scale(0.98)
@@ -537,7 +571,7 @@ pub(super) fn playlist_picker(s: &State, item: &Item, t: &tok::Theme) -> El {
                 .gap(8.0)
                 .fill(theme::FOCUS.alpha(0.10))
                 .hover(t.hover)
-                .motion(motion::SNAPPY)
+                .motion(crate::theme::motion::CONTROL)
                 .focusable(true)
                 .focus_visual(2.0)
                 .press_scale(0.98)
@@ -599,7 +633,7 @@ pub(super) fn collection_picker(s: &State, item: Option<&Item>, t: &tok::Theme) 
                         .center()
                         .fill(Color::TRANSPARENT)
                         .hover(t.hover)
-                        .motion(motion::SNAPPY)
+                        .motion(crate::theme::motion::CONTROL)
                         .focusable(true)
                         .focus_visual(2.0)
                         .press_scale(0.96)
@@ -647,7 +681,7 @@ pub(super) fn collection_picker(s: &State, item: Option<&Item>, t: &tok::Theme) 
                 .gap(8.0)
                 .fill(Color::TRANSPARENT)
                 .hover(t.hover)
-                .motion(motion::SNAPPY)
+                .motion(crate::theme::motion::CONTROL)
                 .focusable(true)
                 .focus_visual(2.0)
                 .press_scale(0.98)
@@ -766,7 +800,7 @@ fn version_row(s: &State, detail: &DetailState, t: &tok::Theme) -> Option<El> {
                     },
                 )
                 .hover(t.hover)
-                .motion(motion::SNAPPY)
+                .motion(crate::theme::motion::CONTROL)
                 .focusable(true)
                 .focus_visual(2.0)
                 .press_scale(0.97)
@@ -856,14 +890,14 @@ fn hero(s: &State, detail: &DetailState, t: &tok::Theme) -> El {
         .shadow(1.0, 2.0, Color::BLACK.alpha(0.30))
         .shadow(4.0, 12.0, tok::accent(0, true).alpha(0.35))
         .hover(t.hover)
-        .motion(motion::SNAPPY)
+        .motion(crate::theme::motion::CONTROL)
         .focusable(true)
         .focus_visual(2.0)
         .press_scale(0.97)
         .child(
             text(detail::primary_label(detail))
                 .font(type_::label())
-                .color(t.bg),
+                .color(theme::on_accent()),
         )
         .cursor(rune::Cursor::Pointer)
         .on_press(|s: &mut State| s.play_detail());
@@ -876,7 +910,7 @@ fn hero(s: &State, detail: &DetailState, t: &tok::Theme) -> El {
         .key("detail-favorite")
         .role("button")
         .h(36.0)
-        .px(16.0)
+        .px(12.0)
         .radius(9.0)
         .center()
         .fill(t.card)
@@ -890,7 +924,7 @@ fn hero(s: &State, detail: &DetailState, t: &tok::Theme) -> El {
             },
         )
         .hover(t.hover)
-        .motion(motion::SNAPPY)
+        .motion(crate::theme::motion::CONTROL)
         .focusable(true)
         .focus_visual(2.0)
         .press_scale(0.97)
@@ -900,7 +934,7 @@ fn hero(s: &State, detail: &DetailState, t: &tok::Theme) -> El {
             "Add favourite"
         })
         .child(
-            text(if favorite { "Favorited" } else { "Favorite" })
+            text(if favorite { "Favourited" } else { "Favourite" })
                 .font(type_::label())
                 .color(if favorite {
                     tok::accent(0, true)
@@ -919,7 +953,7 @@ fn hero(s: &State, detail: &DetailState, t: &tok::Theme) -> El {
         .key("detail-played")
         .role("button")
         .h(36.0)
-        .px(16.0)
+        .px(12.0)
         .radius(9.0)
         .center()
         .fill(t.card)
@@ -928,7 +962,7 @@ fn hero(s: &State, detail: &DetailState, t: &tok::Theme) -> El {
         .shadow(2.0, 6.0, Color::BLACK.alpha(0.18))
         .outline(1.0, 0.0, t.card_border)
         .hover(t.hover)
-        .motion(motion::SNAPPY)
+        .motion(crate::theme::motion::CONTROL)
         .focusable(true)
         .focus_visual(2.0)
         .press_scale(0.97)
@@ -953,6 +987,17 @@ fn hero(s: &State, detail: &DetailState, t: &tok::Theme) -> El {
         .gap(14.0)
         .child(title)
         .child(metadata)
+        .children(
+            detail
+                .item
+                .tagline
+                .as_deref()
+                .filter(|tagline| !tagline.trim().is_empty())
+                .map(|tagline| {
+                    theme::readable_lines(tagline.to_string(), type_::overview(), t.text_secondary, 2)
+                        .key("detail-tagline")
+                }),
+        )
         .children((!extended.is_empty()).then(|| {
             theme::readable_text(extended, type_::meta(), t.text_secondary)
                 .key("detail-extended-meta")
@@ -976,7 +1021,7 @@ fn hero(s: &State, detail: &DetailState, t: &tok::Theme) -> El {
                         .center()
                         .fill(t.card)
                         .hover(t.hover)
-                        .motion(motion::SNAPPY)
+                        .motion(crate::theme::motion::CONTROL)
                         .focusable(true)
                         .focus_visual(2.0)
                         .press_scale(0.96)
@@ -996,7 +1041,7 @@ fn hero(s: &State, detail: &DetailState, t: &tok::Theme) -> El {
         .children((s.detail_tech_open).then(|| technical(&detail.item, t)))
         .child({
             // Buttons wrap instead of clipping when the window is narrow.
-            let mut actions = row().gap(10.0).flex_wrap();
+            let mut actions = row().gap(8.0).flex_wrap();
             // A collection has no stream of its own; its members do.
             if !is_boxset {
                 actions = actions.child(primary);
@@ -1009,18 +1054,23 @@ fn hero(s: &State, detail: &DetailState, t: &tok::Theme) -> El {
                             .w(34.0)
                             .radius(9.0)
                             .center()
-                            .fill(t.card)
-                            .gradient(Color::WHITE.alpha(0.075), Color::TRANSPARENT)
+                            // The same accent as the primary it belongs to: it is that
+                            // button's options, not a second action with a stray glyph.
+                            .fill(tok::accent(0, true))
+                            .gradient(Color::WHITE.alpha(0.18), Color::TRANSPARENT)
                             .shadow(1.0, 2.0, Color::BLACK.alpha(0.30))
-                            .shadow(2.0, 6.0, Color::BLACK.alpha(0.18))
-                            .outline(1.0, 0.0, t.card_border)
+                            .shadow(4.0, 12.0, tok::accent(0, true).alpha(0.35))
                             .hover(t.hover)
-                            .motion(motion::SNAPPY)
+                            .motion(crate::theme::motion::CONTROL)
                             .focusable(true)
                             .focus_visual(2.0)
                             .press_scale(0.97)
                             .cursor(rune::Cursor::Pointer)
-                            .child(text("▾").font(type_::label()).color(t.text))
+                            .child(
+                                text("▾")
+                                    .font(type_::label())
+                                    .color(theme::on_accent()),
+                            )
                             .on_press(|s: &mut State| s.open_preplay()),
                     );
                 }
@@ -1037,7 +1087,7 @@ fn hero(s: &State, detail: &DetailState, t: &tok::Theme) -> El {
                         el().key("detail-restart")
                             .role("button")
                             .h(36.0)
-                            .px(16.0)
+                            .px(12.0)
                             .radius(9.0)
                             .center()
                             .fill(t.card)
@@ -1046,7 +1096,7 @@ fn hero(s: &State, detail: &DetailState, t: &tok::Theme) -> El {
                             .shadow(2.0, 6.0, Color::BLACK.alpha(0.18))
                             .outline(1.0, 0.0, t.card_border)
                             .hover(t.hover)
-                            .motion(motion::SNAPPY)
+                            .motion(crate::theme::motion::CONTROL)
                             .focusable(true)
                             .focus_visual(2.0)
                             .press_scale(0.97)
@@ -1062,7 +1112,7 @@ fn hero(s: &State, detail: &DetailState, t: &tok::Theme) -> El {
                             .role("button")
                             .label("Toggle theme song")
                             .h(36.0)
-                            .px(16.0)
+                            .px(12.0)
                             .radius(9.0)
                             .center()
                             .fill(if s.theme_audio.is_some() {
@@ -1072,7 +1122,7 @@ fn hero(s: &State, detail: &DetailState, t: &tok::Theme) -> El {
                             })
                             .outline(1.0, 0.0, t.card_border)
                             .hover(t.hover)
-                            .motion(motion::SNAPPY)
+                            .motion(crate::theme::motion::CONTROL)
                             .focusable(true)
                             .focus_visual(2.0)
                             .press_scale(0.97)
@@ -1095,7 +1145,7 @@ fn hero(s: &State, detail: &DetailState, t: &tok::Theme) -> El {
                             .role("button")
                             .label("Toggle theme video")
                             .h(36.0)
-                            .px(16.0)
+                            .px(12.0)
                             .radius(9.0)
                             .center()
                             .fill(if s.theme_video_on {
@@ -1105,7 +1155,7 @@ fn hero(s: &State, detail: &DetailState, t: &tok::Theme) -> El {
                             })
                             .outline(1.0, 0.0, t.card_border)
                             .hover(t.hover)
-                            .motion(motion::SNAPPY)
+                            .motion(crate::theme::motion::CONTROL)
                             .focusable(true)
                             .focus_visual(2.0)
                             .press_scale(0.97)
@@ -1129,7 +1179,7 @@ fn hero(s: &State, detail: &DetailState, t: &tok::Theme) -> El {
                             .role("button")
                             .label("Watch trailer")
                             .h(36.0)
-                            .px(16.0)
+                            .px(12.0)
                             .radius(9.0)
                             .center()
                             .fill(t.card)
@@ -1138,7 +1188,7 @@ fn hero(s: &State, detail: &DetailState, t: &tok::Theme) -> El {
                             .shadow(2.0, 6.0, Color::BLACK.alpha(0.18))
                             .outline(1.0, 0.0, t.card_border)
                             .hover(t.hover)
-                            .motion(motion::SNAPPY)
+                            .motion(crate::theme::motion::CONTROL)
                             .focusable(true)
                             .focus_visual(2.0)
                             .press_scale(0.97)
@@ -1182,7 +1232,7 @@ fn hero(s: &State, detail: &DetailState, t: &tok::Theme) -> El {
                                 .role("button")
                                 .label(label.clone())
                                 .h(36.0)
-                                .px(16.0)
+                                .px(12.0)
                                 .radius(9.0)
                                 .center()
                                 .fill(t.card)
@@ -1191,7 +1241,7 @@ fn hero(s: &State, detail: &DetailState, t: &tok::Theme) -> El {
                                 .shadow(2.0, 6.0, Color::BLACK.alpha(0.18))
                                 .outline(1.0, 0.0, t.card_border)
                                 .hover(t.hover)
-                                .motion(motion::SNAPPY)
+                                .motion(crate::theme::motion::CONTROL)
                                 .focusable(true)
                                 .focus_visual(2.0)
                                 .press_scale(0.97)
@@ -1226,7 +1276,7 @@ fn hero(s: &State, detail: &DetailState, t: &tok::Theme) -> El {
                     el().key("detail-playlist")
                         .role("button")
                         .h(36.0)
-                        .px(16.0)
+                        .px(12.0)
                         .radius(9.0)
                         .center()
                         .fill(t.card)
@@ -1235,7 +1285,7 @@ fn hero(s: &State, detail: &DetailState, t: &tok::Theme) -> El {
                         .shadow(2.0, 6.0, Color::BLACK.alpha(0.18))
                         .outline(1.0, 0.0, t.card_border)
                         .hover(t.hover)
-                        .motion(motion::SNAPPY)
+                        .motion(crate::theme::motion::CONTROL)
                         .focusable(true)
                         .focus_visual(2.0)
                         .press_scale(0.97)
@@ -1248,7 +1298,7 @@ fn hero(s: &State, detail: &DetailState, t: &tok::Theme) -> El {
                     el().key("detail-collection-add")
                         .role("button")
                         .h(36.0)
-                        .px(16.0)
+                        .px(12.0)
                         .radius(9.0)
                         .center()
                         .fill(t.card)
@@ -1257,7 +1307,7 @@ fn hero(s: &State, detail: &DetailState, t: &tok::Theme) -> El {
                         .shadow(2.0, 6.0, Color::BLACK.alpha(0.18))
                         .outline(1.0, 0.0, t.card_border)
                         .hover(t.hover)
-                        .motion(motion::SNAPPY)
+                        .motion(crate::theme::motion::CONTROL)
                         .focusable(true)
                         .focus_visual(2.0)
                         .press_scale(0.97)
@@ -1286,7 +1336,7 @@ fn hero(s: &State, detail: &DetailState, t: &tok::Theme) -> El {
                 .w_full()
                 .max_lines(3)
                 .font(type_::mono_caption())
-                .color(tok::accent(2, true)),
+                .color(theme::status::danger()),
         );
     }
     info = info
@@ -1365,7 +1415,7 @@ fn overview(s: &State, detail: &DetailState, t: &tok::Theme) -> El {
                 .radius(6.0)
                 .center()
                 .hover(t.hover)
-                .motion(motion::SNAPPY)
+                .motion(crate::theme::motion::CONTROL)
                 .focusable(true)
                 .focus_visual(2.0)
                 .press_scale(0.96)
@@ -1413,7 +1463,7 @@ fn ratings(s: &State, detail: &DetailState, t: &tok::Theme) -> Option<El> {
                 .gap(4.0)
                 .fill(brand([245, 197, 24]).alpha(0.12))
                 .hover(t.hover)
-                .motion(motion::SNAPPY)
+                .motion(crate::theme::motion::CONTROL)
                 .focusable(true)
                 .focus_visual(2.0)
                 .press_scale(0.97)
@@ -1502,7 +1552,7 @@ fn provider_link(
         .gap(4.0)
         .fill(colour.alpha(0.12))
         .hover(t.hover)
-        .motion(motion::SNAPPY)
+        .motion(crate::theme::motion::CONTROL)
         .focusable(true)
         .focus_visual(2.0)
         .press_scale(0.97)
@@ -1586,7 +1636,7 @@ fn collection(s: &State, detail: &DetailState, t: &tok::Theme) -> Option<El> {
                     },
                 )
                 .hover(t.hover)
-                .motion(motion::SNAPPY)
+                .motion(crate::theme::motion::CONTROL)
                 .focusable(true)
                 .focus_visual(2.0)
                 .press_scale(0.96)
@@ -1646,7 +1696,7 @@ fn collection(s: &State, detail: &DetailState, t: &tok::Theme) -> Option<El> {
                     .w(176.0)
                     .gap(6.0)
                     .hover(t.hover)
-                    .motion(motion::SNAPPY)
+                    .motion(crate::theme::motion::CONTROL)
                     .focusable(true)
                     .focus_visual(2.0)
                     .press_scale(0.98)
@@ -1700,7 +1750,7 @@ fn collections_row(s: &State, t: &tok::Theme) -> Option<El> {
                 .fill(t.card)
                 .outline(1.0, 0.0, t.card_border)
                 .hover(t.hover)
-                .motion(motion::SNAPPY)
+                .motion(crate::theme::motion::CONTROL)
                 .focusable(true)
                 .focus_visual(2.0)
                 .press_scale(0.97)
@@ -1898,7 +1948,7 @@ fn queue_button(
             },
         )
         .hover(t.hover)
-        .motion(motion::SNAPPY)
+        .motion(crate::theme::motion::CONTROL)
         .focusable(true)
         .focus_visual(2.0)
         .press_scale(0.97)
@@ -1944,7 +1994,7 @@ fn season_chips(detail: &DetailState, t: &tok::Theme) -> El {
                     },
                 )
                 .hover(t.hover)
-                .motion(motion::SNAPPY)
+                .motion(crate::theme::motion::CONTROL)
                 .focusable(true)
                 .focus_visual(2.0)
                 .press_scale(0.96)
@@ -2036,10 +2086,15 @@ fn next_up(s: &State, detail: &DetailState, t: &tok::Theme) -> Option<El> {
         .episode_image_key(item)
         .and_then(|key| super::poster_layers(s, &key, SurfaceFit::Fill))
         .unwrap_or_else(|| placeholder(item, t));
-    let label = item
-        .episode_label()
-        .map(|label| format!("{label} · {}", item.name))
-        .unwrap_or_else(|| item.name.clone());
+    let label = if guarded {
+        // The guard blurs the still and replaces the overview; leaving the episode title on
+        // screen defeated it.
+        "Next episode".to_string()
+    } else {
+        item.episode_label()
+            .map(|label| format!("{label} · {}", item.name))
+            .unwrap_or_else(|| item.name.clone())
+    };
     let resume = "Play next".to_string();
     let episode = item.clone();
     Some(
@@ -2068,7 +2123,7 @@ fn next_up(s: &State, detail: &DetailState, t: &tok::Theme) -> Option<El> {
                     .shadow(1.0, 2.0, t.shadow)
                     .shadow(6.0, 18.0, t.shadow_soft)
                     .hover(t.hover)
-                    .motion(motion::SNAPPY)
+                    .motion(crate::theme::motion::CONTROL)
                     .role("button")
                     .focusable(true)
                     .focus_visual(2.0)
@@ -2185,7 +2240,7 @@ fn cast(s: &State, detail: &DetailState, t: &tok::Theme) -> Option<El> {
             .radius(40.0)
             .center()
             .hover(t.hover)
-            .motion(motion::SNAPPY)
+            .motion(crate::theme::motion::CONTROL)
             .focusable(true)
             .focus_ring(theme::focus_width() + 1.0, 0.0, theme::ring())
             .press_scale(0.97)
@@ -2261,7 +2316,7 @@ fn episode_row(item: &Item, s: &State, t: &tok::Theme) -> El {
         .radius(8.0)
         .fill(t.card)
         .hover(t.hover)
-        .motion(motion::SNAPPY)
+        .motion(crate::theme::motion::CONTROL)
         .role("button")
         .focusable(true)
         .focus_visual(2.0)
@@ -2285,7 +2340,7 @@ fn episode_row(item: &Item, s: &State, t: &tok::Theme) -> El {
                 .radius(10.0)
                 .center()
                 .fill(tok::accent(0, true))
-                .child(text("✓").font(type_::caption()).color(t.bg))
+                .child(text("✓").font(type_::caption()).color(theme::on_accent()))
         }))
         .child(
             el().w(160.0)
@@ -2321,28 +2376,33 @@ fn episode_row(item: &Item, s: &State, t: &tok::Theme) -> El {
                         .color(t.text_secondary),
                 ),
         )
-        .child(
+        .children((watched > 0.0).then(|| {
             el().w(80.0).h(3.0).radius(1.5).fill(t.control_track).child(
                 el().w(80.0 * watched)
                     .h(3.0)
                     .radius(1.5)
                     .fill(tok::accent(0, true)),
-            ),
-        )
+            )
+        }))
 }
 
 fn detail_skeleton(t: &tok::Theme) -> El {
+    let bar = |w: f32, h: f32| el().w(w).h(h).radius(h / 2.0).fill(t.card);
+    let pill = |w: f32| el().w(w).h(24.0).radius(12.0).fill(t.card);
     col()
         .key("detail-loading")
         .w_full()
         .grow(1.0)
         .min_h(0.0)
-        .gap(24.0)
+        .gap(26.0)
         .child(
             text("Loading…")
-                .font(subtitle_style())
+                .key("detail-loading-label")
+                .font(type_::caption())
                 .color(t.text_secondary),
         )
+        // The same shape as the loaded hero: poster, title, metadata, scores, actions, overview.
+        // A two-bar placeholder looked like a failed render, not a page on its way.
         .child(
             row()
                 .w_full()
@@ -2357,10 +2417,36 @@ fn detail_skeleton(t: &tok::Theme) -> El {
                 .child(
                     col()
                         .grow(1.0)
+                        .min_w(0.0)
                         .gap(14.0)
-                        .child(el().w(360.0).h(34.0).radius(6.0).fill(t.card))
-                        .child(el().w(260.0).h(12.0).radius(6.0).fill(t.card)),
+                        .child(bar(420.0, 42.0))
+                        .child(bar(300.0, 14.0))
+                        .child(
+                            row()
+                                .gap(8.0)
+                                .child(pill(84.0))
+                                .child(pill(84.0))
+                                .child(pill(64.0)),
+                        )
+                        .child(bar(560.0, 16.0))
+                        .child(
+                            row()
+                                .gap(10.0)
+                                .child(el().w(180.0).h(38.0).radius(9.0).fill(t.card))
+                                .child(el().w(110.0).h(38.0).radius(9.0).fill(t.card))
+                                .child(el().w(110.0).h(38.0).radius(9.0).fill(t.card))
+                                .child(el().w(110.0).h(38.0).radius(9.0).fill(t.card)),
+                        )
+                        .child(bar(620.0, 14.0))
+                        .child(bar(540.0, 14.0)),
                 ),
+        )
+        .child(
+            col().w_full().gap(12.0).child(bar(160.0, 20.0)).child(
+                row()
+                    .gap(16.0)
+                    .children((0..3).map(|_| el().w(256.0).h(144.0).radius(10.0).fill(t.card))),
+            ),
         )
 }
 
@@ -2381,7 +2467,7 @@ fn detail_error(message: &str, t: &tok::Theme) -> El {
             text(message.to_string())
                 .key("detail-error-message")
                 .font(subtitle_style())
-                .color(tok::accent(2, true)),
+                .color(theme::status::danger()),
         )
         .child(
             el().key("detail-retry")
@@ -2392,7 +2478,7 @@ fn detail_error(message: &str, t: &tok::Theme) -> El {
                 .center()
                 .fill(t.card)
                 .hover(t.hover)
-                .motion(motion::SNAPPY)
+                .motion(crate::theme::motion::CONTROL)
                 .focusable(true)
                 .focus_visual(2.0)
                 .press_scale(0.97)

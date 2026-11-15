@@ -2,7 +2,7 @@
 //! closure, so a headless test can drive them and a snapshot can freeze them.
 
 use jellyfin_api::Item;
-use rune::tok::{self, motion};
+use rune::tok;
 
 use crate::theme::FocusVisual;
 use crate::theme::SurfaceStyle;
@@ -175,7 +175,7 @@ pub fn view(s: &State, _cx: &mut Cx<State>) -> El {
                                 .center()
                                 .fill(tok::accent(0, true).alpha(0.16))
                                 .hover(theme::colors().hover)
-                                .motion(motion::SNAPPY)
+                                .motion(crate::theme::motion::CONTROL)
                                 .focusable(true)
                                 .focus_visual(2.0)
                                 .press_scale(0.96)
@@ -241,7 +241,7 @@ fn mini_player(s: &State) -> El {
                 .clip_rounded(8.0)
                 .fill(Color::BLACK)
                 .hover(t.hover)
-                .motion(motion::SNAPPY)
+                .motion(crate::theme::motion::CONTROL)
                 .focusable(true)
                 .focus_visual(2.0)
                 .press_scale(0.98)
@@ -334,7 +334,7 @@ fn mini_button(
         .center()
         .fill(t.bg)
         .hover(t.hover)
-        .motion(motion::SNAPPY)
+        .motion(crate::theme::motion::CONTROL)
         .focusable(true)
         .focus_visual(2.0)
         .press_scale(0.94)
@@ -435,7 +435,7 @@ fn shortcut_overlay(s: &State) -> El {
                         .center()
                         .fill(t.bg)
                         .hover(t.hover)
-                        .motion(motion::SNAPPY)
+                        .motion(crate::theme::motion::CONTROL)
                         .focusable(true)
                         .focus_visual(2.0)
                         .press_scale(0.94)
@@ -559,13 +559,13 @@ fn connect(s: &State) -> El {
         .shadow(1.0, 2.0, Color::BLACK.alpha(0.30))
         .shadow(4.0, 12.0, tok::accent(0, true).alpha(0.35))
         .hover(t.hover)
-        .motion(motion::SNAPPY)
+        .motion(crate::theme::motion::CONTROL)
         .center()
         .focusable(true)
         .default_button()
         .focus_visual(2.0)
         .press_scale(0.97)
-        .child(text(label).font(type_::label()).color(t.bg))
+        .child(text(label).font(type_::label()).color(theme::on_accent()))
         .cursor(rune::Cursor::Pointer)
         .on_press(|s: &mut State| {
             s.connect();
@@ -578,7 +578,7 @@ fn connect(s: &State) -> El {
                 .key("error")
                 .font(type_::label())
                 // accent(2) is the red end of the six-accent ramp: an error, not a brand colour.
-                .color(tok::accent(2, true)),
+                .color(theme::status::danger()),
         ),
         Step::SigningIn => Some(
             text("Checking the server…")
@@ -613,7 +613,7 @@ fn connect(s: &State) -> El {
                     .gap(8.0)
                     .fill(t.card)
                     .hover(t.hover)
-                    .motion(motion::SNAPPY)
+                    .motion(crate::theme::motion::CONTROL)
                     .focusable(true)
                     .focus_visual(2.0)
                     .press_scale(0.98)
@@ -643,7 +643,7 @@ fn connect(s: &State) -> El {
                 .h(32.0)
                 .center()
                 .hover(t.hover)
-                .motion(motion::SNAPPY)
+                .motion(crate::theme::motion::CONTROL)
                 .focusable(true)
                 .focus_visual(2.0)
                 .press_scale(0.97)
@@ -689,7 +689,7 @@ fn quick_card(quick: &crate::state::QuickLogin, t: &tok::Theme) -> El {
         text(error.clone())
             .key("quick-connect-error")
             .font(type_::label())
-            .color(tok::accent(2, true))
+            .color(theme::status::danger())
     } else if quick.authenticated {
         text("Approved. Signing in…")
             .key("quick-connect-status")
@@ -756,7 +756,7 @@ fn quick_card(quick: &crate::state::QuickLogin, t: &tok::Theme) -> El {
                 .center()
                 .fill(t.bg)
                 .hover(t.hover)
-                .motion(motion::SNAPPY)
+                .motion(crate::theme::motion::CONTROL)
                 .focusable(true)
                 .focus_visual(2.0)
                 .press_scale(0.97)
@@ -777,7 +777,7 @@ fn discover_action(s: &State, t: &tok::Theme) -> El {
         .center()
         .fill(rune::Color::TRANSPARENT)
         .hover(t.hover)
-        .motion(motion::SNAPPY)
+        .motion(crate::theme::motion::CONTROL)
         .focusable(true)
         .focus_visual(2.0)
         .press_scale(0.96)
@@ -929,7 +929,7 @@ fn shelf_screen(s: &State, shelf: crate::state::HomeShelf) -> El {
                                 .center()
                                 .fill(t.card)
                                 .hover(t.hover)
-                                .motion(motion::SNAPPY)
+                                .motion(crate::theme::motion::CONTROL)
                                 .focusable(true)
                                 .focus_visual(2.0)
                                 .press_scale(0.97)
@@ -1034,7 +1034,7 @@ pub(super) fn sidebar(s: &State, t: &tok::Theme) -> El {
             .center()
             .fill(t.card)
             .hover(t.hover)
-            .motion(motion::SNAPPY)
+            .motion(crate::theme::motion::CONTROL)
             .focusable(true)
             .focus_visual(2.0)
             .press_scale(0.94)
@@ -1110,7 +1110,14 @@ pub(super) fn sidebar(s: &State, t: &tok::Theme) -> El {
                     .mb(2.0),
             );
         }
-        for library in s.home_data.libraries.iter() {
+        for library in s.home_data.libraries.iter().filter(|library| {
+            // A music, photo, book or audiobook library has no browse or playback surface in
+            // this client. Listing it only leads to a grid that cannot play anything.
+            !matches!(
+                library.collection_type.as_deref(),
+                Some("music" | "photos" | "books" | "audiobooks")
+            )
+        }) {
             let is_live = library.collection_type.as_deref() == Some("livetv");
             let selected = if is_live {
                 matches!(s.route, Route::LiveTv)
@@ -1339,7 +1346,7 @@ fn nav_item(
             rune::Color::TRANSPARENT
         })
         .hover(t.hover)
-        .motion(motion::SNAPPY)
+        .motion(crate::theme::motion::CONTROL)
         .focusable(true)
         .focus_visual(2.0)
         .press_scale(0.98)
@@ -1347,7 +1354,7 @@ fn nav_item(
         .label(label.to_string())
         .help(label.to_string())
         .child(icon(glyph, 18.0).color(if selected {
-            if theme::is_light() { t.text } else { t.bg }
+            theme::on_accent()
         } else {
             t.text_secondary
         }));
@@ -1376,9 +1383,8 @@ fn nav_item(
         item = item.w(60.0).center();
     } else {
         item = item.child(text(label).font(type_::body()).color(if selected {
-            // The light theme keeps the L 0.66 blue for the selected pill; dark text on it
-            // reaches 5.45:1, while the old near-white label was 2.78:1.
-            if theme::is_light() { t.text } else { t.bg }
+            // White on the dark theme's state blue; near-black on the light theme's.
+            theme::on_accent()
         } else {
             t.text_secondary
         }));
@@ -1399,6 +1405,16 @@ fn content(s: &State, t: &tok::Theme) -> El {
     } else {
         "Pick up where you left off"
     };
+    // The halo exists to separate words from artwork. Home's default surface is flat, so a
+    // shadow there is a visible double edge on every glyph.
+    let over_art = s.home_backdrop_key().is_some();
+    let heading = |value: &str, style: rune::TextStyle| {
+        if over_art {
+            theme::readable_text(value.to_string(), style, t.text)
+        } else {
+            text(value.to_string()).font(style).color(t.text)
+        }
+    };
     let header = row()
         .key("home-header")
         .w_full()
@@ -1411,12 +1427,14 @@ fn content(s: &State, t: &tok::Theme) -> El {
             col()
                 .grow(1.0)
                 .gap(6.0)
-                .child(theme::readable_text("Home", hero_style(), t.text).key("home-title"))
-                .child(theme::readable_text(
-                    subtitle,
-                    subtitle_style(),
-                    t.text_secondary,
-                )),
+                .child(heading("Home", hero_style()).key("home-title"))
+                .child(if over_art {
+                    theme::readable_text(subtitle.to_string(), subtitle_style(), t.text_secondary)
+                } else {
+                    text(subtitle.to_string())
+                        .font(subtitle_style())
+                        .color(t.text_secondary)
+                }),
         );
 
     let body = if s.home_data.is_empty() {
@@ -1601,7 +1619,11 @@ fn home_hero(s: &State, t: &tok::Theme) -> Option<El> {
                                     .focusable(true)
                                     .focus_visual(2.0)
                                     .cursor(rune::Cursor::Pointer)
-                                    .child(text("Resume").font(type_::label()).color(t.bg))
+                                    .child(
+                                        text("Resume")
+                                            .font(type_::label())
+                                            .color(theme::on_accent()),
+                                    )
                                     .on_press(move |s: &mut State| s.play_episode(play.clone())),
                             )
                             .child(
@@ -1664,6 +1686,19 @@ fn rails(s: &State, t: &tok::Theme) -> El {
             t,
             None,
             Some(crate::state::HomeShelf::NextUp),
+        ));
+    }
+    if visible(&s.home_data.upcoming) {
+        // Not "Next up" (that is the next unwatched episode of something you follow): this is
+        // the server's air-date lookahead, which is the only Home rail that answers "when?".
+        list = list.child(rail(
+            "Coming up",
+            "rail-upcoming",
+            &s.home_data.upcoming,
+            s,
+            t,
+            None,
+            None,
         ));
     }
     if visible(&s.home_data.on_now) {
@@ -1765,7 +1800,7 @@ fn rail(
                 .center()
                 .fill(t.bg)
                 .hover(t.hover)
-                .motion(motion::SNAPPY)
+                .motion(crate::theme::motion::CONTROL)
                 .focusable(true)
                 .focus_visual(2.0)
                 .press_scale(0.96)
@@ -1785,7 +1820,7 @@ fn rail(
                 .center()
                 .fill(t.bg)
                 .hover(t.hover)
-                .motion(motion::SNAPPY)
+                .motion(crate::theme::motion::CONTROL)
                 .focusable(true)
                 .focus_visual(2.0)
                 .press_scale(0.96)
@@ -1842,8 +1877,8 @@ fn resume_card(item: &Item, s: &State, t: &tok::Theme, highlight: bool) -> El {
             std::f32::consts::PI,
             [
                 (0.0, rune::Color::TRANSPARENT),
-                (0.55, rune::Color::BLACK.alpha(0.12)),
-                (1.0, rune::Color::BLACK.alpha(0.82)),
+                (0.55, rune::Color::BLACK.alpha(0.58)),
+                (1.0, rune::Color::BLACK.alpha(0.94)),
             ],
         ))
         .child(
@@ -1873,16 +1908,20 @@ fn resume_card(item: &Item, s: &State, t: &tok::Theme, highlight: bool) -> El {
                 .w(RESUME_W - 24.0)
                 .gap(2.0)
                 .child(
-                    text(title.to_string())
-                        .font(type_::card_title())
-                        .color(rune::Color::WHITE)
-                        .truncate(),
+                    theme::readable_text_on_art(
+                        title.to_string(),
+                        type_::card_title(),
+                        rune::Color::WHITE,
+                    )
+                    .truncate(),
                 )
                 .child(
-                    text(crate::home::resume_subtitle(item))
-                        .font(type_::caption())
-                        .color(rune::Color::WHITE.alpha(0.72))
-                        .truncate(),
+                    theme::readable_text_on_art(
+                        crate::home::resume_subtitle(item),
+                        type_::caption(),
+                        rune::Color::WHITE.alpha(0.86),
+                    )
+                    .truncate(),
                 ),
         );
     if !s.big_screen {
@@ -1899,7 +1938,7 @@ fn resume_card(item: &Item, s: &State, t: &tok::Theme, highlight: bool) -> El {
                 .center()
                 .fill(rune::Color::BLACK.alpha(0.55))
                 .hover(rune::Color::WHITE.alpha(0.18))
-                .motion(motion::SNAPPY)
+                .motion(crate::theme::motion::CONTROL)
                 .focusable(true)
                 .focus_visual(2.0)
                 .press_scale(0.92)
@@ -1939,11 +1978,11 @@ fn resume_card(item: &Item, s: &State, t: &tok::Theme, highlight: bool) -> El {
         .role("button")
         .w(RESUME_W)
         .hover_group_focus()
-        .hover_motion(motion::SNAPPY, motion::SNAPPY)
+        .hover_motion(crate::theme::motion::HOVER, crate::theme::motion::HOVER)
         .focusable(true)
         .focus_lift_only(4.0)
         .press_scale(0.985)
-        .motion(motion::SNAPPY)
+        .motion(crate::theme::motion::CONTROL)
         .cursor(rune::Cursor::Pointer)
         .on_press(move |s: &mut State| s.open_detail(id.clone()))
         .child(art)
@@ -1976,7 +2015,7 @@ fn on_now_rail(s: &State, t: &tok::Theme) -> El {
             .shadow(1.0, 2.0, Color::BLACK.alpha(0.25))
             .shadow(6.0, 18.0, Color::BLACK.alpha(0.16))
             .hover(t.hover)
-            .motion(motion::SNAPPY)
+            .motion(crate::theme::motion::CONTROL)
             .focusable(true)
             .focus_visual(2.0)
             .press_scale(0.98)
@@ -1989,7 +2028,7 @@ fn on_now_rail(s: &State, t: &tok::Theme) -> El {
                     .child(
                         text("● LIVE")
                             .font(type_::caption())
-                            .color(tok::accent(2, true)),
+                            .color(theme::status::danger()),
                     )
                     .child(
                         text(format!("#{number}"))
@@ -2053,7 +2092,7 @@ fn resume_rail(key: &str, items: &[Item], s: &State, t: &tok::Theme) -> El {
                         .center()
                         .fill(t.bg)
                         .hover(t.hover)
-                        .motion(motion::SNAPPY)
+                        .motion(crate::theme::motion::CONTROL)
                         .focusable(true)
                         .focus_visual(2.0)
                         .press_scale(0.96)
@@ -2163,19 +2202,19 @@ pub(super) fn card_menu(s: &State) -> El {
                 |s: &mut State| s.card_menu_add_to_queue(),
             ));
         }
-        panel = panel.child(menu_row(
+        panel = panel.child(menu_row_menu(
             "Add to playlist…",
             "card-menu-playlist",
             &t,
             |s: &mut State| s.card_menu_add_to_playlist(),
         ));
-        panel = panel.child(menu_row(
+        panel = panel.child(menu_row_menu(
             "Add to collection…",
             "card-menu-collection-add",
             &t,
             |s: &mut State| s.card_menu_add_to_collection(),
         ));
-        panel = panel.child(menu_row(
+        panel = panel.child(menu_row_menu(
             "Play on…",
             "card-menu-cast",
             &t,
@@ -2192,7 +2231,7 @@ pub(super) fn card_menu(s: &State) -> El {
             .is_some_and(|detail| detail.collection.iter().any(|item| item.id == menu.item.id))
     {
         let id = menu.item.id.clone();
-        panel = panel.child(menu_row(
+        panel = panel.child(menu_row_danger(
             "Remove from this collection",
             "card-menu-collection-remove",
             &t,
@@ -2281,7 +2320,7 @@ pub(super) fn card_menu(s: &State) -> El {
     panel = panel.child(menu_separator(&t));
     rows += 1;
     if resumable && !watched {
-        panel = panel.child(menu_row(
+        panel = panel.child(menu_row_danger(
             "Remove from Continue Watching",
             "card-menu-resume",
             &t,
@@ -2346,7 +2385,7 @@ fn cast_picker(s: &State, t: &tok::Theme) -> El {
                         .center()
                         .fill(rune::Color::TRANSPARENT)
                         .hover(t.hover)
-                        .motion(motion::SNAPPY)
+                        .motion(crate::theme::motion::CONTROL)
                         .focusable(true)
                         .focus_visual(2.0)
                         .press_scale(0.96)
@@ -2404,7 +2443,7 @@ fn cast_picker(s: &State, t: &tok::Theme) -> El {
                 .gap(10.0)
                 .fill(rune::Color::TRANSPARENT)
                 .hover(t.hover)
-                .motion(motion::SNAPPY)
+                .motion(crate::theme::motion::CONTROL)
                 .focusable(true)
                 .focus_visual(2.0)
                 .press_scale(0.98)
@@ -2452,7 +2491,7 @@ fn menu_row_tx(
             .items_center()
             .fill(rune::Color::TRANSPARENT)
             .hover(t.hover)
-            .motion(motion::SNAPPY)
+            .motion(crate::theme::motion::CONTROL)
             .focusable(true)
             .focus_visual(2.0)
             .cursor(rune::Cursor::Pointer)
@@ -2468,6 +2507,32 @@ fn menu_row_tx(
 }
 
 fn menu_row(label: &str, key: &str, t: &tok::Theme, on: impl Fn(&mut State) + 'static) -> El {
+    menu_row_inner(label, key, t, false, false, on)
+}
+
+/// A row that opens a picker. The chevron distinguishes it from a row that acts in place.
+fn menu_row_menu(label: &str, key: &str, t: &tok::Theme, on: impl Fn(&mut State) + 'static) -> El {
+    menu_row_inner(label, key, t, true, false, on)
+}
+
+/// A row that removes something. The danger tone is the only place a menu uses colour.
+fn menu_row_danger(
+    label: &str,
+    key: &str,
+    t: &tok::Theme,
+    on: impl Fn(&mut State) + 'static,
+) -> El {
+    menu_row_inner(label, key, t, false, true, on)
+}
+
+fn menu_row_inner(
+    label: &str,
+    key: &str,
+    t: &tok::Theme,
+    chevron: bool,
+    danger: bool,
+    on: impl Fn(&mut State) + 'static,
+) -> El {
     theme::tv_focus(
         row()
             .key(key)
@@ -2477,9 +2542,10 @@ fn menu_row(label: &str, key: &str, t: &tok::Theme, on: impl Fn(&mut State) + 's
             .px(8.0)
             .radius(6.0)
             .items_center()
+            .gap(8.0)
             .fill(rune::Color::TRANSPARENT)
             .hover(t.hover)
-            .motion(motion::SNAPPY)
+            .motion(crate::theme::motion::CONTROL)
             .focusable(true)
             .focus_visual(2.0)
             .cursor(rune::Cursor::Pointer)
@@ -2488,9 +2554,19 @@ fn menu_row(label: &str, key: &str, t: &tok::Theme, on: impl Fn(&mut State) + 's
             .child(
                 text(label.to_string())
                     .font(type_::label())
-                    .color(t.text)
+                    .color(if danger {
+                        crate::theme::status::danger()
+                    } else {
+                        t.text
+                    })
+                    .grow(1.0)
                     .truncate(),
-            ),
+            )
+            .children(chevron.then(|| {
+                text("›")
+                    .font(type_::label())
+                    .color(t.text_secondary.alpha(0.7))
+            })),
     )
 }
 
@@ -2644,14 +2720,14 @@ pub(super) fn card(item: &Item, rail: &str, s: &State, t: &tok::Theme) -> El {
                 .shadow(0.0, 8.0, rune::Color::BLACK.alpha(0.4))
                 .group_opacity(0.0, 1.0)
                 .hover(t.hover)
-                .motion(motion::SNAPPY)
+                .motion(crate::theme::motion::CONTROL)
                 .focusable(true)
                 .focus_visual(2.0)
                 .press_scale(0.94)
                 .cursor(rune::Cursor::Pointer)
                 .label("Play")
                 .help("Play")
-                .child(icon(&theme::icon::PLAY, 15.0).color(t.bg))
+                .child(icon(&theme::icon::PLAY, 15.0).color(theme::on_accent()))
                 .on_press(move |s: &mut State| s.play_episode(episode.clone())),
         );
     }
@@ -2685,7 +2761,7 @@ pub(super) fn card(item: &Item, rail: &str, s: &State, t: &tok::Theme) -> El {
                     .fill(rune::Color::BLACK.alpha(0.72))
                     .outline(1.0, 0.0, rune::Color::WHITE.alpha(0.22))
                     .hover(t.hover)
-                    .motion(motion::SNAPPY)
+                    .motion(crate::theme::motion::CONTROL)
                     .focusable(true)
                     .focus_visual(2.0)
                     .press_scale(0.94)
@@ -2719,7 +2795,7 @@ pub(super) fn card(item: &Item, rail: &str, s: &State, t: &tok::Theme) -> El {
                 .fill(rune::Color::BLACK.alpha(0.72))
                 .outline(1.0, 0.0, rune::Color::WHITE.alpha(0.22))
                 .hover(t.hover)
-                .motion(motion::SNAPPY)
+                .motion(crate::theme::motion::CONTROL)
                 .focusable(true)
                 .focus_visual(2.0)
                 .press_scale(0.94)
@@ -2780,6 +2856,7 @@ pub(super) fn card(item: &Item, rail: &str, s: &State, t: &tok::Theme) -> El {
     });
     let versions = item.media_sources.len() > 1;
     let new = crate::home::is_new(item);
+    let extras = item.special_feature_count.unwrap_or(0);
     let mut labels: Vec<(&str, &str)> = Vec::new();
     for (on, label, key) in [
         (has_4k, "4K", "4k"),
@@ -2794,35 +2871,10 @@ pub(super) fn card(item: &Item, rail: &str, s: &State, t: &tok::Theme) -> El {
             labels.push((label, key));
         }
     }
-    let extras = item.special_feature_count.unwrap_or(0);
     if extras > 0 {
-        // Extras sit at the top-left: the capability tray is top-right and the play puck is
-        // bottom-right, so the corners never argue.
-        poster_box = poster_box.child(
-            el().key(format!("badge-extras-{}", item.id))
-                .role("img")
-                .absolute(8.0, 8.0)
-                .h(20.0)
-                .px(7.0)
-                .radius(6.0)
-                .center()
-                .fill(rune::Color::BLACK.alpha(0.62))
-                .outline(1.0, 0.0, rune::Color::WHITE.alpha(0.10))
-                .shadow(1.0, 2.0, rune::Color::BLACK.alpha(0.30))
-                .label(format!(
-                    "{extras} extra{}",
-                    if extras == 1 { "" } else { "s" }
-                ))
-                .child(
-                    text(if extras > 1 {
-                        format!("+{extras} EXTRA")
-                    } else {
-                        "EXTRA".to_string()
-                    })
-                    .font(type_::mono_caption())
-                    .color(rune::Color::WHITE.alpha(0.92)),
-                ),
-        );
+        // One tray, not a second pill in the same corner as the watched check: the extras fact
+        // belongs with the other facts.
+        labels.push(("EXTRA", "extras"));
     }
     if !labels.is_empty() {
         // One tray, not four floating pills: the poster shows through the gaps of separate
@@ -2880,7 +2932,7 @@ pub(super) fn card(item: &Item, rail: &str, s: &State, t: &tok::Theme) -> El {
                 })
                 .outline(1.0, 0.0, rune::Color::WHITE.alpha(0.35))
                 .hover(t.hover)
-                .motion(motion::SNAPPY)
+                .motion(crate::theme::motion::CONTROL)
                 .focusable(true)
                 .focus_visual(2.0)
                 .press_scale(0.94)
@@ -2898,15 +2950,19 @@ pub(super) fn card(item: &Item, rail: &str, s: &State, t: &tok::Theme) -> El {
     if crate::home::is_watched(item) {
         poster_box = poster_box.child(
             el().key(format!("played-{}", item.id))
+                .role("img")
+                .label("Watched")
                 .absolute(8.0, 8.0)
                 .w(24.0)
                 .h(24.0)
                 .radius(12.0)
                 .center()
-                .fill(tok::accent(0, true))
-                .outline(1.0, 0.0, rune::Color::WHITE.alpha(0.18))
+                // A dark chip with a white check, not the accent fill the Select checkbox
+                // uses: the two must never read as the same state on one card.
+                .fill(rune::Color::BLACK.alpha(0.72))
+                .outline(1.0, 0.0, rune::Color::WHITE.alpha(0.28))
                 .shadow(0.0, 4.0, rune::Color::BLACK.alpha(0.35))
-                .child(text("✓").font(type_::caption()).color(t.bg)),
+                .child(text("✓").font(type_::caption()).color(rune::Color::WHITE)),
         );
     }
     let watched = crate::home::progress(item);
@@ -2926,11 +2982,11 @@ pub(super) fn card(item: &Item, rail: &str, s: &State, t: &tok::Theme) -> El {
         .gap(6.0)
         .radius(10.0)
         .hover_group_focus()
-        .hover_motion(motion::SNAPPY, motion::SNAPPY)
+        .hover_motion(crate::theme::motion::HOVER, crate::theme::motion::HOVER)
         .focusable(true)
         .focus_lift_only(4.0)
         .press_scale(0.985)
-        .motion(motion::SNAPPY)
+        .motion(crate::theme::motion::CONTROL)
         .label(title.to_string())
         .cursor(rune::Cursor::Pointer)
         .on_press({
@@ -2946,11 +3002,12 @@ pub(super) fn card(item: &Item, rail: &str, s: &State, t: &tok::Theme) -> El {
         })
         .child(poster_box)
         .child(
+            // `.truncate()` forces `one_line` in Rune, so applying it after `max_lines(2)`
+            // clipped every long title to one line. Two lines fit inside GRID_ROW_H.
             text(title.to_string())
                 .font(type_::card_title())
                 .color(t.text)
-                .max_lines(2)
-                .truncate(),
+                .max_lines(2),
         )
         .child(
             text(crate::home::subtitle(item))
@@ -2984,7 +3041,7 @@ pub(super) fn poster_layers(s: &State, key: &str, fit: SurfaceFit) -> Option<El>
                 .h_full()
                 .pixels_fit(image.pixels(), fit)
                 .opacity(s.image_alpha(key))
-                .opacity_motion(motion::SNAPPY),
+                .opacity_motion(crate::theme::motion::CONTROL),
         ),
     )
 }
@@ -3036,27 +3093,31 @@ fn skeleton(t: &tok::Theme) -> El {
         .w_full()
         .grow(1.0)
         .min_h(0.0)
-        .px(28.0)
-        .pb(28.0)
-        .gap(30.0)
+        .px(theme::gutter())
+        .pb(32.0)
+        .gap(theme::RAIL_GAP)
         .child(
             text("Loading your library…")
                 .key("home-loading-label")
                 .font(subtitle_style())
                 .color(t.text_secondary),
         )
-        .children((0..3).map(|_| skeleton_rail(t)))
+        // Each rail keeps the shape it will become: Continue Watching is a 304×171 resume card,
+        // the poster rails are 176×264. Three identical tall rails read as one wrong rail.
+        .child(skeleton_rail(t, 170.0, RESUME_W, RESUME_H, 3))
+        .child(skeleton_rail(t, 220.0, CARD_W, CARD_H, 4))
+        .child(skeleton_rail(t, 190.0, CARD_W, CARD_H, 4))
 }
 
-fn skeleton_rail(t: &tok::Theme) -> El {
+fn skeleton_rail(t: &tok::Theme, title_w: f32, w: f32, h: f32, count: usize) -> El {
     col()
         .w_full()
         .gap(12.0)
-        .child(skeleton_bar(150.0, t))
+        .child(skeleton_bar(title_w, t))
         .child(
             row()
                 .gap(CARD_GAP)
-                .children((0..5).map(|_| el().w(CARD_W).h(CARD_H).radius(10.0).fill(t.card))),
+                .children((0..count).map(move |_| el().w(w).h(h).radius(10.0).fill(t.card))),
         )
 }
 
@@ -3122,7 +3183,7 @@ fn error_state(message: &str, t: &tok::Theme) -> El {
             text(message.to_string())
                 .key("home-error-message")
                 .font(subtitle_style())
-                .color(tok::accent(2, true)),
+                .color(theme::status::danger()),
         )
         .child(retry_button("Try again", "home-retry", t))
 }
@@ -3138,7 +3199,7 @@ fn error_banner(message: &str, t: &tok::Theme) -> El {
         .child(
             text(message.to_string())
                 .font(type_::body())
-                .color(tok::accent(2, true))
+                .color(theme::status::danger())
                 .grow(1.0),
         )
         .child(retry_button("Retry", "home-retry", t))
@@ -3153,7 +3214,7 @@ fn retry_button(label: &str, key: &str, t: &tok::Theme) -> El {
         .center()
         .fill(t.card)
         .hover(t.hover)
-        .motion(motion::SNAPPY)
+        .motion(crate::theme::motion::CONTROL)
         .focusable(true)
         .focus_visual(2.0)
         .press_scale(0.97)

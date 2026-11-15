@@ -1,7 +1,7 @@
 //! The in-app GStreamer player: the video surface is the page, and the OSD is a layer that
 //! appears over it instead of shrinking it.
 
-use rune::tok::{self, motion};
+use rune::tok;
 
 use crate::theme::FocusVisual;
 use crate::theme::{self, type_};
@@ -359,7 +359,7 @@ fn goto_panel(s: &State, t: &tok::Theme) -> El {
                                 .focusable(true)
                                 .focus_visual(2.0)
                                 .cursor(rune::Cursor::Pointer)
-                                .child(text("Go").font(type_::label()).color(t.bg))
+                                .child(text("Go").font(type_::label()).color(theme::on_accent()))
                                 .on_press(|s: &mut State| s.submit_in_app_goto()),
                         ),
                 ),
@@ -479,7 +479,7 @@ fn sleep_panel(s: &State, t: &tok::Theme) -> El {
                     Color::TRANSPARENT
                 })
                 .hover(t.hover)
-                .motion(motion::SNAPPY)
+                .motion(crate::theme::motion::CONTROL)
                 .focusable(true)
                 .focus_visual(2.0)
                 .press_scale(0.98)
@@ -955,13 +955,7 @@ fn next_up_banner(s: &State, t: &tok::Theme) -> Option<El> {
         .fill(Color::BLACK.alpha(0.84))
         .outline(1.0, 0.0, Color::WHITE.alpha(0.14))
         .shadow(0.0, 24.0, Color::BLACK.alpha(0.55))
-        .child(
-            col().w(300.0).gap(8.0).child(thumb).child(
-                text(status)
-                    .font(type_::label())
-                    .color(Color::WHITE.alpha(0.72)),
-            ),
-        )
+        .child(col().w(300.0).gap(8.0).child(thumb))
         .child(
             col()
                 .grow(1.0)
@@ -1000,6 +994,23 @@ fn next_up_banner(s: &State, t: &tok::Theme) -> Option<El> {
                 .child(
                     row()
                         .gap(8.0)
+                        .child(
+                            // The countdown is the one number a sit-back viewer needs. It sat
+                            // under the thumbnail at 72 % white, quieter than three buttons.
+                            row()
+                                .h(36.0)
+                                .px(12.0)
+                                .radius(9.0)
+                                .items_center()
+                                .gap(7.0)
+                                .fill(Color::WHITE.alpha(0.08))
+                                .child(el().w(6.0).h(6.0).radius(3.0).fill(tok::accent(0, true)))
+                                .child(
+                                    text(status.clone())
+                                        .font(type_::label())
+                                        .color(Color::WHITE.alpha(0.92)),
+                                ),
+                        )
                         .child(accent_control(
                             "Play now",
                             "in-app-next-play",
@@ -1019,6 +1030,22 @@ fn next_up_banner(s: &State, t: &tok::Theme) -> Option<El> {
                             |s: &mut State| s.dismiss_in_app_next(),
                         )),
                 ),
+        )
+        // A thin countdown rail along the card's bottom edge: the same information as the
+        // pill, readable at a glance without reading.
+        .child(
+            el().absolute(18.0, 227.0)
+                .w(824.0)
+                .h(3.0)
+                .radius(1.5)
+                .fill(Color::WHITE.alpha(0.08)),
+        )
+        .child(
+            el().absolute(18.0, 227.0)
+                .w(824.0 * (remaining as f32 / 30_000.0).clamp(0.0, 1.0))
+                .h(3.0)
+                .radius(1.5)
+                .fill(tok::accent(0, true)),
         );
     Some(
         col()
@@ -1051,7 +1078,7 @@ fn accent_control(
         .shadow(1.0, 2.0, Color::BLACK.alpha(0.30))
         .shadow(4.0, 12.0, tok::accent(0, true).alpha(0.35))
         .hover(Color::WHITE.alpha(0.18))
-        .motion(motion::SNAPPY)
+        .motion(crate::theme::motion::CONTROL)
         .focusable(true)
         .focus_visual(2.0)
         .press_scale(0.96)
@@ -1216,7 +1243,7 @@ fn chapter_panel(s: &State, session: &crate::state::InAppSession, t: &tok::Theme
                     Color::TRANSPARENT
                 })
                 .hover(t.hover)
-                .motion(motion::SNAPPY)
+                .motion(crate::theme::motion::CONTROL)
                 .focusable(true)
                 .focus_visual(2.0)
                 .press_scale(0.99)
@@ -1291,7 +1318,7 @@ fn queue_control(
         .center()
         .fill(t.bg)
         .hover(t.hover)
-        .motion(motion::SNAPPY)
+        .motion(crate::theme::motion::CONTROL)
         .focusable(true)
         .focus_visual(2.0)
         .press_scale(0.94)
@@ -1351,7 +1378,7 @@ fn queue_panel(s: &State, t: &tok::Theme) -> El {
                     Color::TRANSPARENT
                 })
                 .hover(t.hover)
-                .motion(motion::SNAPPY)
+                .motion(crate::theme::motion::CONTROL)
                 .focusable(true)
                 .focus_visual(2.0)
                 .press_scale(0.99)
@@ -1523,7 +1550,7 @@ fn subtitle_tracks_panel(s: &State, t: &tok::Theme) -> El {
                     .gap(8.0)
                     .fill(Color::TRANSPARENT)
                     .hover(t.hover)
-                    .motion(motion::SNAPPY)
+                    .motion(crate::theme::motion::CONTROL)
                     .focusable(true)
                     .focus_visual(2.0)
                     .press_scale(0.98)
@@ -1641,7 +1668,7 @@ fn subtitle_tracks_panel(s: &State, t: &tok::Theme) -> El {
                 .gap(8.0)
                 .fill(Color::TRANSPARENT)
                 .hover(t.hover)
-                .motion(motion::SNAPPY)
+                .motion(crate::theme::motion::CONTROL)
                 .focusable(true)
                 .focus_visual(2.0)
                 .press_scale(0.98)
@@ -1687,7 +1714,7 @@ fn subtitle_tracks_panel(s: &State, t: &tok::Theme) -> El {
                 .gap(8.0)
                 .fill(theme::FOCUS.alpha(0.10))
                 .hover(t.hover)
-                .motion(motion::SNAPPY)
+                .motion(crate::theme::motion::CONTROL)
                 .focusable(true)
                 .focus_visual(2.0)
                 .press_scale(0.98)
@@ -1735,7 +1762,7 @@ fn subtitle_search_panel(s: &State, t: &tok::Theme) -> El {
                 .items_center()
                 .fill(Color::TRANSPARENT)
                 .hover(t.hover)
-                .motion(motion::SNAPPY)
+                .motion(crate::theme::motion::CONTROL)
                 .focusable(true)
                 .focus_visual(2.0)
                 .press_scale(0.96)
@@ -1780,7 +1807,7 @@ fn subtitle_search_panel(s: &State, t: &tok::Theme) -> El {
                     })
                     .outline(1.0, 0.0, if selected { theme::FOCUS } else { t.separator })
                     .hover(t.hover)
-                    .motion(motion::SNAPPY)
+                    .motion(crate::theme::motion::CONTROL)
                     .focusable(true)
                     .focus_visual(2.0)
                     .press_scale(0.96)
@@ -1827,7 +1854,7 @@ fn subtitle_search_panel(s: &State, t: &tok::Theme) -> El {
                     .center()
                     .fill(theme::FOCUS.alpha(0.14))
                     .hover(t.hover)
-                    .motion(motion::SNAPPY)
+                    .motion(crate::theme::motion::CONTROL)
                     .focusable(true)
                     .focus_visual(2.0)
                     .press_scale(0.97)
@@ -1867,7 +1894,7 @@ fn subtitle_search_panel(s: &State, t: &tok::Theme) -> El {
             .radius(8.0)
             .fill(Color::TRANSPARENT)
             .hover(t.hover)
-            .motion(motion::SNAPPY)
+            .motion(crate::theme::motion::CONTROL)
             .focusable(true)
             .focus_visual(2.0)
             .press_scale(0.99)
@@ -2928,17 +2955,41 @@ fn gear_row(
     t: &tok::Theme,
     on: impl Fn(&mut State) + 'static,
 ) -> El {
+    gear_row_inner(label, value, key, t, false, on)
+}
+
+/// A row that opens a submenu. A chevron is the difference between "this changes here" and
+/// "this opens something"; the gear was a wall of identical labels.
+fn gear_row_menu(
+    label: &str,
+    value: &str,
+    key: &str,
+    t: &tok::Theme,
+    on: impl Fn(&mut State) + 'static,
+) -> El {
+    gear_row_inner(label, value, key, t, true, on)
+}
+
+fn gear_row_inner(
+    label: &str,
+    value: &str,
+    key: &str,
+    t: &tok::Theme,
+    chevron: bool,
+    on: impl Fn(&mut State) + 'static,
+) -> El {
+    let big = crate::theme::is_big_screen();
     row()
         .key(key)
         .role("button")
-        .w(168.0)
-        .h(27.0)
-        .px(7.0)
-        .radius(6.0)
+        .w(if big { 236.0 } else { 168.0 })
+        .h(if big { 40.0 } else { 32.0 })
+        .px(if big { 10.0 } else { 7.0 })
+        .radius(7.0)
         .items_center()
         .gap(8.0)
         .hover(t.hover)
-        .motion(motion::SNAPPY)
+        .motion(crate::theme::motion::CONTROL)
         .focusable(true)
         .focus_visual(2.0)
         .cursor(rune::Cursor::Pointer)
@@ -2959,6 +3010,11 @@ fn gear_row(
                 .max_w(76.0)
                 .truncate(),
         )
+        .children(chevron.then(|| {
+            text("›")
+                .font(type_::label())
+                .color(t.text_secondary.alpha(0.75))
+        }))
 }
 
 /// The settings sheet. Every control that left the bar lives here, grouped, with its current
@@ -3030,21 +3086,24 @@ fn gear_panel(s: &State, t: &tok::Theme) -> El {
     let rows = row()
         .w_full()
         .flex_wrap()
-        .focus_group()
         .gap(3.0)
         .child(gear_heading("Tracks", t))
-        .child(gear_row(
+        .child(gear_row_menu(
             "Subtitles",
             &subs_value,
             "in-app-subtitles",
             t,
             |s: &mut State| s.toggle_in_app_subtitles_menu(),
         ))
-        .child(gear_row("Audio", &audio_value, "in-app-audio", t, |s| {
-            s.toggle_in_app_audio_menu()
-        }))
+        .child(gear_row_menu(
+            "Audio",
+            &audio_value,
+            "in-app-audio",
+            t,
+            |s| s.toggle_in_app_audio_menu(),
+        ))
         .child(gear_heading("Playback", t))
-        .child(gear_row(
+        .child(gear_row_menu(
             "Quality",
             s.playback_quality.label(),
             "in-app-quality",
@@ -3058,7 +3117,7 @@ fn gear_panel(s: &State, t: &tok::Theme) -> El {
             s.toggle_in_app_fit()
         }))
         .child(gear_heading("Timers", t))
-        .child(gear_row("Sleep", &sleep, "in-app-sleep", t, |s| {
+        .child(gear_row_menu("Sleep", &sleep, "in-app-sleep", t, |s| {
             s.toggle_sleep_menu()
         }))
         .child(gear_row("A–B loop", loop_label, "in-app-loop", t, |s| {
@@ -3066,11 +3125,11 @@ fn gear_panel(s: &State, t: &tok::Theme) -> El {
         }))
         .child(gear_heading("Navigate", t))
         .children((session.item.chapters.len() >= 2).then(|| {
-            gear_row("Chapters", "", "in-app-chapters", t, |s| {
+            gear_row_menu("Chapters", "", "in-app-chapters", t, |s| {
                 s.toggle_in_app_chapters()
             })
         }))
-        .child(gear_row("Go to time", "", "in-app-goto", t, |s| {
+        .child(gear_row_menu("Go to time", "", "in-app-goto", t, |s| {
             s.toggle_in_app_goto()
         }))
         .children(
@@ -3088,9 +3147,13 @@ fn gear_panel(s: &State, t: &tok::Theme) -> El {
             }),
         )
         .child(gear_heading("This device", t))
-        .child(gear_row("Continue on…", "", "in-app-transfer", t, |s| {
-            s.open_in_app_transfer()
-        }))
+        .child(gear_row_menu(
+            "Continue on…",
+            "",
+            "in-app-transfer",
+            t,
+            |s| s.open_in_app_transfer(),
+        ))
         .child(gear_row(
             "Statistics",
             &sink,
@@ -3109,15 +3172,42 @@ fn gear_panel(s: &State, t: &tok::Theme) -> El {
     let menu = col()
         .key("in-app-gear-menu")
         .transition(rune::Transition::offset(0.0, 8.0).combined(rune::Transition::opacity()))
-        .w(368.0)
+        .w(if s.big_screen { 520.0 } else { 368.0 })
         .padding(10.0)
         .gap(6.0)
         .radius(12.0)
+        .focus_group()
         .child(
-            text("Player")
-                .font(type_::section())
-                .color(t.text)
-                .padding(2.0),
+            row()
+                .w_full()
+                .items_center()
+                .gap(8.0)
+                .child(
+                    text("Player")
+                        .font(type_::section())
+                        .color(t.text)
+                        .grow(1.0)
+                        .padding(2.0),
+                )
+                .child(
+                    el().key("in-app-gear-close")
+                        .role("button")
+                        .label("Close player settings")
+                        .help("Close player settings")
+                        .w(if s.big_screen { 36.0 } else { 30.0 })
+                        .h(if s.big_screen { 36.0 } else { 30.0 })
+                        .radius(8.0)
+                        .center()
+                        .fill(t.card)
+                        .hover(t.hover)
+                        .motion(crate::theme::motion::CONTROL)
+                        .focusable(true)
+                        .focus_visual(2.0)
+                        .press_scale(0.94)
+                        .cursor(rune::Cursor::Pointer)
+                        .child(text("✕").font(type_::label()).color(t.text_secondary))
+                        .on_press(|s: &mut State| s.close_player_gear()),
+                ),
         )
         .child(rows)
         .child(
@@ -3156,13 +3246,13 @@ fn transport_primary(glyph: &'static Icon, label: &str, t: &tok::Theme) -> El {
         .fill(tok::accent(0, true))
         .shadow(0.0, 12.0, tok::accent(0, true).alpha(0.35))
         .hover(t.hover)
-        .motion(motion::SNAPPY)
+        .motion(crate::theme::motion::CONTROL)
         .focusable(true)
         .focus_visual(2.0)
         .press_scale(0.94)
         .label(label)
         .help(label)
-        .child(icon(glyph, 18.0).color(t.bg))
+        .child(icon(glyph, 18.0).color(theme::on_accent()))
         .cursor(rune::Cursor::Pointer)
         .on_press(|s: &mut State| s.toggle_in_app_pause())
 }
@@ -3184,7 +3274,7 @@ fn icon_control(
             .fill(Color::BLACK.alpha(0.32))
             .outline(1.0, 0.0, Color::WHITE.alpha(0.14))
             .hover(t.hover)
-            .motion(motion::SNAPPY)
+            .motion(crate::theme::motion::CONTROL)
             .focusable(true)
             .focus_visual(2.0)
             .press_scale(0.94)
@@ -3209,7 +3299,7 @@ fn control(label: &str, key: &str, t: &tok::Theme, on: impl Fn(&mut State) + 'st
             .outline(1.0, 0.0, Color::WHITE.alpha(0.14))
             .shadow(1.0, 2.0, Color::BLACK.alpha(0.30))
             .hover(t.hover)
-            .motion(motion::SNAPPY)
+            .motion(crate::theme::motion::CONTROL)
             .focusable(true)
             .focus_visual(2.0)
             .press_scale(0.96)

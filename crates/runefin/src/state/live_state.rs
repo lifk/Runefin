@@ -304,6 +304,9 @@ impl State {
     }
 
     pub fn play_live_channel(&mut self, item: Item) {
+        // Remember the channel before the tuner answers: a failed tune is still where the
+        // viewer meant to go, and the next visit can offer it.
+        self.config.last_channel = Some(item.id.clone());
         if self.in_app.is_some() {
             self.finish_in_app();
         }

@@ -20,6 +20,12 @@ finish-args:
   - --filesystem=xdg-run/pipewire-0
   - --talk-name=org.freedesktop.Notifications
   - --own-name=org.mpris.MediaPlayer2.runefin
+  # The tray icon registers through the StatusNotifierWatcher; without this name the Flatpak
+  # silently has no tray on KDE.
+  - --talk-name=org.kde.StatusNotifierWatcher
+  # `systemd-inhibit` holds the screen awake during playback through logind, which lives on the
+  # system bus. The sandbox hid that name.
+  - --system-talk-name=org.freedesktop.login1
   # Screen readers: AccessKit reaches the AT-SPI registry through org.a11y.Bus, and the sandbox
   # hides that name from an app that does not ask for it.
   - --talk-name=org.a11y.Bus

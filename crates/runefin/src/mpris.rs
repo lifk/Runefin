@@ -98,6 +98,10 @@ pub enum Command {
     SetShuffle(bool),
     /// `None`, `Track` or `Playlist`.
     SetLoopStatus(String),
+    /// Bring the window forward.
+    Raise,
+    /// Quit the app through the same shutdown path as the tray and Settings.
+    Quit,
 }
 
 #[derive(Default)]
@@ -209,17 +213,17 @@ impl Root {
 
     #[zbus(property)]
     fn desktop_entry(&self) -> &str {
-        "runefin"
+        "io.github.lifk.Runefin"
     }
 
     #[zbus(property)]
     fn can_quit(&self) -> bool {
-        false
+        true
     }
 
     #[zbus(property)]
     fn can_raise(&self) -> bool {
-        false
+        true
     }
 
     #[zbus(property)]
@@ -242,9 +246,13 @@ impl Root {
         self.inner.push(Command::SetFullscreen(fullscreen));
     }
 
-    fn raise(&self) {}
+    fn raise(&self) {
+        self.inner.push(Command::Raise);
+    }
 
-    fn quit(&self) {}
+    fn quit(&self) {
+        self.inner.push(Command::Quit);
+    }
 }
 
 struct Player {

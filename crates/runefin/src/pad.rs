@@ -78,6 +78,14 @@ struct Pad {
 }
 
 impl Pad {
+    /// Forget every held button. A unplugged pad never sends its release, so without this the
+    /// last direction repeats forever while the UI scrolls on its own.
+    fn reset(&mut self) {
+        self.held = None;
+        self.next = None;
+        self.stick = (0.0, 0.0);
+    }
+
     fn on_button(&mut self, button: Button, pressed: bool, now: Instant) -> Option<KeyEvent> {
         if let Some(dir) = direction(button) {
             if pressed {
@@ -155,7 +163,14 @@ pub fn start(handle: AppHandle<State>) {
 }
 
 fn run(handle: AppHandle<State>) {
-    let Ok(mut gilrs) = Gilrs::new() else { return };
+    // A pad can be paired after the app starts (a Steam Machine controller wakes the box). A
+    // single failed `Gilrs::new` used to kill the listener for the rest of the session.
+    let mut gilrs = loop {
+        match Gilrs::new() {
+            Ok(gilrs) => break gilrs,
+            Err(_) => std::thread::sleep(std::time::Duration::from_secs(2)),
+        }
+    };
     let mut pad = Pad::default();
     loop {
         while let Some(event) = gilrs.next_event() {
@@ -164,6 +179,11 @@ fn run(handle: AppHandle<State>) {
                 EventType::ButtonPressed(button, _) => pad.on_button(button, true, now),
                 EventType::ButtonReleased(button, _) => pad.on_button(button, false, now),
                 EventType::AxisChanged(axis, value, _) => pad.on_axis(axis, value, now),
+                EventType::Connected | EventType::Disconnected => {
+                    // The release for a held direction is never delivered when the pad goes.
+                    pad.reset();
+                    None
+                }
                 _ => None,
             };
             if let Some(key) = key {
@@ -183,6 +203,16 @@ mod tests {
 
     fn key(button: Button, pressed: bool) -> Option<KeyEvent> {
         Pad::default().on_button(button, pressed, Instant::now())
+    }
+
+    #[test]
+    fn a_dropped_pad_forgets_a_held_direction() {
+        let mut pad = Pad::default();
+        let now = Instant::now();
+        assert!(pad.on_button(Button::DPadRight, true, now).is_some());
+        assert!(pad.tick(now + REPEAT_DELAY).is_some());
+        pad.reset();
+        assert!(pad.tick(now + REPEAT_DELAY + REPEAT_RATE).is_none());
     }
 
     #[test]

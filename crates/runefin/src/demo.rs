@@ -175,6 +175,8 @@ pub fn home() -> HomeData {
                 0.0,
             ),
         ],
+        // The demo snapshot stays time-independent; the rail is covered by its loader test.
+        upcoming: Vec::new(),
         on_now: live_channels()
             .into_iter()
             .filter(|channel| channel.current_program.is_some())
@@ -784,6 +786,7 @@ pub fn movie_detail() -> DetailState {
             ),
             genres: Some(vec!["Science Fiction".into(), "Drama".into()]),
             original_title: Some("Metropolis".into()),
+            tagline: Some("The mediator between head and hands must be the heart.".into()),
             premiere_date: Some("1927-01-10T00:00:00.0000000Z".into()),
             tags: vec!["Restored".into(), "Silent".into()],
             studios: vec![jellyfin_api::NameGuid {
