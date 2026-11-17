@@ -156,7 +156,7 @@ dependencies = [
  "objc2-foundation 0.3.2",
  "parking_lot",
  "percent-encoding",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
  "wl-clipboard-rs",
  "x11rb",
 ]
@@ -807,7 +807,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -880,9 +880,9 @@ checksum = "1d674e81391d1e1ab681a28d99df07927c6d4aa5b027d7da16ba32d1d21ecd99"
 
 [[package]]
 name = "flate2"
-version = "1.1.10"
+version = "1.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6e634e2e0ebac1ee034020da1ca582e17ffe4e0f5e985823721e168928136dcb"
+checksum = "626d4928326b646e70f65ed36fc7cf9f206bdb68a0019ee7c6b4709da4e084c4"
 dependencies = [
  "crc32fast",
  "miniz_oxide 0.9.1",
@@ -1150,7 +1150,7 @@ dependencies = [
  "gobject-sys",
  "libc",
  "system-deps",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -2585,7 +2585,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7d8fae84b431384b68627d0f9b3b1245fcf9f46f6c0e3dc902e9dce64edd1967"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -3061,7 +3061,7 @@ dependencies = [
 [[package]]
 name = "rune"
 version = "0.0.1"
-source = "git+https://github.com/lifk/rune?rev=0dbad3f0695c4e9ce11d1876491c2fb35e32e1b2#0dbad3f0695c4e9ce11d1876491c2fb35e32e1b2"
+source = "git+https://github.com/lifk/rune?rev=2d549f176b2c612a7da0c37c19f6fac505e6f003#2d549f176b2c612a7da0c37c19f6fac505e6f003"
 dependencies = [
  "accesskit",
  "accesskit_macos",
@@ -3113,7 +3113,7 @@ dependencies = [
  "spellbook",
  "swash",
  "taffy",
- "tiny-skia-path 0.11.4 (git+https://github.com/lifk/rune?rev=0dbad3f0695c4e9ce11d1876491c2fb35e32e1b2)",
+ "tiny-skia-path 0.11.4 (git+https://github.com/lifk/rune?rev=2d549f176b2c612a7da0c37c19f6fac505e6f003)",
  "tokio",
  "unicode-segmentation",
  "wasm-bindgen",
@@ -3134,19 +3134,19 @@ dependencies = [
  "winit",
  "x11rb",
  "xkbcommon",
- "zbus 6.2.0",
+ "zbus 6.3.0",
  "zeroize",
 ]
 
 [[package]]
 name = "rune-motion"
 version = "0.1.0"
-source = "git+https://github.com/lifk/rune?rev=0dbad3f0695c4e9ce11d1876491c2fb35e32e1b2#0dbad3f0695c4e9ce11d1876491c2fb35e32e1b2"
+source = "git+https://github.com/lifk/rune?rev=2d549f176b2c612a7da0c37c19f6fac505e6f003#2d549f176b2c612a7da0c37c19f6fac505e6f003"
 
 [[package]]
 name = "rune-staging"
 version = "0.0.1"
-source = "git+https://github.com/lifk/rune?rev=0dbad3f0695c4e9ce11d1876491c2fb35e32e1b2#0dbad3f0695c4e9ce11d1876491c2fb35e32e1b2"
+source = "git+https://github.com/lifk/rune?rev=2d549f176b2c612a7da0c37c19f6fac505e6f003#2d549f176b2c612a7da0c37c19f6fac505e6f003"
 dependencies = [
  "wgpu",
 ]
@@ -3154,7 +3154,7 @@ dependencies = [
 [[package]]
 name = "rune-taffy"
 version = "0.0.1"
-source = "git+https://github.com/lifk/rune?rev=0dbad3f0695c4e9ce11d1876491c2fb35e32e1b2#0dbad3f0695c4e9ce11d1876491c2fb35e32e1b2"
+source = "git+https://github.com/lifk/rune?rev=2d549f176b2c612a7da0c37c19f6fac505e6f003#2d549f176b2c612a7da0c37c19f6fac505e6f003"
 dependencies = [
  "taffy",
 ]
@@ -3180,7 +3180,7 @@ dependencies = [
  "signal-hook",
  "tokio",
  "toml 0.8.23",
- "zbus 6.2.0",
+ "zbus 6.3.0",
  "zeroize",
 ]
 
@@ -3234,7 +3234,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -3678,10 +3678,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.4.3",
+ "getrandom 0.3.4",
  "once_cell",
  "rustix 1.1.6",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -3776,7 +3776,7 @@ dependencies = [
 [[package]]
 name = "tiny-skia-path"
 version = "0.11.4"
-source = "git+https://github.com/lifk/rune?rev=0dbad3f0695c4e9ce11d1876491c2fb35e32e1b2#0dbad3f0695c4e9ce11d1876491c2fb35e32e1b2"
+source = "git+https://github.com/lifk/rune?rev=2d549f176b2c612a7da0c37c19f6fac505e6f003#2d549f176b2c612a7da0c37c19f6fac505e6f003"
 dependencies = [
  "arrayref",
  "bytemuck",
@@ -3992,9 +3992,9 @@ checksum = "8ecb6da28b8a351d773b68d5825ac39017e680750f980f3a1a85cd8dd28a47c1"
 
 [[package]]
 name = "ureq"
-version = "3.5.0"
+version = "3.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cde93ff05758a36a851a398a772b0b79a82fbe3c186a46f2696baaeaf84c966b"
+checksum = "3ac5cecf619ca81f66a96482db09687c9f7465af65f4300a8c30cca05bd5a59d"
 dependencies = [
  "base64 0.23.1",
  "flate2",
@@ -4009,9 +4009,9 @@ dependencies = [
 
 [[package]]
 name = "ureq-proto"
-version = "0.6.5"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "841583fc36089d7d59419568ae157f43a5a03a2e5a81ba87c77d1596ef46e922"
+checksum = "622dce33c252115466d83f63e9744a18f12b4406aae51a01c15ad8fcf1185eb3"
 dependencies = [
  "base64 0.23.1",
  "http",
@@ -4409,7 +4409,7 @@ dependencies = [
 [[package]]
 name = "wgpu-external-frame"
 version = "0.4.0"
-source = "git+https://github.com/lifk/rune?rev=0dbad3f0695c4e9ce11d1876491c2fb35e32e1b2#0dbad3f0695c4e9ce11d1876491c2fb35e32e1b2"
+source = "git+https://github.com/lifk/rune?rev=2d549f176b2c612a7da0c37c19f6fac505e6f003#2d549f176b2c612a7da0c37c19f6fac505e6f003"
 dependencies = [
  "ash",
  "glow",
@@ -4514,7 +4514,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -4975,9 +4975,9 @@ dependencies = [
 
 [[package]]
 name = "zbus"
-version = "6.2.0"
+version = "6.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3666b126b788c05de810dd9e4e8dc84b21f87f7ad70a29a09b9db093f0102891"
+checksum = "6b4aae740b23927ceabed962431abab2cdefb9f7f885e5bbab062da09bf580e4"
 dependencies = [
  "async-trait",
  "bitflags 2.13.2",
@@ -4995,7 +4995,7 @@ dependencies = [
  "uuid",
  "windows-sys 0.61.2",
  "winnow 1.0.4",
- "zbus_macros 6.2.0",
+ "zbus_macros 6.3.0",
  "zbus_utils",
  "zcheapstr",
  "zruntime",
@@ -5042,9 +5042,9 @@ dependencies = [
 
 [[package]]
 name = "zbus_macros"
-version = "6.2.0"
+version = "6.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "20e0bfa90f7877d308d09bdac3586a45c5f5986e58ebf6ec5c3b809c21ad8e22"
+checksum = "37c9dd4beaf145c16fcb2902862f50da86e54aed13dd368ddf64a1d17e6b8529"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -5146,9 +5146,9 @@ dependencies = [
 
 [[package]]
 name = "zeroize"
-version = "1.9.1"
+version = "1.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e13084392c5e4bc371903e2935a5eaeed24905a7511356b883835e18a78f6879"
+checksum = "85ccff8a4805aba1eaa4cd4afcd49f7557dd2cf5fd79ffc37f8959466effc5aa"
 
 [[package]]
 name = "zerotrie"
