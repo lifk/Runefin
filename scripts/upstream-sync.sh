@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Rebase our Rune fork onto upstream dev and prove it still builds.
+# Merge upstream dev into our Rune fork and prove it still builds.
 #
-# Run weekly, and always before starting Rune work. Review the diff after rebasing (see
-# docs/design-player.md §7).
+# Run weekly, and always before starting Rune work. The fork branch carries the player/HDR
+# commits plus earlier upstream merges, so a rebase would flatten that history; merge instead.
+# Review the diff after merging (see docs/design-player.md §7).
 set -euo pipefail
 
 fork=${RUNE_FORK:-$HOME/Projects/rune}
@@ -24,10 +25,10 @@ git checkout -q dev
 git merge --ff-only upstream/dev
 
 git checkout -q "$branch"
-if ! git rebase dev; then
+if ! git merge --no-edit dev; then
     echo
-    echo "rebase stopped at a conflict. Resolve it, then:"
-    echo "  git rebase --continue   (or 'git rebase --abort' to back out)"
+    echo "merge stopped at a conflict. Resolve it, then:"
+    echo "  git merge --continue   (or 'git merge --abort' to back out)"
     exit 1
 fi
 
