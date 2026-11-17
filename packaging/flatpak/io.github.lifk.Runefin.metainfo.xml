@@ -42,6 +42,24 @@
   </screenshots>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.1.38" date="2026-11-17">
+      <description>
+        <p>
+          The engine and living-room release. Rune moved 157 upstream commits forward: text is
+          laid out ahead of mounting, virtual lists grow and trade places without moving the
+          rest of the window, wheel routing no longer traps on a nested viewport, focus and
+          reveal were fixed, image wakes and atlases are cheaper, and Linux text gamma matches
+          Skia's. Runefin now has optional HDMI audio passthrough: compressed AC3/EAC3/DTS/
+          TrueHD can go to a receiver instead of being decoded to PCM, with a decoded fallback
+          if the output cannot open, and the server's transcode profile offers 5.1. A new
+          host-side installer creates a first-class Steam tile with the Big Screen launch path,
+          a wrapper that survives Steam's launch environment, and portrait/header/hero/logo art.
+          Compatible dependency updates: zbus 6.3, ureq 3.5.2, zeroize 1.9.2 and flate2 1.1.11.
+          HDR output is still tone-mapped to SDR; the implementation plan is documented, not
+          claimed.
+        </p>
+      </description>
+    </release>
     <release version="0.1.37" date="2026-11-15">
       <description>
         <p>
