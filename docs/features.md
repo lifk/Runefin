@@ -516,10 +516,11 @@ holds the address, the masked admin key and an optional user id; **Test** proves
 | `Menu` / `⇧F10` | Poster item menu |
 
 Controller (standard gamepad): D-pad/left stick = arrows; A = Space; B/Select = Esc;
-LB/RB = Shift+Tab/Tab; Start = Menu. Text entry uses Steam's on-screen keyboard on the Steam
-Machine, or the desktop keyboard. HDMI-CEC TV remotes arrive as keyboard input on SteamOS 3.8.1+
-(`cecd`); `packaging/flatpak/cecd.toml` maps Select to Space and the transport buttons to the
-keys the player already uses.
+LB/RB = Shift+Tab/Tab; Start = Menu. Text entry uses Steam's on-screen keyboard where Steam
+provides it for a non-Steam Flatpak, or the desktop keyboard; Quick Connect avoids typing
+entirely. HDMI-CEC TV remotes arrive as keyboard input on SteamOS 3.8.1+ (`cecd`) and OK, Back
+and the D-pad keep its defaults. `packaging/flatpak/cecd.toml` maps only the Menu buttons;
+transport keys are not mapped yet, so a remote's Play/Stop/FF/Rewind do nothing.
 
 ## Verification
 

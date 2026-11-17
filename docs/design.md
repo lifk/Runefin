@@ -435,8 +435,9 @@ the keyboard's, not a second interaction model, so every shortcut, focus ring an
 identically with either device. A big-screen launch focuses the first item of each route, and an
 opened layer (card menu, gear, subtitle/audio list, chapters, queue) focuses its first control, so
 a fresh screen is one press from playing. On the Steam Machine Runefin is added as a non-Steam game
-with `--big-screen`; the physical pad reaches the native listener without a Steam Input layout, and
-Steam+X still opens the on-screen keyboard for Search and Settings.
+with `--big-screen`; the physical pad reaches the native listener without a Steam Input layout.
+Steam+X on a non-Steam Flatpak is best-effort (the overlay injection is sandbox-dependent);
+Quick Connect is the couch sign-in path and does not require it.
 
 **Images.** Geometry first: reserve the box from the aspect ratio, paint a blurred 27×17
 placeholder, crossfade over 200 ms. Rune's `ImageCache` decodes on its own worker and dedupes by
