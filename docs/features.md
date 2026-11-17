@@ -391,6 +391,11 @@ separate window. `scripts/check.sh` builds it; the player's contract is
 - **Quit anywhere**: a Settings → Account row, a tray **Quit**, and SIGTERM/SIGINT (Steam's
   "Exit game", a logoff, Ctrl+C) all run the same shutdown: preferences saved, playback stopped
   and reported, the idle inhibitor released. A second launch brings the running window forward.
+- **One-command Steam tile** (`scripts/steam-install.py`): on a SteamOS host it installs the
+  Flatpak if needed, writes the LD_PRELOAD-safe wrapper and host launcher, adds one **Runefin**
+  entry to the running Steam client, reads the appid back and installs portrait/header/hero/logo
+  art. `--dry-run`, `--no-install`, `--no-steam` and `--uninstall` are supported. It is host-side
+  because Flatpak has no post-install hook and cannot write Steam's shortcut database.
 - **A stable app id** (`io.github.lifk.Runefin`) for the launcher, the window icon and the media
   widget. The Flatpak grants the tray's StatusNotifierWatcher name and logind on the system bus,
   so the tray and the idle inhibitor actually work inside the sandbox; where `systemd-inhibit` is

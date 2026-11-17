@@ -6,7 +6,7 @@ OS.
 
 ## Steps
 
-- [ ] 1. Steam entry installer + wrapper + generated artwork (stable appid, one tile, `--big-screen`, uninstall)
+- [x] 1. Steam entry installer + wrapper + generated artwork (stable appid, one tile, `--big-screen`, uninstall) — host fixture tested; Steam Machine validation pending
 - [ ] 2. Session detection + fullscreen at create + per-mode geometry (`SteamTenfoot`, gamescope, `SteamDeck`, `--desktop` opt-out)
 - [ ] 3. Couch first run: auto-discovery, single-server prefill, Quick Connect above credentials, Steam+X hint
 - [ ] 4. Input: focus gate under overlay/OSK, last-active pad, trigger seek/right-stick volume, virtual-pad de-dupe

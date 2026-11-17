@@ -68,6 +68,20 @@ flatpak update --user          # later
 If you installed from a `.flatpak` bundle before, remove that copy once so this origin takes
 over (`flatpak uninstall --user io.github.lifk.Runefin`); your settings stay in `~/.var/app`.
 
+On a SteamOS host, one command installs the Flatpak if needed, adds the **Runefin** tile to
+Steam with the big-screen launch path, and installs its library artwork:
+
+```sh
+curl -fsSLO https://raw.githubusercontent.com/lifk/Runefin/main/scripts/steam-install.py
+python3 steam-install.py --dry-run
+python3 steam-install.py
+```
+
+It is host-side because Flatpak has no post-install hook and a sandbox cannot write Steam's
+shortcuts. It needs Steam running (Desktop Mode is fine), and `--uninstall` removes what it added.
+See [`packaging/steam/README.md`](packaging/steam/README.md). SteamOS updates keep the Flatpak,
+the wrapper and the tile.
+
 The offline bundle is still attached to every release:
 
 ```sh

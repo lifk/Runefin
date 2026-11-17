@@ -173,10 +173,22 @@ to change, and restart the app after an update.
 
 ## Steam Machine
 
+The supported one-command path is the host installer described in
+[`packaging/steam/README.md`](../steam/README.md):
+
+```sh
+python3 scripts/steam-install.py --dry-run
+python3 scripts/steam-install.py
+```
+
+It installs the Flatpak if needed, writes the wrapper and host launcher, adds the **Runefin**
+tile, and installs artwork. The manual path remains:
+
 1. Install the bundle (or a hosted `.flatpakref` through Discover).
-2. Desktop Mode → Steam → **Add a Non-Steam Game** → choose **Runefin Big Screen** from the
-   application list. If it is not listed, add a shortcut with the command
-   `flatpak run io.github.lifk.Runefin --big-screen`.
+2. Desktop Mode → Steam → **Add a Non-Steam Game** → choose **Runefin** from the application
+   list. If it is not listed, add a shortcut with the command
+   `flatpak run io.github.lifk.Runefin --big-screen`. A host `.desktop` launcher is more durable
+   than the Flatpak export; the installer writes one.
 3. Leave Steam Input **off** for the native gamepad path. If it is on, use a standard
    Xbox-layout virtual pad.
 4. Start it from Gaming Mode. Big Screen requests fullscreen and focuses the first item.
