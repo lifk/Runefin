@@ -355,3 +355,15 @@ fn the_device_profile_declines_dolby_vision_and_still_allows_hdr10() {
     assert!(declined.contains(&"DOVIWithHDR10"), "{declined:?}");
     assert!(declined.contains(&"DOVI"), "{declined:?}");
 }
+
+#[test]
+fn the_video_transcode_profile_offers_five_point_one() {
+    let profile = Client::device_profile();
+    let video = profile["TranscodingProfiles"]
+        .as_array()
+        .expect("transcoding profiles")
+        .iter()
+        .find(|entry| entry["Type"] == "Video")
+        .expect("a video profile");
+    assert_eq!(video["MaxAudioChannels"], "6");
+}

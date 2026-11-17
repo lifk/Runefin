@@ -424,7 +424,7 @@ impl Client {
                     "Context": "Streaming",
                     "VideoCodec": "h264",
                     "AudioCodec": "aac",
-                    "MaxAudioChannels": "2"
+                    "MaxAudioChannels": "6"
                 },
                 {
                     "Type": "Audio",

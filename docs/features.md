@@ -316,6 +316,11 @@ separate window. `scripts/check.sh` builds it; the player's contract is
 
 - Audio track menu from `MediaSources`, selected by playbin's own `current-audio`; a preferred
   language applies once, manual choices are never overridden.
+- **HDMI audio passthrough** (Settings → Playback, off by default): AC3/EAC3/DTS/TrueHD stay
+  compressed for a receiver instead of being decoded to PCM. The app's filter chain (downmix,
+  delay, sound modes) is bypassed by design and volume is controlled by the receiver; a
+  passthrough start that cannot open the output is retried once as decoded audio. The server's
+  video transcode profile offers 5.1 (six channels) for decoded playback too.
 - Text subtitles: SRT, VTT and ASS, with inline bold/italic/colour, `<font color>`, VTT colour
   classes, `{\anN}` alignment and `\pos`.
 - Full appearance: Sans/Serif/Mono, six colours, Off/Thin/Thick outline (glyph runs, not a
@@ -470,7 +475,8 @@ holds the address, the masked admin key and an optional user id; **Test** proves
 
 | Limit | Why |
 |---|---|
-| **True HDR passthrough** | HDR10/HLG is tone-mapped to the 8-bit sRGB window. Passing PQ through unchanged needs an HDR swapchain and color space in Rune (M5d), not a shader flag. |
+| **True HDR passthrough** | HDR10/HLG is tone-mapped to the 8-bit sRGB window. wgpu 30 exposes HDR surface color spaces, but Rune still configures an sRGB surface and an 8-bit renderer target; passing PQ through unchanged needs a 10-bit/HDR swapchain and a composited HDR frame (M5d), not a shader flag. |
+| **Audio passthrough** | Compressed AC3/EAC3/DTS/TrueHD reaches the output only when the sink and receiver accept it (HDMI). It bypasses the app's DSP and volume; a receiver that refuses it falls back to decoded audio. |
 | **NVIDIA zero-copy** | The DMA-BUF path is tuned and tested on AMD RADV/VCN. NVIDIA would need `nvidia-vaapi-driver` or an NVDEC branch; without it the player falls back to CPU (SDR) and HDR can look wrong. |
 | **DVB live proof** | No DVB track exists on this server. The path was validated with a DVB MPEG-TS generated from an on-server DVD track (720×480 bitmap). |
 | **MPRIS signals** | Properties and commands work; no `PropertiesChanged` push, so a client that caches without polling refreshes when it next asks. |
@@ -518,9 +524,9 @@ keys the player already uses.
 ## Verification
 
 ```sh
-cargo test -p jellyfin-api        # 26 API tests, no network
+cargo test -p jellyfin-api        # 49 API tests, no network
 cargo test -p seerr-api           # 26 Seerr API tests, no network
-cargo test -p runefin             # 434 app tests (26 ignored), headless
+cargo test -p runefin             # 437 app tests (26 ignored), headless
 scripts/check.sh                  # fmt, clippy, all three suites, release build
 scripts/snapshots.sh              # the committed views, in place
 JELLYFIN_URL=... JELLYFIN_USER_ID=... JELLYFIN_TOKEN=... \

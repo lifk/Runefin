@@ -6,10 +6,22 @@ use std::time::{Duration, Instant};
 use jellyfin_api::{Client, PlaybackInfoRequest, PlaybackInfoResponse, PlaybackReport, SortBy};
 
 use super::*;
-use crate::player::Player;
+use crate::player::{AudioOutput, Player};
 
 /// The speeds the player offers. 1× is in the middle so either direction is one press away.
 const SPEEDS: [f64; 6] = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
+
+/// The channel count to offer the server for a transcode. Passthrough needs 5.1 even when the
+/// local downmix preference is on, because the downmix filter is bypassed.
+fn requested_audio_channels(passthrough: bool, downmix: bool) -> Option<i32> {
+    if passthrough {
+        Some(6)
+    } else if downmix {
+        Some(2)
+    } else {
+        None
+    }
+}
 
 /// What the worker found on `fields=MediaSources`: the file to ask for subtitles and the
 /// text tracks the app can draw.
@@ -866,7 +878,10 @@ impl State {
             media_source_id: source.clone(),
             audio_stream_index: None,
             subtitle_stream_index: None,
-            max_audio_channels: self.downmix_stereo.then_some(2),
+            max_audio_channels: requested_audio_channels(
+                self.audio_passthrough,
+                self.downmix_stereo,
+            ),
             enable_direct_play: true,
             enable_direct_stream: true,
             enable_transcoding: true,
@@ -877,6 +892,11 @@ impl State {
         let fallback = url.clone();
         let item_id = item.id.clone();
         let cap = quality.max_bitrate();
+        let audio = if self.audio_passthrough {
+            AudioOutput::Passthrough
+        } else {
+            AudioOutput::Decoded
+        };
         self.in_app_start.request(
             (
                 client,
@@ -888,8 +908,9 @@ impl State {
                 surface,
                 waker,
                 start_ms,
+                audio,
             ),
-            |(client, item_id, source, request, cap, fallback, surface, waker, start_ms)| {
+            |(client, item_id, source, request, cap, fallback, surface, waker, start_ms, audio)| {
                 let negotiated = request
                     .as_ref()
                     .and_then(|request| client.playback_info(&item_id, request).ok());
@@ -901,7 +922,13 @@ impl State {
                     &fallback,
                 );
                 let resume_at = resume_target(method, &url, start_ms);
-                match Player::start_at(&url, surface.clone(), waker.clone(), resume_at) {
+                match Player::start_at_with_audio(
+                    &url,
+                    surface.clone(),
+                    waker.clone(),
+                    resume_at,
+                    audio,
+                ) {
                     Ok(started) => {
                         let (started_ms, notice) =
                             resume_notice(started.started_ms, resume_at, notice);
@@ -948,7 +975,7 @@ impl State {
                             &fallback,
                         );
                         let resume_at = resume_target(method, &url, start_ms);
-                        match Player::start_at(&url, surface, waker, resume_at) {
+                        match Player::start_at_with_audio(&url, surface, waker, resume_at, audio) {
                             Ok(started) => {
                                 let (started_ms, notice) = resume_notice(
                                     started.started_ms,
@@ -2812,6 +2839,16 @@ fn shuffle_items(items: &mut [Item]) {
 
 #[cfg(test)]
 mod tests {
+    use super::requested_audio_channels;
+
+    #[test]
+    fn passthrough_offers_six_channels_even_with_downmix_preferred() {
+        assert_eq!(requested_audio_channels(true, true), Some(6));
+        assert_eq!(requested_audio_channels(true, false), Some(6));
+        assert_eq!(requested_audio_channels(false, true), Some(2));
+        assert_eq!(requested_audio_channels(false, false), None);
+    }
+
     use super::*;
     use std::time::{Duration, Instant};
 

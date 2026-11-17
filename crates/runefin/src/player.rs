@@ -74,6 +74,8 @@ pub struct Player {
     stopped: Arc<AtomicBool>,
     /// Static HDR facts from the caps, for the Statistics panel.
     colour: Arc<Mutex<Option<ColourFacts>>>,
+    /// True when the pipeline was built for compressed audio; volume then lives on the sink.
+    audio_passthrough: bool,
 }
 
 /// A pipeline started and at its resume point: `started_ms` is the position the first picture
@@ -81,6 +83,17 @@ pub struct Player {
 pub struct Started {
     pub player: Player,
     pub started_ms: Option<i64>,
+}
+
+/// How the source's audio reaches the output.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum AudioOutput {
+    /// Decode to PCM and run the filter chain (volume, delay, downmix, sound modes).
+    #[default]
+    Decoded,
+    /// Leave AC3/EAC3/DTS/TrueHD compressed for an HDMI receiver. The app's volume and DSP
+    /// controls are bypassed; the receiver owns them.
+    Passthrough,
 }
 
 impl Player {
@@ -116,6 +129,7 @@ impl Player {
             trace: Arc::new(Trace::default()),
             stopped: Arc::new(AtomicBool::new(false)),
             colour: Arc::new(Mutex::new(None)),
+            audio_passthrough: false,
         }
     }
 
@@ -136,6 +150,16 @@ impl Player {
         Self::start_at(url, surface, waker, None).map(|started| started.player)
     }
 
+    /// As [`Player::start`], with an explicit audio route.
+    pub fn start_with_audio(
+        url: &str,
+        surface: NativeSurface,
+        waker: Option<rune::Waker>,
+        audio: AudioOutput,
+    ) -> Result<Player, String> {
+        Self::start_at_with_audio(url, surface, waker, None, audio).map(|started| started.player)
+    }
+
     /// [`Player::start`] from a resume point: the seek is queued the moment the pipeline is
     /// PLAYING instead of after the first picture, so the frame the wait sees is the resume
     /// frame. A seek the pipeline ignored is caught by the clock check and retried once, which
@@ -147,43 +171,73 @@ impl Player {
         waker: Option<rune::Waker>,
         start_ms: Option<i64>,
     ) -> Result<Started, String> {
+        Self::start_at_with_audio(url, surface, waker, start_ms, AudioOutput::Decoded)
+    }
+
+    /// [`Player::start_at`] with an explicit audio route. A passthrough attempt that cannot
+    /// open the output is retried once as decoded audio, so a stereo-only host still plays.
+    pub fn start_at_with_audio(
+        url: &str,
+        surface: NativeSurface,
+        waker: Option<rune::Waker>,
+        start_ms: Option<i64>,
+        audio: AudioOutput,
+    ) -> Result<Started, String> {
         gst::init().map_err(|error| format!("GStreamer could not start: {error}"))?;
         if let Some(waker) = waker {
             surface.set_waker(waker);
         }
         let target = start_ms.filter(|ms| *ms > 0);
-        crate::bench::mark("bench.player.pipeline");
-        // The DMA-BUF path is the fast one, but a file the VA-API converter refuses reaches
-        // PLAYING and then produces no frames. Waiting the CPU path's full timeout there costs
-        // six seconds on every such file; two seconds is enough for a healthy first frame.
-        let dmabuf = match start_pipeline(url, surface.clone(), true) {
-            Ok(player) => match player.first_frame_at(target, Duration::from_secs(8)) {
-                Ok(started) => {
-                    crate::bench::mark("bench.player.first_frame");
-                    player.begin_trace();
-                    return Ok(Started {
-                        player,
-                        started_ms: started,
-                    });
-                }
+        let mut audio = audio;
+        loop {
+            crate::bench::mark("bench.player.pipeline");
+            // The DMA-BUF path is the fast one, but a file the VA-API converter refuses reaches
+            // PLAYING and then produces no frames. Waiting the CPU path's full timeout there costs
+            // six seconds on every such file; two seconds is enough for a healthy first frame.
+            let dmabuf = match start_pipeline(url, surface.clone(), true, audio) {
+                Ok(player) => match player.first_frame_at(target, Duration::from_secs(8)) {
+                    Ok(started) => {
+                        crate::bench::mark("bench.player.first_frame");
+                        player.begin_trace();
+                        return Ok(Started {
+                            player,
+                            started_ms: started,
+                        });
+                    }
+                    Err(error) => error,
+                },
                 Err(error) => error,
-            },
-            Err(error) => error,
-        };
-        eprintln!("in-app: DMA-BUF path unavailable ({dmabuf}); using CPU");
-        match start_pipeline(url, surface, false) {
-            Ok(player) => match player.first_frame_at(target, Duration::from_secs(12)) {
-                Ok(started) => Ok(Started {
-                    player,
-                    started_ms: started,
-                }),
-                Err(cpu) => Err(format!(
-                    "GStreamer produced no frames: {cpu} (DMA-BUF path: {dmabuf})"
-                )),
-            },
-            Err(cpu) => Err(format!(
-                "GStreamer couldn't start: {cpu} (DMA-BUF path: {dmabuf})"
-            )),
+            };
+            eprintln!("in-app: DMA-BUF path unavailable ({dmabuf}); using CPU");
+            match start_pipeline(url, surface.clone(), false, audio) {
+                Ok(player) => match player.first_frame_at(target, Duration::from_secs(12)) {
+                    Ok(started) => {
+                        return Ok(Started {
+                            player,
+                            started_ms: started,
+                        });
+                    }
+                    Err(cpu) => {
+                        let error =
+                            format!("GStreamer produced no frames: {cpu} (DMA-BUF path: {dmabuf})");
+                        if audio == AudioOutput::Passthrough && audio_failure(&error) {
+                            eprintln!("in-app: passthrough produced no frames; decoding audio");
+                            audio = AudioOutput::Decoded;
+                            continue;
+                        }
+                        return Err(error);
+                    }
+                },
+                Err(cpu) => {
+                    let error = format!("GStreamer couldn't start: {cpu} (DMA-BUF path: {dmabuf})");
+                    if audio == AudioOutput::Passthrough && audio_failure(&error) {
+                        eprintln!("in-app: passthrough could not open the output; decoding audio");
+                        audio = AudioOutput::Decoded;
+                        continue;
+                    }
+                    return Err(error);
+                }
+            }
         }
     }
 
@@ -254,6 +308,7 @@ impl Player {
             trace: Arc::new(Trace::default()),
             stopped: Arc::new(AtomicBool::new(false)),
             colour: Arc::new(Mutex::new(None)),
+            audio_passthrough: false,
         })
     }
 
@@ -403,21 +458,46 @@ impl Player {
         }
     }
 
+    /// Passthrough has no `soft-volume`, so volume and mute live on the chosen sink; the
+    /// decoded path keeps using playbin's own properties.
+    fn audio_sink(&self) -> Option<gst::Element> {
+        if !self.audio_passthrough {
+            return None;
+        }
+        self.pipeline.property::<Option<gst::Element>>("audio-sink")
+    }
+
     pub fn is_muted(&self) -> bool {
-        self.pipeline.property::<bool>("mute")
+        self.audio_sink().map_or_else(
+            || self.pipeline.property::<bool>("mute"),
+            |sink| sink.property::<bool>("mute"),
+        )
     }
 
     pub fn toggle_mute(&self) {
-        self.pipeline.set_property("mute", !self.is_muted());
+        let mute = !self.is_muted();
+        if let Some(sink) = self.audio_sink() {
+            sink.set_property("mute", mute);
+        } else {
+            self.pipeline.set_property("mute", mute);
+        }
     }
 
     pub fn set_volume(&self, volume: f64) {
-        self.pipeline.set_property("volume", volume.clamp(0.0, 2.0));
+        let volume = volume.clamp(0.0, 2.0);
+        if let Some(sink) = self.audio_sink() {
+            sink.set_property("volume", volume);
+        } else {
+            self.pipeline.set_property("volume", volume);
+        }
     }
 
     #[cfg(test)]
     pub fn volume(&self) -> f64 {
-        self.pipeline.property::<f64>("volume")
+        self.audio_sink().map_or_else(
+            || self.pipeline.property::<f64>("volume"),
+            |sink| sink.property::<f64>("volume"),
+        )
     }
 
     /// Fold every channel into two. Off restores the file's own layout.
@@ -596,12 +676,24 @@ impl Drop for Player {
     }
 }
 
+/// A failed start worth retrying as decoded audio. A video codec failure should not pay a
+/// second eight-second attempt just because passthrough was selected.
+fn audio_failure(error: &str) -> bool {
+    let error = error.to_ascii_lowercase();
+    [
+        "audio", "sink", "device", "output", "negotiat", "pulse", "alsa",
+    ]
+    .iter()
+    .any(|hint| error.contains(hint))
+}
+
 /// The sink itself decides whether the pipeline can use zero-copy; if DMA-BUF fails, the caller
 /// retries this function with the CPU NV12 path.
 fn start_pipeline(
     url: &str,
     surface: NativeSurface,
     prefer_dmabuf: bool,
+    audio: AudioOutput,
 ) -> Result<Player, String> {
     let playbin = gst::ElementFactory::make("playbin")
         .build()
@@ -610,10 +702,26 @@ fn start_pipeline(
     crate::bench::mark("bench.player.playbin");
     // The audio chain: pitch correction, a timestamp offset for A/V delay, an optional
     // compressor, and an optional downmix. Built as one bin so playbin sees a single filter.
-    let (audio_filter, downmix, delay, dynamic) =
-        build_audio_filter(playbin.find_property("audio-filter").is_some());
+    // Passthrough deliberately installs no filter: the filter's capsfilter forces raw PCM.
+    let passthrough = audio == AudioOutput::Passthrough;
+    let (audio_filter, downmix, delay, dynamic) = if passthrough {
+        (None, None, None, None)
+    } else {
+        build_audio_filter(playbin.find_property("audio-filter").is_some())
+    };
     if let Some(filter) = &audio_filter {
         playbin.set_property("audio-filter", filter);
+    }
+    if passthrough {
+        // PulseAudio's sink advertises AC3/EAC3/DTS caps and hands compressed frames to an
+        // HDMI receiver. Keep `audio` in the flags but drop `soft-volume`, which would demand
+        // raw samples and defeat passthrough.
+        if let Ok(sink) = gst::ElementFactory::make("pulsesink").build() {
+            let sink = sink.upcast::<gst::Element>();
+            sink.set_property("volume", 1.0f64);
+            playbin.set_property("audio-sink", &sink);
+        }
+        playbin.set_property_from_str("flags", "soft-colorbalance+deinterlace+audio+video");
     }
     let convert = if prefer_dmabuf {
         gst::ElementFactory::make("vapostproc")
@@ -723,7 +831,7 @@ fn start_pipeline(
     if playbin.find_property("current-text").is_some() {
         playbin.set_property("current-text", -1i32);
     }
-    if playbin.find_property("flags").is_some() {
+    if !passthrough && playbin.find_property("flags").is_some() {
         // `flags` is a GstPlayFlags, not a plain integer; a string setter is the portable way
         // to clear TEXT without depending on the generated flags type.
         playbin.set_property_from_str(
@@ -776,6 +884,7 @@ fn start_pipeline(
         trace: Arc::clone(&trace),
         stopped: Arc::clone(&stopped),
         colour: Arc::clone(&colour),
+        audio_passthrough: passthrough,
     })
 }
 
@@ -990,6 +1099,20 @@ fn set_cpu_callbacks(
 
 #[cfg(test)]
 mod tests {
+    use super::AudioOutput;
+
+    #[test]
+    fn audio_defaults_to_decoded() {
+        assert_eq!(AudioOutput::default(), AudioOutput::Decoded);
+    }
+
+    #[test]
+    fn only_audio_shaped_failures_retry_decoded() {
+        assert!(super::audio_failure("could not negotiate audio format"));
+        assert!(super::audio_failure("pulsesink: device unavailable"));
+        assert!(!super::audio_failure("no decoder for video/x-hevc"));
+    }
+
     use super::*;
 
     #[test]

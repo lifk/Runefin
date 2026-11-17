@@ -98,6 +98,10 @@ pub struct Config {
     /// audio and cached, because the server sends no loudness tags.
     pub loudness: Option<bool>,
     /// Audio shifted against video, in milliseconds (-100 to 100).
+    /// Send compressed audio (AC3/EAC3/DTS) to the receiver instead of decoding it.
+    /// Off by default; needs HDMI passthrough and a receiver that understands the format.
+    #[serde(default)]
+    pub audio_passthrough: Option<bool>,
     #[serde(default)]
     pub audio_delay_ms: Option<i64>,
     #[serde(default)]

@@ -123,7 +123,13 @@ exactly the difference between "a client" and "a toy". Budget real time here.
   AR24/XR24 remains the fallback. P010 uses BT.2020/PQ/HLG decoding and a Reinhard tone map in
   the shader before writing SDR.
 - Audio: GStreamer's own sink (PipeWire via `pipewiresink`, else PulseAudio/ALSA). **One clock**:
-  GStreamer's pipeline clock is the master; we never time video ourselves.
+  GStreamer's pipeline clock is the master; we never time video ourselves. The default path
+  decodes to PCM and runs the filter bin (pitch, delay, compressor, downmix). **HDMI passthrough**
+  (Settings → Playback, off by default) instead installs no `audio-filter`, drops `soft-volume`
+  from playbin's flags, and selects `pulsesink` so AC3/EAC3/DTS/TrueHD can reach a receiver
+  compressed. Volume and mute then live on the sink, the DSP controls are bypassed, and a start
+  that cannot open the output is retried once as decoded. The device profile offers 5.1 to the
+  server for transcodes; passthrough itself is direct-play only.
 - Shipped in the app: the DMA-BUF `BaseSink` feeds `NativeSurface::push_dmabuf` (zero copy,
   P010 first, NV12 and AR24/XR24 fallbacks), with pause/seek/stop, audio tracks, mute/volume,
   fit/fill, keyboard controls, Jellyfin reporting and automatic CPU NV12 + mpv fallbacks. A real
@@ -173,7 +179,7 @@ exactly the difference between "a client" and "a toy". Budget real time here.
   speed, position/duration and frame count. `Esc` closes it. It is the same frame counter the
   performance probe uses.
 - Player flags: playbin's `TEXT` flag is cleared by setting `flags` from the string
-  `soft-colorbalance+deinterlace+soft-volume+audio+video`. This is not cosmetic: playsink's
+  `soft-colorbalance+deinterlace+soft-volume+audio+video` (passthrough omits `soft-volume`). This is not cosmetic: playsink's
   default subtitleoverlay rejects `VAMemory P010`, which silently forced every HEVC file onto
   the CPU sink and could crash inside `libgstassrender` during a flush seek. With TEXT off, HEVC
   and 4K HDR stay on the DMA-BUF path. The app's own SRT overlay is the only subtitle path.
@@ -308,7 +314,7 @@ steps, subtitle mode
 |---|---|---|
 | 10-bit decode (HEVC/AV1, BT.2020 PQ) | yes, VAAPI | nothing |
 | Correct colour on an SDR display (tone map) | yes — our shader | nothing |
-| HDR output to an HDR display (passthrough) | **no** | wgpu has no Wayland colour-management surface; open issue [wgpu #10545](https://github.com/gfx-rs/wgpu/issues/10545) (Oct 2026) + `wp_color_management_v1` + an HDR compositor (KDE Plasma 6) |
+| HDR output to an HDR display (passthrough) | **no** | wgpu 30 types expose `Bt2100Pq`/`Bt2100Hlg` and Vulkan maps `HDR10_ST2084_EXT`; Rune still configures an sRGB surface and an `Bgra8UnormSrgb` renderer, and the compositor must advertise an HDR colour space (`wp_color_management_v1`; KDE Plasma 6). A Rune renderer milestone, not an app flag |
 | Dolby Vision | no | needs libplacebo (path B) |
 
 So: **4K yes, HDR content yes, HDR output not yet.** Phase M5c flips it on when wgpu exposes

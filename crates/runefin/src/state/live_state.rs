@@ -378,9 +378,15 @@ impl State {
         self.in_app_volume = 1.0;
         let surface = rune::NativeSurface::new();
         let waker = self.waker.clone();
-        self.in_app_start
-            .request((stream.url, surface, waker), |(url, surface, waker)| {
-                Player::start(&url, surface, waker)
+        let audio = if self.audio_passthrough {
+            crate::player::AudioOutput::Passthrough
+        } else {
+            crate::player::AudioOutput::Decoded
+        };
+        self.in_app_start.request(
+            (stream.url, surface, waker, audio),
+            |(url, surface, waker, audio)| {
+                Player::start_with_audio(&url, surface, waker, audio)
                     .map(|player| crate::state::InAppStart {
                         started_ms: None,
                         player,
@@ -392,7 +398,8 @@ impl State {
                         stage: Stage::Player,
                         message,
                     })
-            });
+            },
+        );
     }
 
     fn fail_live(&mut self, message: String) {

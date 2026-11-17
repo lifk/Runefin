@@ -435,6 +435,12 @@ pub(super) fn settings_screen(s: &State) -> El {
             (|s: &mut State| s.toggle_notifications()) as fn(&mut State),
         ),
         (
+            "setting-audio-passthrough",
+            "HDMI audio passthrough",
+            if s.audio_passthrough { "On" } else { "Off" }.to_string(),
+            (|s: &mut State| s.toggle_audio_passthrough()) as fn(&mut State),
+        ),
+        (
             "setting-downmix",
             "Downmix to stereo",
             if s.downmix_stereo { "On" } else { "Off" }.to_string(),
@@ -746,6 +752,15 @@ pub(super) fn settings_screen(s: &State) -> El {
                     )),
             ),
     );
+    if s.audio_passthrough {
+        playback = playback.child(
+            text("Needs an HDMI receiver that decodes the source format. Bypasses downmix and sound modes; volume is controlled by the receiver. Takes effect on the next play.")
+                .key("setting-passthrough-note")
+                .font(type_::caption())
+                .color(t.text_secondary)
+                .padding(2.0),
+        );
+    }
     content = content
         .child(
             text("Appearance")

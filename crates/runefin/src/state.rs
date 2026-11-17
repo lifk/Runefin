@@ -593,6 +593,8 @@ pub struct State {
     pub still_watching_minutes: i64,
     pub resume_rewind_seconds: i64,
     pub downmix_stereo: bool,
+    /// Compressed audio to the receiver instead of PCM. Takes effect on the next play.
+    pub audio_passthrough: bool,
     pub audio_delay_ms: i64,
     pub audio_mode: crate::config::AudioMode,
     pub reduce_motion: bool,
@@ -1037,6 +1039,7 @@ impl State {
             still_watching_minutes: 90,
             resume_rewind_seconds: 10,
             downmix_stereo: false,
+            audio_passthrough: false,
             audio_delay_ms: 0,
             audio_mode: crate::config::AudioMode::Off,
             reduce_motion: false,
@@ -1204,6 +1207,7 @@ impl State {
             _ => 10,
         };
         state.downmix_stereo = state.config.downmix_stereo.unwrap_or(false);
+        state.audio_passthrough = state.config.audio_passthrough.unwrap_or(false);
         state.loudness = state.config.loudness.unwrap_or(false);
         state.audio_delay_ms = state.config.audio_delay_ms.unwrap_or(0).clamp(-100, 100);
         state.audio_mode = state.config.audio_mode.unwrap_or_default();
@@ -1513,6 +1517,15 @@ impl State {
         if self.reduce_motion {
             self.stop_theme_video();
         }
+    }
+
+    pub fn toggle_audio_passthrough(&mut self) {
+        self.audio_passthrough = !self.audio_passthrough;
+        self.show_toast(if self.audio_passthrough {
+            "Audio passthrough: On (next play)."
+        } else {
+            "Audio passthrough: Off."
+        });
     }
 
     pub fn toggle_downmix(&mut self) {
@@ -1885,6 +1898,7 @@ impl State {
         self.config.still_watching_minutes = Some(self.still_watching_minutes);
         self.config.resume_rewind_seconds = Some(self.resume_rewind_seconds);
         self.config.downmix_stereo = Some(self.downmix_stereo);
+        self.config.audio_passthrough = Some(self.audio_passthrough);
         self.config.loudness = Some(self.loudness);
         self.config.audio_delay_ms = Some(self.audio_delay_ms);
         self.config.audio_mode = Some(self.audio_mode);
@@ -5021,6 +5035,7 @@ mod tests {
             still_watching_minutes: 90,
             resume_rewind_seconds: 10,
             downmix_stereo: false,
+            audio_passthrough: false,
             audio_delay_ms: 0,
             audio_mode: crate::config::AudioMode::Off,
             reduce_motion: false,

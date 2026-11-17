@@ -89,11 +89,13 @@ changes; no direct dependency is materially behind except the two deliberate hol
   10-bit/16-bit target, an HDR color-space request on the surface, PQ/HLG output encoding for the
   whole composited frame, and a rebuild path when playback starts/stops. That is a fork feature
   with hardware verification; it cannot be turned on from `runefin` alone.
-- **Audio passthrough is an app-layer change** in `player.rs`: playbin currently always installs
-  an `audio-filter` that converts to `audio/x-raw`, and the transcode profile caps at two
-  channels. A passthrough mode can remove that filter, keep compressed caps, expose a sink/device
-  choice, and fall back to decoded audio on a negotiation error. The 5.1 transcode profile is
-  independent and can ship first.
+- **Audio passthrough shipped in this pass** (`player.rs`, Settings → Playback): the filter chain
+  is skipped, `soft-volume` is dropped, `pulsesink` accepts AC3/EAC3/DTS/TrueHD, volume/mute live
+  on the sink, a start that cannot open the output retries once as decoded, and the transcode
+  profile offers 5.1. It is off by default and the fallback path is unchanged.
+- **HDR output is still a Rune milestone.** The concrete surface/renderer/present-pass plan and
+  the hardware matrix are in `docs/plans/2026-11-17-hdr-passthrough.md`. Do not add an app toggle
+  before the Rune API exists; a 10-bit surface with sRGB tone-mapped values is worse than the
+  current correct SDR picture.
 
-The HDR spike and the audio passthrough work are tracked separately in the next pass; the Rune
-bump is a clean, independently revertible commit.
+The Rune bump is a clean, independently revertible commit; audio is a separate app change.
