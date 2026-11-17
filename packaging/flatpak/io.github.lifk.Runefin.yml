@@ -34,6 +34,10 @@ build-options:
   append-path: /usr/lib/sdk/rust-stable/bin
   env:
     CARGO_HOME: /run/build/cargo
+    # Same cap as .cargo/config.toml: a 32-job release build is what stopped
+    # this machine on 2026-11-15. Kept here too so the limit survives even if
+    # the source tree is ever built without its .cargo directory.
+    CARGO_BUILD_JOBS: "16"
   # `cargo` fetches crates and the pinned Rune fork. A release build can replace this with
   # vendored sources from `cargo vendor`; see docs/plans/2026-11-07-steam-machine-packaging.md.
   build-args:
