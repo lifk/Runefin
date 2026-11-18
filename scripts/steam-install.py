@@ -403,18 +403,19 @@ def install_decky_plugin(dry: bool) -> Path | None:
     if dry:
         say(f"would install the Decky plugin in {DECKY_PLUGIN}")
         return DECKY_PLUGIN
-    for name in DECKY_FILES:
-        destination = DECKY_PLUGIN / name
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        if local.is_dir():
-            shutil.copyfile(local / name, destination)
-        else:
-            try:
+    try:
+        for name in DECKY_FILES:
+            destination = DECKY_PLUGIN / name
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            if local.is_dir():
+                shutil.copyfile(local / name, destination)
+            else:
                 urllib.request.urlretrieve(f"{DECKY_BASE}/{name}", destination)
-            except OSError as error:
-                say(f"warning: could not download the Decky plugin's {name}: {error}")
-                return None
-    say(f"installed the optional Decky QAM plugin in {DECKY_PLUGIN}")
+    except OSError as error:
+        shutil.rmtree(DECKY_PLUGIN, ignore_errors=True)
+        say(f"warning: could not install the Decky plugin: {error}")
+        return None
+    say(f"installed the optional Decky QAM plugin in {DECKY_PLUGIN}; restart Decky to load it")
     return DECKY_PLUGIN
 
 
