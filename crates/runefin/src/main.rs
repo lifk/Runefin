@@ -237,6 +237,17 @@ fn setup(s: &mut State, waker: rune::Waker) {
 fn poll(s: &mut State, _clock: f64, tx: &mut Tx) -> bool {
     let started = std::time::Instant::now();
     let mut changed = s.poll();
+    // A Settings switch asks the window to reconfigure its surface; the status the surface
+    // reports afterwards is what the row shows, so an unsupported display stays honest.
+    if let Some(hdr) = s.hdr_pending.take() {
+        tx.set_hdr(hdr.into());
+        changed = true;
+    }
+    let hdr_status = rune::hdr_status();
+    if hdr_status != s.hdr_status {
+        s.hdr_status = hdr_status;
+        changed = true;
+    }
     if s.open_requested {
         s.open_requested = false;
         if let Some(handle) = APP_HANDLE.get() {
@@ -2231,6 +2242,7 @@ fn main() {
         ..AppSpec::new("Runefin", size, init, view)
     })
     .tab_visits_controls(true)
+    .hdr(startup.hdr().into())
     .on_window(move |window| {
         // A launch from a terminal or another app can create the window without focus. Ask
         // for it once the native window exists, then once more after the host has settled.

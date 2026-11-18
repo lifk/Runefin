@@ -24,7 +24,8 @@ everything from a gamepad or an HDMI-CEC remote.
   results with see-all.
 - **Detail**: shared-element poster, logo, scores, technical details, seasons and episodes, cast,
   recommendations, playlists, trailers and theme video.
-- **Player**: zero-copy DMA-BUF GStreamer path (4K HEVC HDR10 on AMD), HDR tone mapping, OSD,
+- **Player**: zero-copy DMA-BUF GStreamer path (4K HEVC HDR10 on AMD), HDR output via scRGB
+  (SDR tone map where the compositor offers no HDR surface), OSD,
   trickplay, chapters, queue, up next, stats, audio tracks, text/ASS/PGS/VobSub/DVB subtitles,
   online subtitle search, skip intro/credits, speed, volume, fit/fill, mini player, fullscreen,
   MPRIS and a CPU plus `mpv` fallback.

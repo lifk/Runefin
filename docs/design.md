@@ -1,8 +1,9 @@
 # Runefin — design
 
-**Status:** approved; M1–M6 are built, the in-app GStreamer player ships with DMA-BUF/HDR and
-mpv fallback, and Phase 2/2b adds direct-play-first transcoding, text scaling, remappable player
-shortcuts, live reminders and collection/playlist management depth. D1 and D3 are superseded by
+**Status:** approved; M1–M6 are built, the in-app GStreamer player ships with DMA-BUF playback,
+HDR output where the compositor offers scRGB (SDR tone map otherwise) and mpv fallback, and Phase
+2/2b adds direct-play-first transcoding, text scaling, remappable player shortcuts, live reminders
+and collection/playlist management depth. D1 and D3 are superseded by
 [`design-player.md`](design-player.md); the rest of this document is the browse-app contract.
 
 **One sentence:** a Jellyfin desktop client for Linux, drawn entirely by Rune, that browses your

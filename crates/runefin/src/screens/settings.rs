@@ -441,6 +441,12 @@ pub(super) fn settings_screen(s: &State) -> El {
             (|s: &mut State| s.toggle_audio_passthrough()) as fn(&mut State),
         ),
         (
+            "setting-hdr",
+            "HDR output",
+            s.hdr.label().to_string(),
+            (|s: &mut State| s.toggle_hdr()) as fn(&mut State),
+        ),
+        (
             "setting-downmix",
             "Downmix to stereo",
             if s.downmix_stereo { "On" } else { "Off" }.to_string(),
@@ -761,6 +767,30 @@ pub(super) fn settings_screen(s: &State) -> El {
                 .padding(2.0),
         );
     }
+    let hdr_note = match s.hdr_status {
+        rune::HdrStatus::Active {
+            format,
+            color_space,
+        } => format!(
+            "Active: {format}, {color_space}. The compositor owns tone mapping and HDR metadata."
+        ),
+        rune::HdrStatus::Unsupported => {
+            "This display or compositor offers no HDR surface; SDR is used.".to_string()
+        }
+        rune::HdrStatus::Failed => "The driver refused the HDR surface; SDR is used.".to_string(),
+        _ if s.hdr == crate::config::HdrMode::Auto => {
+            "Uses extended-range HDR when the display and compositor offer it; otherwise SDR."
+                .to_string()
+        }
+        _ => "Always SDR. Auto uses HDR when the display offers it.".to_string(),
+    };
+    playback = playback.child(
+        text(hdr_note)
+            .key("setting-hdr-note")
+            .font(type_::caption())
+            .color(t.text_secondary)
+            .padding(2.0),
+    );
     content = content
         .child(
             text("Appearance")

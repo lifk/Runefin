@@ -189,8 +189,15 @@ separate window. `scripts/check.sh` builds it; the player's contract is
 - **Zero-copy DMA-BUF** on Linux: a custom `BaseSink` imports the decoder's `P010`/`NV12`/`BGRA`
   frames into Rune's Vulkan device. Tested at 4K HEVC HDR10 on AMD RADV/VCN: 256 ms to first
   frame, 24 fps, 232 MB RSS.
-- **HDR tone mapping** for PQ/HLG to the SDR window, calibrated so reference white lands at 0.8
-  and 1 000/4 000-nit highlights at 0.976/0.994. True HDR passthrough is not shipped (see §15).
+- **HDR output (scRGB)** when the surface offers `Rgba16Float` + `ExtendedSrgbLinear`: the whole
+  frame composites in linear light, UI white sits at the compositor's 203 cd/m² reference (scRGB
+  ×203/80), and PQ keeps its absolute luminance up to 10,000 cd/m²; HLG uses the BT.2100 OOTF at
+  a 1,000 cd/m² nominal peak. The compositor owns tone mapping and gamut; the app sends no
+  static HDR10 metadata. **Settings → Playback → HDR output: Auto / Off**, switched at runtime,
+  with the actual result shown under the row. A surface without an extended-range colour space
+  stays SDR.
+- **HDR tone mapping** when the surface is SDR: PQ/HLG Reinhard into the 8-bit window, calibrated
+  so reference white lands at 0.8 and 1,000/4,000-nit highlights at 0.976/0.994.
 - **CPU NV12 fallback** when VA-API or DMA-BUF negotiation fails; it copies frames through
   system memory and plays SDR reliably.
 - **mpv fallback** if the in-app pipeline cannot produce a frame; the same start/progress/stop
@@ -480,7 +487,7 @@ holds the address, the masked admin key and an optional user id; **Test** proves
 
 | Limit | Why |
 |---|---|
-| **True HDR passthrough** | HDR10/HLG is tone-mapped to the 8-bit sRGB window. wgpu 30 exposes HDR surface color spaces, but Rune still configures an sRGB surface and an 8-bit renderer target; passing PQ through unchanged needs a 10-bit/HDR swapchain and a composited HDR frame (M5d), not a shader flag. |
+| **HDR10 static metadata** | HDR output is scRGB (`Rgba16Float + ExtendedSrgbLinear`): the app sends absolute linear light and the compositor tone maps and gamut maps it. wgpu 30 sets no `MaxCLL`/`MaxFALL` or mastering-display metadata, so a TV that only badges PQ-tagged streams may show no HDR badge even though the panel receives extended-range light. PQ/BT.2020 output with metadata is a later present-pass milestone. HDR in SteamOS Gaming Mode is not available to a non-Steam Wayland client at all; use Desktop Mode. |
 | **Audio passthrough** | Compressed AC3/EAC3/DTS/TrueHD reaches the output only when the sink and receiver accept it (HDMI). It bypasses the app's DSP and volume; a receiver that refuses it falls back to decoded audio. |
 | **NVIDIA zero-copy** | The DMA-BUF path is tuned and tested on AMD RADV/VCN. NVIDIA would need `nvidia-vaapi-driver` or an NVDEC branch; without it the player falls back to CPU (SDR) and HDR can look wrong. |
 | **DVB live proof** | No DVB track exists on this server. The path was validated with a DVB MPEG-TS generated from an on-server DVD track (720×480 bitmap). |

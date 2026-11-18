@@ -598,6 +598,11 @@ pub struct State {
     pub audio_delay_ms: i64,
     pub audio_mode: crate::config::AudioMode,
     pub reduce_motion: bool,
+    /// Extended-range HDR output, and what the last window actually got.
+    pub hdr: crate::config::HdrMode,
+    pub hdr_status: rune::HdrStatus,
+    /// A pending HDR switch, applied by the frame's `poll` through `Tx::set_hdr`.
+    pub hdr_pending: Option<crate::config::HdrMode>,
     /// The Settings search field; it filters the rows already on the page.
     pub settings_query: rune::TextEdit,
     pub library_search: rune::TextEdit,
@@ -1043,6 +1048,9 @@ impl State {
             audio_delay_ms: 0,
             audio_mode: crate::config::AudioMode::Off,
             reduce_motion: false,
+            hdr: crate::config::HdrMode::Auto,
+            hdr_status: rune::HdrStatus::Unknown,
+            hdr_pending: None,
             settings_query: rune::TextEdit::new(""),
             library_search: rune::TextEdit::new(""),
             library_search_due: None,
@@ -1212,6 +1220,7 @@ impl State {
         state.audio_delay_ms = state.config.audio_delay_ms.unwrap_or(0).clamp(-100, 100);
         state.audio_mode = state.config.audio_mode.unwrap_or_default();
         state.reduce_motion = state.config.reduce_motion.unwrap_or(false);
+        state.hdr = state.config.hdr();
         state.version_choices = state.config.version_choices.clone().unwrap_or_default();
         state.playback_quality = state.config.playback_quality.unwrap_or_default();
         state.quality_choices = state.config.quality_choices.clone().unwrap_or_default();
@@ -1517,6 +1526,20 @@ impl State {
         if self.reduce_motion {
             self.stop_theme_video();
         }
+    }
+
+    /// Switch HDR output between Auto and Off. The window reconfigures its surface on the next
+    /// frame; the status line under the row says whether it is active or unavailable here.
+    pub fn toggle_hdr(&mut self) {
+        self.hdr = match self.hdr {
+            crate::config::HdrMode::Auto => crate::config::HdrMode::Off,
+            crate::config::HdrMode::Off => crate::config::HdrMode::Auto,
+        };
+        self.hdr_pending = Some(self.hdr);
+        self.show_toast(match self.hdr {
+            crate::config::HdrMode::Auto => "HDR output: Auto.",
+            crate::config::HdrMode::Off => "HDR output: Off.",
+        });
     }
 
     pub fn toggle_audio_passthrough(&mut self) {
@@ -1903,6 +1926,7 @@ impl State {
         self.config.audio_delay_ms = Some(self.audio_delay_ms);
         self.config.audio_mode = Some(self.audio_mode);
         self.config.reduce_motion = Some(self.reduce_motion);
+        self.config.hdr = Some(self.hdr);
         self.config.version_choices = Some(self.version_choices.clone());
         self.config.playback_quality = Some(self.playback_quality);
         self.config.quality_choices = Some(self.quality_choices.clone());
@@ -5039,6 +5063,9 @@ mod tests {
             audio_delay_ms: 0,
             audio_mode: crate::config::AudioMode::Off,
             reduce_motion: false,
+            hdr: crate::config::HdrMode::Auto,
+            hdr_status: rune::HdrStatus::Unknown,
+            hdr_pending: None,
             settings_query: rune::TextEdit::new(""),
             library_search: rune::TextEdit::new(""),
             library_search_due: None,

@@ -1,112 +1,104 @@
-# HDR passthrough — implementation plan
+# HDR output — implementation plan
 
-**2026-11-17.** Audio passthrough shipped this pass; HDR output remains a Rune renderer
-milestone. This document is the scoped plan and the reason it is not an app toggle.
+**2026-11-18.** The first HDR slice shipped: extended-range **scRGB** output
+(`Rgba16Float` + `ExtendedSrgbLinear`) with a linear composite, absolute PQ/HLG video and an
+honest SDR fallback. This document records the design, what is deliberately not done, and the
+hardware verification that remains.
 
-## Today
+## What shipped
 
-- The video path decodes 10-bit HEVC/AV1, keeps BT.2020, and tone-maps PQ/HLG in
-  `native_surface/video.wgsl` (Reinhard; reference white 0.8) into the app's 8-bit sRGB surface.
-- Rune's window config (`window.rs::surface_config`) picks the surface's **sRGB** format
-  (`Bgra8UnormSrgb` by default) and its renderer is built for that target. The UI, images,
-  video and OSD all composite there.
-- wgpu 30.0.1 now exposes `SurfaceColorSpace::Bt2100Pq` / `Bt2100Hlg` and 10-bit formats;
-  `wgpu-hal` maps Vulkan `HDR10_ST2084_EXT` and reports color-space capabilities per format.
-  Whether a surface advertises HDR is the compositor's answer (`wp_color_management_v1` on
-  Wayland; KDE Plasma 6 is the realistic test). This is a capability to probe, not a guarantee.
-- Rune does not request HDR, has no API to switch color space at runtime, and its renderer target
-  is 8-bit sRGB. Setting `RUNE_HDR=1` in the app would produce wrong colors, not HDR.
+- **Rune surface.** `App::hdr(Hdr::Auto)` makes a window ask its surface for `Rgba16Float` in
+  `ExtendedSrgbLinear` when the surface advertises that colour space; otherwise it keeps the SDR
+  format. `surface_config_hdr` is the single selection point, and it retries SDR if the driver
+  refuses the HDR swap chain.
+- **Linear composite.** An HDR window forces `srgb_blend = false`: fills, images, text coverage,
+  layers, backdrops and video all hold linear light. The window pass scales that light by
+  `HDR_WHITE_SCALE` (`203/80 = 2.5375`) so UI white lands on the compositor's SDR reference white
+  (BT.2408 graphics white, 203 cd/m²). Isolated layers stay unscaled and are scaled when
+  composited, so a layer never double-scales its contents.
+- **Video shader.** `native_surface/video.wgsl` keeps two output paths. On SDR it tone-maps as
+  before (Reinhard). On scRGB it decodes PQ to absolute luminance (0–10,000 cd/m²), runs HLG
+  through the BT.2100 OOTF at a 1,000 cd/m² nominal peak, converts BT.2020 → BT.709 and divides
+  by 203 so `1.0` is SDR white and highlights stay above it.
+- **Runtime switch.** `Tx::set_hdr(Hdr)` reconfigures the surface and rebuilds the renderer and
+  the video pipelines in place; no playback restart. `rune::hdr_status()` reports `Active`
+  (with format and colour space), `Unsupported`, `Failed`, `Off` or `Unknown`, and the app shows
+  that under its Settings row.
+- **App.** `Settings → Playback → HDR output: Auto / Off`; Auto is the default, the switch
+  applies on the next frame, and the note states what the surface actually got.
+- **Verified locally** on RADV/Wayland: the surface configures and presents as
+  `Rgba16Float + ExtendedSrgbLinear`; the video shader's PQ/HLG math was checked against
+  ST.2084/BT.2100 on a float target for 203 cd/m², 1,000 cd/m² and HLG 75 % (the first two land
+  at 2.52 and 12.68 in the window, i.e. SDR white and ~5× white, with no clip).
 
-## What “HDR passthrough” has to mean
+## What “HDR output” means here
 
 1. The decoder's BT.2020/PQ (or HLG) samples reach the display without the Reinhard SDR map.
-2. The UI stays SDR at a defined white level (about 100 nits in a 1 000-nit container), and the
-   video's highlights go above it.
-3. The compositor receives an HDR surface with the right color space and, where the protocol
-   allows, mastering metadata.
-4. The OSD, subtitles and menus are composited over the HDR frame, not in a separate window.
+2. The UI stays SDR at a defined reference white (203 cd/m²), and the video's highlights go above
+   it.
+3. The compositor receives extended-range linear light and owns gamut mapping, tone mapping and
+   the display signal.
+4. The OSD, subtitles and menus composite over the HDR frame in the same window.
 5. A display/compositor that cannot accept HDR falls back to the existing SDR tone map, visibly
    and honestly.
 
-## Architecture
+## Why scRGB first, not a PQ present pass
 
-**Preferred: one HDR render target and a final PQ encode.**
+The plan originally proposed rendering into a float target, then a fullscreen present pass that
+encodes PQ/BT.2020 and writes an `Rgb10a2Unorm` surface. That is the path a TV needs for an
+**HDR10 badge** (PQ signal plus mastering metadata), but it has costs this slice did not need:
 
-- Render the whole UI + video into a linear `Rgba16Float` (or `Rgb10a2Unorm`) target.
-- UI colors are sRGB-decoded to linear and scaled so SDR reference white is 100 nits
-  (0.1 of a 1 000-nit container); video PQ is decoded to linear scene values and kept above 1.0.
-- Composite in linear, then a fullscreen present shader encodes PQ (or HLG) and writes the
-  HDR surface.
-- Blend/alpha behavior must be checked: sRGB-encoded UI on a linear HDR target is the classic
-  “washed out / too bright” bug.
+- every pass would either encode PQ before blending (wrong for text and AA) or need a real linear
+  intermediate plus a present pass;
+- HDR10 metadata is not settable through wgpu 30, so the badge could not be attached anyway;
+- scRGB is advertised by RADV, Metal EDR and DX12, and KWin maps it to the panel correctly.
+
+scRGB carries absolute linear light, so the video grade is preserved and the compositor does the
+display-specific work. It is the portable path today. PQ/BT.2020 output with static metadata is
+still the follow-up if a TV badge or a non-tone-mapping sink is required; it builds on the same
+linear scene.
 
 **Rejected alternatives.**
 
-- Toggle a 10-bit surface while still writing tone-mapped sRGB: wrong colors, no benefit.
+- Toggle a 10-bit surface while still writing tone-mapped sRGB: wrong colours, no benefit.
 - Separate HDR video window plus SDR OSD window: focus, fullscreen, compositor mixing and
-  multi-window lifecycle are worse than one renderer path, and Rune is single-window by design.
-- Only request HDR when the file is HDR, without a renderer path: a black/incorrect frame is
-  worse than a correct SDR tone map.
+  multi-window lifecycle are worse than one renderer path.
+- Only request HDR when the file is HDR, without a renderer path: a black/incorrect frame is worse
+  than a correct SDR tone map.
 
-## Rune changes (fork, then upstream)
+## Remaining work
 
-1. **Surface options.** `SurfaceConfigOptions { color: Sdr | HdrAuto | HdrPq }` on `WindowSpec`
-   (default `Sdr`). `surface_config` asks for `Rgb10a2Unorm` or `Rgba16Float` + `Bt2100Pq`
-   when the caps include it; store the chosen format/color space and a `hdr_available` flag.
-2. **Capability probe.** Expose `WindowHandle::hdr_surface()` / `hdr_color_space()` (or a
-   `HdrSupport` enum) so the app can show “available / unsupported / SDR fallback” in
-   Diagnostics and only offer the setting when it can work.
-3. **Renderer target.** Permit a linear HDR target: all pipelines write linear values or a
-   dedicated present pass converts the existing SDR UI texture. The smallest correct version:
-   - keep the existing SDR renderer for UI into an offscreen `Rgba8UnormSrgb`;
-   - render video into an `Rgba16Float` HDR texture (no tone map);
-   - fullscreen composite shader: HDR video + sRGB-decoded UI at 100 nits → PQ;
-   - present that to the HDR surface.
-   That isolates the change from 40+ UI pipelines and is the recommended first slice.
-4. **Video shader.** Add an HDR output mode: PQ EOTF without Reinhard, BT.2020 matrix, values
-   above 1.0 preserved; the SDR mode keeps the calibrated tone map. Cap metadata (MaxCLL,
-   MaxFALL, mastering display) when the surface/protocol accepts it.
-5. **Runtime switch.** Reconfigure the surface between SDR and HDR when playback starts/stops
-   (or when the setting changes); rebuild the renderer and the present pass, and keep the
-   window alive. A failed reconfiguration returns to SDR with a logged reason.
-6. **Tests.** Unit tests for the format/color-space choice and the PQ encode; a headless render
-   of a known HDR ramp through the present shader; a window integration test that simulates
-   “HDR not advertised” and falls back.
-7. **Docs and diagnostics.** `docs/design-player.md` §3.4 and the Settings row say what is
-   actually happening. No dead switch.
+1. **Hardware verification.** A real HDR TV in Desktop Mode (KWin HDR on): UI white level,
+   subtitle white, OSD contrast, alpha over video, 1,000/4,000-nit ramps, BT.2020 primaries, HLG,
+   and the SDR↔HDR switch with playback running. The development panel here reports HDR
+   unsupported, so this is still open.
+2. **Gaming Mode.** gamescope does HDR, but it does not expose HDR/colour management to a
+   non-Steam Wayland client; a Steam tile launched under gamescope stays SDR. Desktop Mode is the
+   supported HDR path.
+3. **PQ/BT.2020 with metadata.** A linear intermediate plus a present pass, `Rgb10a2Unorm`, and
+   mastering-display/MaxCLL/MaxFALL metadata once the compositor/API surface exists. Needed only
+   for a TV badge or a sink that cannot do scRGB.
+4. **Per-content policy.** Auto currently enables HDR for the whole window, which is the TV model
+   (UI in HDR at reference white). If a user wants HDR only while a film plays, that is a policy
+   change, not a renderer change.
+5. **Dolby Vision.** Still needs libplacebo; the app refuses DV profiles and DirectPlays the
+   HDR10 base layer where the server offers one.
 
-## App changes
+## Verification that is already automated
 
-- `Settings → Playback → HDR output: Auto / Off` (Auto only when the surface reports HDR).
-- `PlaybackInfo` profile: mark HDR-capable and choose DirectPlay for HDR10 sources; keep the
-  Dolby Vision refusal (DV needs libplacebo).
-- Player OSD: `HDR10` / `HLG` badge only when the output is actually HDR; `SDR tone map` in
-  diagnostics otherwise.
-- `RUNEFIN_HDR=0/auto` for a launch, and a one-time toast when the compositor refuses HDR.
-- The SDR fallback remains the default and the tested path on every machine without HDR.
+- `window::tests::hdr_*` cover the surface choice: scRGB only for `Rgba16Float` with
+  `ExtendedSrgbLinear`, SDR for a float surface that only offers sRGB, and the SDR format choice
+  with and without gamma blending.
+- The video shader was rendered to an `Rgba16Float` target with a PQ/HLG frame and read back:
+  203 cd/m² → 2.5176 (Q16), 1,000 cd/m² → 12.68, layer scale → 0.992, SDR tone map unchanged
+  (0.889), HLG 75 % → 2.521. This is a local GPU check, not a committed CI test yet.
 
-## Verification
+## Risks
 
-- KDE Plasma 6 with HDR enabled, AMD RADV/VCN, 4K HDR10 TV over HDMI 2.1.
-- Test patterns: a 1 000-nit ramp, black-level steps, BT.2020 primaries, HLG, and a real HDR10
-  film; compare against `mpv --target-colorspace-hint=yes` on the same display.
-- Check UI white level, subtitle white, OSD contrast, alpha blending over video, and that
-  leaving playback restores SDR without a flash or a lost surface.
-- Measure the present pass cost at 4K60; HDR must not add a frame.
-- Fallback test: compositor with HDR off, NVIDIA without a working HDR surface, and a monitor
-  that advertises 10-bit but not PQ.
-
-## Estimate and risks
-
-- Rune surface + capability + present path: **2–3 weeks**, most of it in the composited present
-  pass and the reconfiguration path, plus hardware iteration.
-- App settings/profile/OSD: **3–5 days** after the Rune API exists.
-- Risks: Wayland color-management protocol versions, compositor HDR behavior, SDR white-level
-  calibration, UI-in-HDR banding, and deciding whether HDR is only allowed fullscreen. None is
-  a reason to fake it in the app.
-
-## Interim
-
-Keep the calibrated SDR tone map and the honest “HDR content, SDR output” label. A later
-quality pass can replace Reinhard with BT.2390 and add 10-bit dithering if the HDR milestone
-slips; that improves the fallback, not the passthrough.
+Wayland colour-management protocol versions and compositor HDR behaviour; SDR white-level
+calibration (203 cd/m² is BT.2408's graphics white, not every desktop's SDR setting); banding in
+smooth UI gradients at 16-bit float (none expected, but a 4K TV pass should confirm); and the
+per-display HDR state, which wgpu does not expose on Vulkan/Linux — the app can only ask whether
+the *surface* supports the colour space, not whether the panel is currently in HDR mode. KWin
+tone maps scRGB to SDR when HDR is off, so Auto remains correct there; it just does not make an
+SDR panel brighter.

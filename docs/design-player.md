@@ -5,8 +5,8 @@
 
 **Decision in one line:** the player lives inside Runefin, one window, on Wayland; frames arrive
 as **DMA-BUF** and are imported into Rune's own Vulkan device; decoding is **GStreamer + VA-API**;
-HDR is **tone-mapped to SDR** in our shader until wgpu can do HDR passthrough, which is an open
-upstream issue, not a feature we can schedule.
+HDR is **presented as extended-range linear (scRGB)** when the compositor offers the colour space,
+and tone-mapped to SDR when it does not.
 
 ---
 
@@ -310,16 +310,40 @@ steps, subtitle mode
 
 ### 3.4 HDR, precisely
 
-| Capability | Today | Blocked on |
+| Capability | Today | Notes |
 |---|---|---|
 | 10-bit decode (HEVC/AV1, BT.2020 PQ) | yes, VAAPI | nothing |
-| Correct colour on an SDR display (tone map) | yes — our shader | nothing |
-| HDR output to an HDR display (passthrough) | **no** | wgpu 30 types expose `Bt2100Pq`/`Bt2100Hlg` and Vulkan maps `HDR10_ST2084_EXT`; Rune still configures an sRGB surface and an `Bgra8UnormSrgb` renderer, and the compositor must advertise an HDR colour space (`wp_color_management_v1`; KDE Plasma 6). A Rune renderer milestone, not an app flag |
+| Correct colour on an SDR display (tone map) | yes — our shader | Reinhard shoulder; reference white at 0.8 |
+| HDR output on an HDR display | **yes, scRGB** | `Rgba16Float` + `ExtendedSrgbLinear` when the surface advertises it; see below |
+| HDR10 static metadata (`MaxCLL`/`MaxFALL`) | not sent | wgpu sets no metadata; the compositor tone maps the scRGB signal |
 | Dolby Vision | no | needs libplacebo (path B) |
 
-So: **4K yes, HDR content yes, HDR output not yet.** Phase M5c flips it on when wgpu exposes
-`set_image_description`/the colour-management protocol; until then a setting that says exactly
-that, rather than a switch that silently does nothing.
+**How HDR output works.** Rune configures the window's surface as `Rgba16Float` in
+`ExtendedSrgbLinear` (scRGB) when `App::hdr(Hdr::Auto)` asks for it and the surface offers that
+colour space. Everything then composites in **linear light**: UI colours, text coverage, images
+and video are premultiplied linear values in one unit, `1.0` = SDR reference white (203 cd/m²,
+BT.2408 graphics white). The window pass scales that unit into scRGB (`× 203/80`), so UI white
+lands on the compositor's SDR reference and HDR highlight detail stays above it.
+
+The video shader has two output paths:
+
+- **SDR surface**: PQ/HLG is decoded, converted BT.2020 → BT.709 and tone-mapped into the small
+  `0..1` window (the shipped Reinhard curve).
+- **scRGB surface**: PQ keeps its absolute luminance (0–10,000 cd/m²), HLG goes through the
+  BT.2100 OOTF at a 1,000 cd/m² nominal peak (75 % signal = 203 cd/m²), and the result is divided
+  by 203 so `1.0` remains SDR white. Nothing is clipped at white; the compositor owns gamut and
+  tone mapping for the panel.
+
+The app never writes PQ/BT.2020 itself, so it does not need to attach HDR10 mastering metadata:
+the compositor receives absolute linear light and produces the display signal. A TV that only
+shows its "HDR" badge for PQ-tagged metadata may not badge this path; KWin's HDR output and
+tone mapping still apply.
+
+**Switching.** Settings → Playback → **HDR output: Auto / Off**. Auto negotiates on the next
+frame, and the row's note reports what the window actually got (`Active` with the format and
+colour space, `Unsupported`, or `Failed`). The window reconfigures its surface and rebuilds its
+pipelines in place; playback does not restart. A display or compositor without an extended-range
+surface stays on SDR with the tone map, and the note says so instead of pretending.
 
 ---
 
@@ -329,8 +353,8 @@ that, rather than a switch that silently does nothing.
 |---|---|---|
 | M5a | Rune patch: `push_dmabuf` + video kind, SDR only | a 1080p H.264 file plays in-window on Wayland with no CPU copy (`perf` shows no memcpy growth; GPU busy) |
 | M5b | GStreamer pipeline in Runefin: seek, pause, tracks, audio clock, Jellyfin reporting | a 2-hour 4K HEVC 10-bit file plays at 60 fps on the iGPU, <0.1% dropped, seek <250 ms, resume position survives a restart |
-| M5c | Tone mapping quality + HDR10 metadata | side-by-side with mpv gpu-next on the same clip; no clipped highlights, no banding |
-| M5d | HDR passthrough | when wgpu lands #10545 and your compositor is KDE Plasma with HDR on |
+| M5c | Tone mapping quality | side-by-side with mpv gpu-next on the same clip; no clipped highlights, no banding |
+| M5d | HDR output (scRGB) | **shipped**: `Rgba16Float + ExtendedSrgbLinear`, linear composite, absolute PQ/HLG video, UI at reference white, runtime Auto/Off with an honest status; hardware HDR verification on the TV is still pending |
 
 **Fallback stays shipped:** the mpv handoff (D3 in `design.md`) remains behind a setting, so a
 driver regression cannot brick playback. On Wayland that fallback is a separate window; it is the
@@ -442,14 +466,17 @@ does its side, and gamescope already does — the client is the gap.
 
 So the plan for the TV, in order:
 
-1. **Now → M5c:** decode 10-bit, tone map to SDR well. On a good panel this already looks correct,
-   just not "HDR". No dependency on anyone.
-2. **M5d:** when wgpu exposes an HDR surface, flip a flag: skip tone mapping, write PQ/BT.2020, set
-   metadata. The shader is written for this from day one (two output paths, one switch), so M5d is
-   a day's work *if* the primitive exists.
-3. **If wgpu stalls:** the escape hatch is a small Vulkan swapchain of our own via `wgpu-hal`'s
-   escape hatches (Rune already does this for Metal) — painful, contained, and only worth it if the
-   TV case becomes the main use.
+1. **Decode 10-bit and tone map well.** On a good SDR panel this already looks correct, just not
+   "HDR". No dependency on anyone.
+2. **M5d shipped:** an extended-range scRGB surface, a linear composite, and absolute PQ/HLG video
+   keep the grade's highlights. The compositor tone maps to the panel; the app sends no static
+   metadata. This is the supported HDR path on Wayland under KWin (Desktop Mode).
+3. **Gaming Mode:** gamescope can do HDR, but it does not expose HDR/colour management to a
+   non-Steam Wayland client, so the supported path is Desktop Mode. A Steam tile launched in
+   Gaming Mode stays SDR until that changes.
+4. **Next, if a TV badge is required:** write PQ/BT.2020 ourselves with a present pass and attach
+   mastering-display + MaxCLL/MaxFALL metadata. That needs compositor metadata support wgpu does
+   not expose; scRGB is the portable path until then.
 
 HDR10+ (Samsung's dynamic-metadata variant) is out of scope: nothing on Linux signals it, and
 HDR10 static metadata is what a player should output anyway.

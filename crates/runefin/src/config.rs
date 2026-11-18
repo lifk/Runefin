@@ -109,6 +109,10 @@ pub struct Config {
     /// Suppress ambient and theme motion. Off by default; the setting is a promise, not a hint.
     #[serde(default)]
     pub reduce_motion: Option<bool>,
+    /// Extended-range HDR output. Absent means Auto: use scRGB when the window's surface offers
+    /// it on a display the compositor drives in HDR.
+    #[serde(default)]
+    pub hdr: Option<HdrMode>,
     /// The last version chosen per item id, so a restart keeps the edition.
     #[serde(default)]
     pub version_choices: Option<std::collections::HashMap<String, String>>,
@@ -465,6 +469,34 @@ impl SkipMode {
     }
 }
 
+/// Extended-range HDR output for the window.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum HdrMode {
+    /// Present scRGB when the surface supports it; otherwise stay SDR.
+    #[default]
+    Auto,
+    /// Always present SDR.
+    Off,
+}
+
+impl HdrMode {
+    pub fn label(self) -> &'static str {
+        match self {
+            HdrMode::Auto => "Auto",
+            HdrMode::Off => "Off",
+        }
+    }
+}
+
+impl From<HdrMode> for rune::Hdr {
+    fn from(mode: HdrMode) -> Self {
+        match mode {
+            HdrMode::Auto => rune::Hdr::Auto,
+            HdrMode::Off => rune::Hdr::Off,
+        }
+    }
+}
+
 /// The audio shaping the player offers without a DSP dependency.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -680,6 +712,11 @@ impl Config {
         self.user_name.clear();
         self.token.zeroize();
         self.token.clear();
+    }
+
+    /// Extended-range HDR output; absent in an older file means Auto.
+    pub fn hdr(&self) -> HdrMode {
+        self.hdr.unwrap_or_default()
     }
 
     /// The saved interface mode. Big screen is the TV layout; everything else is the desk UI.
