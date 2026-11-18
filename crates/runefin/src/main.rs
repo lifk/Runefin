@@ -1225,6 +1225,11 @@ fn in_app_stats_scene(s: &mut State) {
     s.in_app_stats = true;
     s.in_app_video = Some(("hevc".into(), 3840, 2160, Some("HDR10".into())));
     s.in_app_container = Some("mkv".into());
+    // The Preview row is the direct answer to "why is the scrub preview soft?": it names every
+    // width the server published and the set this screen samples.
+    if let Some(session) = &mut s.in_app {
+        session.item.trickplay = Some(demo::trickplay_manifest());
+    }
 }
 
 #[cfg(not(debug_assertions))]

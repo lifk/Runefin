@@ -145,6 +145,15 @@ This is the only change that makes a 320×180 preview genuinely sharp on a 4K TV
 8. **Diagnostics row:** available widths, interval, tile size, last fetch/decode time, cache hit;
    makes a slow server or a missing 1280 set visible instead of mysterious.
 
+**Shipped 2026-11-19, against this 640-only server:** B1, B2, B3, B4, B5, B6, B7 and B8 (a
+"Preview" row in the statistics sheet: every published width, the set in use, the tile geometry,
+and whether the hovered tile is cached or still loading), plus the 32 MP sprite guard and the
+byte-budget cache from C. B2 became **a loading card with the right time** rather than keeping the
+previous sprite: holding it would keep two 88 MB decodes resident (176 MB at 640, and the same at
+1280 5×5), which is the case C already calls out as too much for a Steam Machine. A pointer that
+rests on a new tile sees the card for the ~0.4 s of fetch and decode; the rest of the drag is
+covered by the debounce, and the playhead's own tile is prefetched.
+
 ### C. Cache and memory (S–M, links Q10)
 
 - Move the image cache from 256 entries to a **byte budget** (LRU by decoded size). One 640
@@ -181,8 +190,12 @@ cannot use 5×5 tiles, or if a future 4K/8K preview wants more than 1280.
 - Confirm the 1280 5×5 sprite decodes at the same size/memory as today's 640 10×10 and the
   preview is 320×180 at 3× without visible softness.
 - Check the disk cache does not evict posters after a long trickplay session.
-- Add tests for `trickplay_width(target)` selection, tile/cell math with 5×5, debounce, stale
-  response drop, and snapshots for 240/320 previews.
+- Tests are in place for the width choice per screen, 5×5 tile/cell math, the debounce (and the
+  wake that makes it fire), stale-response drop, byte accounting and the 240/320 panel size
+  (320 needs a 960+ set, 4:3 keeps its own height). The `in-app-trickplay` and
+  `in-app-trickplay-loading` scenes freeze the cropped frame and the card at the same panel size.
+  Still to measure on hardware: cold and warm first-preview latency, and a tile boundary on a
+  6-tile film.
 
 ## 8. Deliberately not doing
 

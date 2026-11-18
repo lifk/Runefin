@@ -2131,6 +2131,18 @@ fn segment_marks(s: &State, session: &crate::state::InAppSession, _t: &tok::Them
     rail.child(el().grow((duration - last).max(1) as f32).h(4.0))
 }
 
+/// The scrub panel's point size. A 960+ set earns the 320 panel a 4K TV can fill; anything
+/// smaller keeps 240, where a 640 set is already 1:1 or downscaled. The thumbnail's own aspect
+/// sets the height, so a 4:3 film is not stretched into a 16:9 box.
+pub(crate) fn trickplay_preview_size(info: Option<&jellyfin_api::TrickplayInfo>) -> (f32, f32) {
+    let Some(info) = info else {
+        return (240.0, 135.0);
+    };
+    let width = if info.width >= 960 { 320.0 } else { 240.0 };
+    let height = width * info.height.max(1) as f32 / info.width.max(1) as f32;
+    (width, height)
+}
+
 /// The preview above the timeline: the trickplay frame under the pointer when the server has
 /// one, and a plain time card when it does not. Both use the same box, so the panel never
 /// changes size under the pointer. The panel is inert: moving onto it must not move the time.
@@ -2146,13 +2158,7 @@ fn seek_preview(s: &State, session: &crate::state::InAppSession, _t: &tok::Theme
     // The panel is sized from the set the server actually has: 320×180 when a 960/1280 set can
     // fill a 4K TV, 240×135 otherwise. 4:3 thumbnails keep their own height instead of being
     // stretched into a 16:9 box.
-    let (preview_w, preview_h) = manifest
-        .map(|(_, info)| {
-            let width = if info.width >= 960 { 320.0 } else { 240.0 };
-            let height = width * info.height.max(1) as f32 / info.width.max(1) as f32;
-            (width, height)
-        })
-        .unwrap_or((240.0, 135.0));
+    let (preview_w, preview_h) = trickplay_preview_size(manifest.map(|(_, info)| info));
     let frame = s.trickplay_key(&session.item, ms).and_then(|key| {
         let image = s.images.get(&key)?;
         let (_, info) = manifest?;
@@ -2425,6 +2431,7 @@ fn stats_panel(s: &State, session: &crate::state::InAppSession) -> El {
                 },
             ),
         ),
+        ("Preview", trickplay_facts(s, session)),
         ("Last request", format!("{} ms", crate::net::last_job_ms())),
         ("Position", position),
         ("Frames", session.player.frames().to_string()),
@@ -2483,6 +2490,49 @@ fn stats_panel(s: &State, session: &crate::state::InAppSession) -> El {
         .pt(76.0)
         .pr(20.0)
         .child(panel)
+}
+
+/// What the server published for the scrub preview and which set this screen samples: the only
+/// way to tell a soft 640 on a 4K TV from a server that never generated a larger one. The last
+/// part is live state, so a blank preview reads as "loading" rather than as a broken feature.
+fn trickplay_facts(s: &State, session: &crate::state::InAppSession) -> String {
+    let Some(sets) = session.item.trickplay.as_ref() else {
+        return "none generated".to_string();
+    };
+    let mut widths: Vec<u32> = sets
+        .values()
+        .flat_map(|by_width| by_width.keys())
+        .filter_map(|width| width.parse().ok())
+        .collect();
+    widths.sort_unstable();
+    widths.dedup();
+    let Some((width, info)) = session
+        .item
+        .trickplay_manifest_for(s.in_app_trickplay_min_width())
+    else {
+        return "none usable".to_string();
+    };
+    let available = widths
+        .iter()
+        .map(u32::to_string)
+        .collect::<Vec<_>>()
+        .join(", ");
+    let mut text = format!(
+        "{available} · using {width} · {}×{} · {} s",
+        info.tile_width,
+        info.tile_height,
+        info.interval.max(1) / 1000
+    );
+    if let Some((_, ms)) = s.in_app_hover
+        && let Some(key) = s.trickplay_key(&session.item, ms)
+    {
+        text.push_str(if s.images.contains_key(&key) {
+            " · tile cached"
+        } else {
+            " · tile loading"
+        });
+    }
+    text
 }
 
 /// The LIVE marker and what is on. It replaces the timeline for a tuner stream, which has no
@@ -3343,11 +3393,50 @@ fn control(label: &str, key: &str, t: &tok::Theme, on: impl Fn(&mut State) + 'st
 
 #[cfg(test)]
 mod tests {
-    use super::seek_label;
+    use super::{seek_label, trickplay_preview_size};
 
     #[test]
     fn the_seek_labels_follow_the_configured_step() {
         assert_eq!(seek_label(10_000, false), "Back 10 seconds");
         assert_eq!(seek_label(30_000, true), "Forward 30 seconds");
+    }
+
+    #[test]
+    fn the_scrub_panel_is_bigger_only_when_the_server_has_the_set() {
+        use jellyfin_api::TrickplayInfo;
+        let info = |width, height| TrickplayInfo {
+            width,
+            height,
+            tile_width: 10,
+            tile_height: 10,
+            thumbnail_count: 100,
+            interval: 10_000,
+            bandwidth: 1,
+        };
+        assert_eq!(
+            trickplay_preview_size(None),
+            (240.0, 135.0),
+            "no manifest keeps the plain time card"
+        );
+        assert_eq!(
+            trickplay_preview_size(Some(&info(640, 360))),
+            (240.0, 135.0),
+            "640 stays 1:1 on a desktop and a mild upscale on a TV"
+        );
+        assert_eq!(
+            trickplay_preview_size(Some(&info(960, 540))),
+            (320.0, 180.0),
+            "a 960 set fills the 320 panel a 4K TV draws at 960 device pixels"
+        );
+        assert_eq!(
+            trickplay_preview_size(Some(&info(1280, 720))),
+            (320.0, 180.0)
+        );
+        let (width, height) = trickplay_preview_size(Some(&info(352, 288)));
+        assert_eq!(width, 240.0);
+        assert!(
+            (height - 196.36).abs() < 0.1,
+            "a 4:3 thumbnail keeps its own height, not 135"
+        );
     }
 }
