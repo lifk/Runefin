@@ -8,6 +8,7 @@ MPRIS service Runefin already exposes.
 from __future__ import annotations
 
 import asyncio
+import os
 import re
 import shutil
 from pathlib import Path
@@ -22,13 +23,24 @@ GDBUS = shutil.which("gdbus") or "/usr/bin/gdbus"
 
 
 async def gdbus(*args: str, timeout: float = 2.0) -> tuple[int, str]:
-    """One gdbus call, without blocking the plugin's event loop."""
+    """One gdbus call, without blocking the plugin's event loop.
+
+    Decky's loader is a system service, so the plugin process may inherit root's environment
+    rather than the desktop session's. Point GDBus at the user's session bus explicitly.
+    """
     try:
+        env = os.environ.copy()
+        uid = os.getuid()
+        if uid != 0:
+            runtime = env.get("XDG_RUNTIME_DIR") or f"/run/user/{uid}"
+            env["XDG_RUNTIME_DIR"] = runtime
+            env["DBUS_SESSION_BUS_ADDRESS"] = f"unix:path={runtime}/bus"
         process = await asyncio.create_subprocess_exec(
             GDBUS,
             *args,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.DEVNULL,
+            env=env,
         )
         stdout, _ = await asyncio.wait_for(process.communicate(), timeout)
         return process.returncode or 0, stdout.decode("utf-8", "replace")
