@@ -16,6 +16,12 @@ running Steam client to add that launcher, reads the assigned appid back from
 `userdata/<id>/config/shortcuts.vdf`, and copies generated portrait/header/hero/logo/icon art into
 `config/grid`.
 
+`--decky` also copies the optional Decky QAM companion into `~/homebrew/plugins/Runefin` when
+Decky is already installed. It never installs or enables Decky, and the plugin is unsupported:
+it adds an Open/transport/Quit panel and a "Media" collection, not HDR. `--uninstall` removes it
+along with the wrapper, launcher and art. See
+[`packaging/decky/runefin/README.md`](../decky/runefin/README.md).
+
 The wrapper is the durable launch path, not a detail:
 
 ```sh
@@ -35,7 +41,7 @@ Rules the script follows:
   reads the result back
 - one shortcut named Runefin; no per-film entries, no mutable appid
 - generated artwork only; no SteamGridDB assets are bundled
-- `--dry-run`, `--no-install`, `--no-steam`, `--art-dir`, `--ref` for controlled runs
+- `--dry-run`, `--no-install`, `--no-steam`, `--decky`, `--art-dir`, `--ref` for controlled runs
 - `--uninstall` removes the wrapper, launcher and art; the Steam entry is removed from Steam's UI
 
 Requirements: Steam is running (Desktop Mode is fine), a user account has logged into Steam once,

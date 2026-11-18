@@ -80,6 +80,9 @@ python3 steam-install.py
 
 It is host-side because Flatpak has no post-install hook and a sandbox cannot write Steam's
 shortcuts. It needs Steam running (Desktop Mode is fine), and `--uninstall` removes what it added.
+If Decky Loader is already installed, `--decky` also copies the optional Quick Access Menu
+companion (Open, transport, Quit, a Media collection); it never installs Decky and makes no HDR
+claim.
 See [`packaging/steam/README.md`](packaging/steam/README.md). SteamOS updates keep the Flatpak,
 the wrapper and the tile.
 

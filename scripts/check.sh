@@ -4,6 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 python3 -c "compile(open('scripts/steam-install.py').read(), 'scripts/steam-install.py', 'exec')"
+python3 -c "compile(open('packaging/decky/runefin/main.py').read(), 'packaging/decky/runefin/main.py', 'exec')"
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test -p jellyfin-api

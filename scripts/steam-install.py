@@ -44,6 +44,9 @@ RUNEFIN_DIR = DATA_HOME / "runefin"
 WRAPPER = RUNEFIN_DIR / "runefin-steam.sh"
 LAUNCHER = DATA_HOME / "applications" / "runefin-steam.desktop"
 RECORD = RUNEFIN_DIR / "steam.json"
+DECKY_PLUGIN = Path.home() / "homebrew" / "plugins" / "Runefin"
+DECKY_BASE = "https://raw.githubusercontent.com/lifk/Runefin/main/packaging/decky/runefin"
+DECKY_FILES = ("plugin.json", "main.py", "package.json", "dist/index.js")
 
 
 def say(message: str) -> None:
@@ -386,7 +389,36 @@ def install_art(shortcuts_path: Path, wrapper: Path, art: Path | None, dry: bool
     return written
 
 
-def write_record(appid: str | None, artworks: list[Path], dry: bool) -> None:
+def install_decky_plugin(dry: bool) -> Path | None:
+    """Copy the optional QAM plugin into an existing Decky install.
+
+    Decky is not a dependency and is never installed here; an absent `~/homebrew/plugins` is
+    simply skipped. The plugin is a separate, unsupported extra: no root flag, no route patches.
+    """
+    plugins = DECKY_PLUGIN.parent
+    if not plugins.is_dir():
+        say("Decky is not installed; skipping the optional QAM plugin.")
+        return None
+    local = Path(__file__).resolve().parent.parent / "packaging" / "decky" / "runefin"
+    if dry:
+        say(f"would install the Decky plugin in {DECKY_PLUGIN}")
+        return DECKY_PLUGIN
+    for name in DECKY_FILES:
+        destination = DECKY_PLUGIN / name
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        if local.is_dir():
+            shutil.copyfile(local / name, destination)
+        else:
+            try:
+                urllib.request.urlretrieve(f"{DECKY_BASE}/{name}", destination)
+            except OSError as error:
+                say(f"warning: could not download the Decky plugin's {name}: {error}")
+                return None
+    say(f"installed the optional Decky QAM plugin in {DECKY_PLUGIN}")
+    return DECKY_PLUGIN
+
+
+def write_record(appid: str | None, artworks: list[Path], decky: Path | None, dry: bool) -> None:
     if dry:
         say(f"would write {RECORD}")
         return
@@ -397,6 +429,8 @@ def write_record(appid: str | None, artworks: list[Path], dry: bool) -> None:
         "launcher": str(LAUNCHER),
         "artwork": [str(path) for path in artworks],
     }
+    if decky is not None:
+        payload["decky_plugin"] = str(decky)
     RECORD.write_text(json.dumps(payload, indent=2) + "\n")
 
 
@@ -423,6 +457,16 @@ def uninstall(dry: bool) -> int:
             else:
                 path.unlink()
                 removed.append(path)
+    decky = record.get("decky_plugin")
+    if decky:
+        decky_path = Path(decky)
+        plugins = (Path.home() / "homebrew" / "plugins").resolve()
+        if decky_path.is_dir() and plugins in decky_path.resolve().parents:
+            if dry:
+                say(f"would remove {decky_path}")
+            else:
+                shutil.rmtree(decky_path)
+                removed.append(decky_path)
     if RECORD.is_file():
         if dry:
             say(f"would remove {RECORD}")
@@ -439,6 +483,7 @@ def main() -> int:
     parser.add_argument("--uninstall", action="store_true", help="remove wrapper, launcher and art")
     parser.add_argument("--no-install", action="store_true", help="do not install the Flatpak")
     parser.add_argument("--no-steam", action="store_true", help="write the wrapper and launcher only")
+    parser.add_argument("--decky", action="store_true", help="also install the optional Decky QAM plugin when Decky is present")
     parser.add_argument("--art-dir", type=Path, help="use this artwork directory")
     parser.add_argument("--ref", default=DEFAULT_REF, help="Flatpak .flatpakref to install")
     args = parser.parse_args()
@@ -452,8 +497,11 @@ def main() -> int:
     if not install_flatpak(args.ref, args.dry_run, args.no_install):
         return 1
     write_files(args.dry_run)
+    decky = install_decky_plugin(args.dry_run) if args.decky else None
 
     if args.no_steam:
+        if decky is not None:
+            write_record(None, [], decky, args.dry_run)
         say("Wrapper and launcher written. Add it in Steam yourself, or rerun without --no-steam.")
         return 0
 
@@ -473,7 +521,7 @@ def main() -> int:
         appid = str(found_shortcut[1].get("appid")) if found_shortcut else None
     except (OSError, ValueError):
         appid = None
-    write_record(appid, artworks, args.dry_run)
+    write_record(appid, artworks, decky, args.dry_run)
     say("Done. Restart Steam if the artwork or name does not appear immediately.")
     return 0
 

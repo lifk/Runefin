@@ -174,6 +174,10 @@ The core mixed-use wins are not plugin-system wins:
 
 ## 7. If C is pursued
 
+**2026-11-18:** implemented as `packaging/decky/runefin` (QAM Open/transport/Quit and a Media
+collection) with `scripts/steam-install.py --decky` for an existing Decky install. It is built
+(`pnpm build`) and typechecked, but **not tested on a Steam Machine**; see §9.
+
 Scope it as a **separate, MIT, unsupported companion**, not part of the Runefin binary:
 
 1. `plugin.json` with `api_version: 1`, no `root` flag; `@decky/api`/`@decky/ui` pinned.
@@ -202,6 +206,11 @@ commitment; an unmaintained entry that breaks is worse than no entry.
 ---
 
 ## 8. If B is pursued
+
+**2026-11-18:** the bridge shipped: `runefin://item/<id>` and `runefin://play/<id>` parse in
+`deep_link.rs`, the scheme is in the exported desktop entry, and a link waits for sign-in/home.
+MPRIS already supplies transport/quit. No read-only "Continue watching" endpoint was added; the
+app's Home remains the list.
 
 - Parse `--play <itemId>` and `runefin://play/<itemId>`; the single-instance path already forwards
   a second launch's arguments to the first. Route it to the item's detail or the player, with the
