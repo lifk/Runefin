@@ -134,6 +134,41 @@ media profile** for people who want a media-first machine. Not a replacement con
   new passthrough attempts `pulsesink`, but the SteamOS default stack may not expose compressed
   caps; treat it as receiver/OS dependent.
 
+#### SteamOS #2166 comments, checked 2026-11-18
+
+[ValveSoftware/SteamOS#2166](https://github.com/ValveSoftware/SteamOS/issues/2166) is the tracking
+issue for HDR in non-Proton Wayland Flatpaks (Kodi, mpv, Stremio). All 15 comments were read; the
+workarounds they contain do not reach a native Flatpak that is not running under Proton:
+
+- **`gamescope --expose-wayland`** is the only real mechanism. It makes gamescope publish the
+  standard `WAYLAND_DISPLAY` instead of only `GAMESCOPE_WAYLAND_DISPLAY`.
+  - It is a **session/compositor** flag: it has to be added to the unit that starts gamescope or a
+    TTY session. A Steam shortcut's launch options run inside the already-running Gaming Mode
+    gamescope and cannot add it. Reports start Kodi with it but get blinking between Kodi and the
+    "abort game" screen, and broken resolution detection (#3, #9, #10).
+  - Even with the flag, gamescope's colour management is its own **`frog_color_management_v1`**,
+    not the upstream `wp_color_management_v1`. Native clients such as wgpu/Mesa and Kodi do not
+    speak frog-color, so they still see no HDR surface (#3). The comment's suggested fix is to port
+    the client to frog-color, not a launch option.
+- **`WAYLAND_DISPLAY=gamescope-0` / `$GAMESCOPE_WAYLAND_DISPLAY`** (plus a gamescope Flatpak) has
+  one unreproduced report of mpv showing HDR "via XWayland", with no exact steps (#6). Later tests
+  by another user found HDR + Wayland with Kodi/mpv did not work at all in Gaming Mode (#10), and
+  nobody supplied a working recipe (#11, #12).
+- **Force Wayland in the Flatpak** (`--socket=wayland`, Flatseal) only changes the display backend,
+  not HDR capability (#13). Runefin already runs Wayland; this is not the missing piece.
+- **Proton/Windows apps do get HDR** (e.g. Windows Kodi under Proton, #15), because DXVK talks to
+  gamescope's HDR interface. That is not available to a native Linux Flatpak.
+- **Desktop Mode on the Deck OLED's internal panel** still reports only EDR, not true HDR (#8,
+  #15); an external HDR TV through KWin is the intended path.
+- **XWayland is not a shortcut.** On this host, RADV's X11 WSI (XWayland under KWin) advertises
+  only `VK_COLOR_SPACE_SRGB_NONLINEAR_KHR`; the Flatpak also grants `fallback-x11`, not a standing
+  X11 socket. Moving Runefin to X11 would need a permission change and still no HDR surface here.
+
+**Verdict:** no supported workaround exists for a native Wayland Flatpak launched from Gaming Mode.
+The only paths are Desktop Mode (supported today) or a Rune-level `frog_color_management_v1` /
+custom swapchain plus a `--expose-wayland` session — gamescope-specific, unverified, and outside
+the supported Steam tile. The issue is still open (last comment 2026-07-30).
+
 ---
 
 ## 3. What “deep integration” can mean — a ladder
