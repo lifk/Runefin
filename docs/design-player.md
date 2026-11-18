@@ -1,7 +1,8 @@
 # Runefin — the player, in-app, on Wayland, at 4K with HDR
 
-**Status:** decision proposed, awaiting your GPU/session answers. Supersedes D1 and D3 in
-`docs/design.md` (which said "no decoder in process, hand off to mpv").
+**Status:** accepted; the in-app player, DMA-BUF import, 4K decode and HDR output (scRGB) are
+shipped. Supersedes D1 and D3 in `docs/design.md` (which said "no decoder in process, hand off to
+mpv").
 
 **Decision in one line:** the player lives inside Runefin, one window, on Wayland; frames arrive
 as **DMA-BUF** and are imported into Rune's own Vulkan device; decoding is **GStreamer + VA-API**;
