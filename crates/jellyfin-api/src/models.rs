@@ -261,6 +261,19 @@ impl TrickplayInfo {
     }
 }
 
+/// The decoded size of a whole trickplay sprite, in pixels. A server can be configured with a
+/// 1280 set in 10×10 tiles, which is 12800×7200 (368 MB RGBA); the plan's 5×5 profile keeps the
+/// same 1280 thumbnails at 6400×3600. Refuse a set this client cannot upload without turning a
+/// scrub into a memory spike.
+const MAX_TRICKPLAY_SPRITE_PIXELS: u64 = 32_000_000;
+
+fn trickplay_sprite_pixels(info: &TrickplayInfo) -> u64 {
+    u64::from(info.width)
+        .saturating_mul(u64::from(info.tile_width.max(1)))
+        .saturating_mul(u64::from(info.height))
+        .saturating_mul(u64::from(info.tile_height.max(1)))
+}
+
 impl Item {
     /// The trickplay manifest to sample: the 640 px set when the server generated it,
     /// otherwise the widest one it has, so the choice never depends on map order.
@@ -277,6 +290,7 @@ impl Item {
             .values()
             .flat_map(|widths| widths.iter())
             .filter_map(|(key, info)| Some((key.parse().ok()?, info)))
+            .filter(|(_, info)| trickplay_sprite_pixels(info) <= MAX_TRICKPLAY_SPRITE_PIXELS)
             .collect();
         sets.sort_by_key(|(width, _)| *width);
         sets.iter()

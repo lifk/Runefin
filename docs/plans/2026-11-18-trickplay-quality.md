@@ -117,6 +117,9 @@ Set `TrickplayOptions` to:
   Images”, or the equivalent task). A `640`-only existing set is not upgraded automatically.
 - If `JpegQuality`/`Qscale` is raised for even better stills, bytes grow but decode stays the
   same; 90/4 is already good.
+- The client refuses a sprite larger than 32 megapixels: 1280 in 10×10 (368 MB) falls back to
+  640, while 1280 in 5×5 is accepted. A misconfigured width cannot turn a scrub into a memory
+  spike.
 
 This is the only change that makes a 320×180 preview genuinely sharp on a 4K TV.
 

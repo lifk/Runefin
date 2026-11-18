@@ -219,6 +219,32 @@ fn trickplay_can_ask_for_the_size_it_will_draw() {
 }
 
 #[test]
+fn a_sprite_too_large_to_decode_is_not_chosen() {
+    let body = r#"{"Id":"e1","Name":"Episode","Type":"Episode","Trickplay":{"e1":{
+      "640":{"Width":640,"Height":360,"TileWidth":10,"TileHeight":10,
+             "ThumbnailCount":100,"Interval":10000},
+      "1280":{"Width":1280,"Height":720,"TileWidth":10,"TileHeight":10,
+              "ThumbnailCount":100,"Interval":10000}}}}"#;
+    let item: Item = serde_json::from_str(body).expect("the trickplay body parses");
+    let (width, _) = item
+        .trickplay_manifest_for(960)
+        .expect("the sane set is used");
+    assert_eq!(width, 640, "1280 in 10x10 is 368 MB and is refused");
+
+    // 1280 in 5x5 is the same 6400x3600 sprite and is accepted.
+    let body = r#"{"Id":"e1","Name":"Episode","Type":"Episode","Trickplay":{"e1":{
+      "640":{"Width":640,"Height":360,"TileWidth":10,"TileHeight":10,
+             "ThumbnailCount":100,"Interval":10000},
+      "1280":{"Width":1280,"Height":720,"TileWidth":5,"TileHeight":5,
+              "ThumbnailCount":25,"Interval":10000}}}}"#;
+    let item: Item = serde_json::from_str(body).expect("the trickplay body parses");
+    let (width, _) = item
+        .trickplay_manifest_for(960)
+        .expect("the 5x5 set is used");
+    assert_eq!(width, 1280);
+}
+
+#[test]
 fn trickplay_falls_back_to_the_widest_set_deterministically() {
     let body = r#"{"Id":"e1","Name":"Episode","Type":"Episode","Trickplay":{"e1":{
       "160":{"Width":160,"Height":90,"TileWidth":5,"TileHeight":5,"ThumbnailCount":9,
