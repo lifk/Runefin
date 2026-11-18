@@ -162,6 +162,8 @@ covered by the debounce, and the playhead's own tile is prefetched.
   1280 5×5 profile both are 88 MB; two is 176 MB, so one may be the honest default on a Steam
   Machine. The previous **cell** (not the whole sprite) is much cheaper if crop-on-decode lands.
 - The disk cache should keep the full sprite bytes (2–3 MB) and trim by bytes, not 400 entries.
+  **Done:** the cache now holds 400 entries **and** 512 MiB, oldest first; a sprite-heavy session
+  can no longer squeeze out a library's posters by count alone.
 
 ### D. Crop-on-decode — only if larger tiles are required (M–L)
 

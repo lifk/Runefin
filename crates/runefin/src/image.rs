@@ -6,7 +6,7 @@
 //! visit to a screen reads the disk and never touches the network.
 
 use std::hash::{Hash, Hasher};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::net::ImageSource;
 
@@ -131,21 +131,25 @@ pub fn load_or_fetch(
         }
         // A failed cache write is not worth failing the image for; it will be fetched next time.
         let _ = std::fs::write(&path, &bytes);
-        trim_cache(400);
+        if let Some(dir) = cache_dir() {
+            trim_cache(&dir, CACHE_MAX_ENTRIES, CACHE_MAX_BYTES);
+        }
     }
     Ok(bytes)
 }
 
-/// Keep the poster cache bounded. Named for what it does, not for a timer: it runs after a
-/// write, on the image worker, and deletes the least recently modified files first.
-fn trim_cache(max_entries: usize) {
-    let Some(dir) = cache_dir() else {
+/// The disk cache's ceiling. Entries keep the listing cheap; bytes keep a few trickplay sprites
+/// (one 640 sprite is 2.3 MB, ten times a poster) from crowding out a library's art.
+const CACHE_MAX_ENTRIES: usize = 400;
+const CACHE_MAX_BYTES: u64 = 512 * 1024 * 1024;
+
+/// Keep the image cache bounded, oldest first. It runs after a write, on the image worker, and
+/// stops as soon as both ceilings hold, so trimming everything at once is not the common case.
+fn trim_cache(dir: &Path, max_entries: usize, max_bytes: u64) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
         return;
     };
-    let Ok(entries) = std::fs::read_dir(&dir) else {
-        return;
-    };
-    let mut files: Vec<(std::time::SystemTime, PathBuf)> = entries
+    let mut files: Vec<(std::time::SystemTime, u64, PathBuf)> = entries
         .flatten()
         .filter(|entry| {
             entry
@@ -154,17 +158,24 @@ fn trim_cache(max_entries: usize) {
                 .is_some_and(|extension| extension == "img")
         })
         .filter_map(|entry| {
-            let modified = entry.metadata().ok()?.modified().ok()?;
-            Some((modified, entry.path()))
+            let metadata = entry.metadata().ok()?;
+            Some((metadata.modified().ok()?, metadata.len(), entry.path()))
         })
         .collect();
-    if files.len() <= max_entries {
+    let mut over_entries = files.len().saturating_sub(max_entries);
+    let mut total: u64 = files.iter().map(|(_, bytes, _)| *bytes).sum();
+    if over_entries == 0 && total <= max_bytes {
         return;
     }
-    files.sort_by_key(|(modified, _)| *modified);
-    let excess = files.len() - max_entries;
-    for (_, path) in files.into_iter().take(excess) {
-        let _ = std::fs::remove_file(path);
+    files.sort_by_key(|(modified, _, _)| *modified);
+    for (_, bytes, path) in files {
+        if over_entries == 0 && total <= max_bytes {
+            break;
+        }
+        if std::fs::remove_file(path).is_ok() {
+            total = total.saturating_sub(bytes);
+            over_entries = over_entries.saturating_sub(1);
+        }
     }
 }
 
@@ -215,6 +226,42 @@ mod tests {
             key("http://a", "item-1", "Primary", None, 360),
             key("http://a", "item-1", "Primary", Some("no-tag"), 360)
         );
+    }
+
+    #[test]
+    fn the_disk_cache_trims_by_bytes_not_only_entries() {
+        let dir = std::env::temp_dir().join(format!(
+            "runefin-cache-test-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |elapsed| elapsed.as_nanos())
+        ));
+        std::fs::create_dir_all(&dir).expect("a temp cache dir");
+        for index in 0..6u8 {
+            let path = dir.join(format!("tile-{index}.img"));
+            std::fs::write(&path, vec![index; 1024]).expect("a cache file");
+            // Force a distinct, increasing mtime so the trim order is deterministic; a coarse
+            // filesystem clock would otherwise leave the oldest file ambiguous.
+            let stamp = std::time::UNIX_EPOCH
+                + std::time::Duration::from_secs(1_700_000_000 + u64::from(index));
+            let _ = std::fs::File::options()
+                .write(true)
+                .open(&path)
+                .and_then(|file| file.set_modified(stamp));
+        }
+        // Six 1 KiB files against a 2.5 KiB ceiling: two must survive, the newest ones.
+        trim_cache(&dir, 400, 2_560);
+        let mut names: Vec<String> = std::fs::read_dir(&dir)
+            .expect("list the cache dir")
+            .flatten()
+            .map(|entry| entry.file_name().to_string_lossy().into_owned())
+            .collect();
+        names.sort();
+        assert_eq!(names.len(), 2, "bytes bound the cache: {names:?}");
+        assert!(names.contains(&"tile-4.img".to_string()));
+        assert!(names.contains(&"tile-5.img".to_string()));
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
