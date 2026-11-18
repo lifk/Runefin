@@ -759,7 +759,8 @@ pub struct State {
     /// fresh frame is not a leave, so it must not clear a preview the scene seeded.
     in_app_hover_armed: bool,
     in_app_trickplay_key: Option<String>,
-    /// A tile fetch waiting for the pointer to settle; the old tile stays while it waits.
+    /// A tile fetch waiting for the pointer to settle. Nothing is queued while a drag is in
+    /// motion; the preview shows its loading card until the resting tile arrives.
     trickplay_due: Option<(Item, i64, Instant)>,
     pub in_app_launching: bool,
     pending_in_app: Option<PendingInApp>,
@@ -5413,16 +5414,21 @@ mod tests {
         item.trickplay = Some(crate::demo::trickplay_manifest());
         s.in_app_trickplay_key = Some("old-tile".into());
         s.ensure_trickplay_tile(&item, 16 * 60_000);
-        let (_, _, due) = s.trickplay_due.expect("a tile change is debounced");
+        let (_, _, due) = s.trickplay_due.clone().expect("a tile change is debounced");
         assert!(
             due > Instant::now(),
             "not fetched while the pointer is moving"
+        );
+        assert!(
+            s.trickplay_pending(),
+            "the host must keep a wake scheduled, or a resting pointer never loads"
         );
         // As if 140 ms passed without another move: the fetch is attempted (no session here,
         // so it stops after the request point, which is enough to prove the debounce fired).
         s.trickplay_due = Some((item, 16 * 60_000, Instant::now() - Duration::from_millis(1)));
         assert!(s.poll_trickplay());
         assert!(s.trickplay_due.is_none());
+        assert!(!s.trickplay_pending());
     }
 
     #[test]

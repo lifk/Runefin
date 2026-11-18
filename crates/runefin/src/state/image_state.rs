@@ -194,8 +194,8 @@ impl State {
     /// is a whole sprite (10×10 or 5×5), so a preview never asks for a second thumbnail endpoint.
     ///
     /// The first tile starts at once (a prefetch usually made it unnecessary). A tile change
-    /// waits a short beat so a fast drag cannot queue a sprite per 16 minutes crossed, and the
-    /// old tile is kept until the new one is actually requested.
+    /// waits a short beat so a fast drag cannot queue a sprite for every 16 minutes crossed; the
+    /// panel shows its loading card with the right time until the resting tile decodes.
     pub(crate) fn ensure_trickplay_tile(&mut self, item: &Item, ms: i64) {
         let min_width = self.in_app_trickplay_min_width();
         let Some((width, info)) = item.trickplay_manifest_for(min_width) else {
@@ -233,6 +233,11 @@ impl State {
                 Instant::now() + Duration::from_millis(140),
             ));
         }
+    }
+
+    /// Whether a debounced tile is waiting; the host keeps a wake scheduled while it is.
+    pub(crate) fn trickplay_pending(&self) -> bool {
+        self.trickplay_due.is_some()
     }
 
     /// The debounced fetch `poll` runs once the pointer has rested in a new tile.

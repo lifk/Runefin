@@ -176,6 +176,7 @@ render in-app-loop in-app-loop 1280 800
 render in-app-goto in-app-goto 1280 800
 render in-app-why in-app-why 1280 800
 render in-app-trickplay in-app-trickplay 1280 800
+render in-app-trickplay-loading in-app-trickplay-loading 1280 800
 render in-app-subtitles in-app-subtitles 1280 800
 render in-app-subtitle-style in-app-subtitle-style 1280 800
 render in-app-image-subtitle in-app-image-subtitle 1280 800

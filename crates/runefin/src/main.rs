@@ -296,6 +296,11 @@ fn poll(s: &mut State, _clock: f64, tx: &mut Tx) -> bool {
     if s.hover_preview.is_some() {
         tx.wake_after(std::time::Duration::from_millis(120));
     }
+    // The tile debounce is a timer, not an event: a pointer resting on the timeline must still
+    // wake the app when its 140 ms are up, or the preview never appears.
+    if s.trickplay_pending() {
+        tx.wake_after(std::time::Duration::from_millis(40));
+    }
     if let Some(key) = s.take_focus_key() {
         s.note_focus(key.clone());
         tx.focus_key(key);
@@ -940,6 +945,22 @@ fn in_app_trickplay_scene(s: &mut State) {
 
 #[cfg(not(debug_assertions))]
 fn in_app_trickplay_scene(_s: &mut State) {}
+
+/// The same hover before its sprite decoded: the panel keeps its size and shows the time, so
+/// a scrub never flashes a differently shaped box while a tile is in flight.
+#[cfg(debug_assertions)]
+fn in_app_trickplay_loading_scene(s: &mut State) {
+    demo::signed_in(s);
+    let mut session = demo::in_app();
+    session.item.trickplay = Some(demo::trickplay_manifest());
+    s.in_app = Some(session);
+    s.in_app_seek_width = 1232.0;
+    s.hover_in_app_seek(620.0);
+    s.osd_visible = true;
+}
+
+#[cfg(not(debug_assertions))]
+fn in_app_trickplay_loading_scene(_s: &mut State) {}
 
 #[cfg(debug_assertions)]
 fn in_app_subtitles_scene(s: &mut State) {
@@ -2213,6 +2234,7 @@ fn main() {
                 s.in_app_sleep_open = true;
             }),
             ("in-app-trickplay", in_app_trickplay_scene),
+            ("in-app-trickplay-loading", in_app_trickplay_loading_scene),
             ("in-app-subtitles", in_app_subtitles_scene),
             ("in-app-subtitle-style", in_app_subtitle_style_scene),
             ("in-app-image-subtitle", in_app_image_subtitle_scene),
