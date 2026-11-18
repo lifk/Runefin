@@ -190,32 +190,87 @@ impl State {
         ))
     }
 
-    /// Fetch only the trickplay tile under the pointer. A tile is a 10×10 sprite, so a preview
-    /// never asks the server for a second thumbnail endpoint.
+    /// Fetch the trickplay tile under the pointer, at the size this preview will draw. A tile
+    /// is a whole sprite (10×10 or 5×5), so a preview never asks for a second thumbnail endpoint.
+    ///
+    /// The first tile starts at once (a prefetch usually made it unnecessary). A tile change
+    /// waits a short beat so a fast drag cannot queue a sprite per 16 minutes crossed, and the
+    /// old tile is kept until the new one is actually requested.
     pub(crate) fn ensure_trickplay_tile(&mut self, item: &Item, ms: i64) {
+        let min_width = self.in_app_trickplay_min_width();
+        let Some((width, info)) = item.trickplay_manifest_for(min_width) else {
+            return;
+        };
+        let Some(key) = self.trickplay_key_for(item, ms, min_width) else {
+            return;
+        };
+        if self.in_app_trickplay_key.as_deref() == Some(key.as_str()) {
+            self.trickplay_due = None;
+            // A failed fetch clears its key from `requested_images`; the next resting pointer
+            // retries instead of leaving a permanently blank preview.
+            if !self.images.contains_key(&key) && !self.requested_images.contains(&key) {
+                self.fetch_trickplay_tile(item, ms, width, info, key);
+            }
+            return;
+        }
+        if self.images.contains_key(&key) || self.requested_images.contains(&key) {
+            // A prefetch or an earlier request already has this tile: adopt it now and drop
+            // the old sprite, which nothing will draw once the key moves.
+            if let Some(previous) = self.in_app_trickplay_key.replace(key)
+                && !previous.is_empty()
+            {
+                self.forget_image(&previous);
+            }
+            self.trickplay_due = None;
+            return;
+        }
+        if self.in_app_trickplay_key.is_none() {
+            self.fetch_trickplay_tile(item, ms, width, info, key);
+        } else {
+            self.trickplay_due = Some((
+                item.clone(),
+                ms,
+                Instant::now() + Duration::from_millis(140),
+            ));
+        }
+    }
+
+    /// The debounced fetch `poll` runs once the pointer has rested in a new tile.
+    pub(crate) fn poll_trickplay(&mut self) -> bool {
+        let Some((item, ms, due)) = self.trickplay_due.as_ref() else {
+            return false;
+        };
+        if Instant::now() < *due {
+            return false;
+        }
+        let (item, ms) = (item.clone(), *ms);
+        self.trickplay_due = None;
+        let min_width = self.in_app_trickplay_min_width();
+        if let Some((width, info)) = item.trickplay_manifest_for(min_width)
+            && let Some(key) = self.trickplay_key_for(&item, ms, min_width)
+        {
+            self.fetch_trickplay_tile(&item, ms, width, info, key);
+        }
+        true
+    }
+
+    fn fetch_trickplay_tile(
+        &mut self,
+        item: &Item,
+        ms: i64,
+        width: u32,
+        info: &jellyfin_api::TrickplayInfo,
+        key: String,
+    ) {
         let Some(client) = self.client() else {
             return;
         };
-        let Some((width, info)) = item.trickplay_manifest() else {
-            return;
-        };
-        let Some(key) = self.trickplay_key(item, ms) else {
-            return;
-        };
-        if self.images.contains_key(&key) || self.requested_images.contains(&key) {
-            return;
-        }
-        // A 640-wide tile is a 6400×3600 sprite. Keep only the tile under the pointer so
-        // scrubbing a long film cannot accumulate hundreds of megabytes of decoded frames.
+        // One sprite is tens of megabytes decoded. Keep only the tile under the pointer so a
+        // long scrub cannot accumulate a film's worth of frames.
         if let Some(previous) = self.in_app_trickplay_key.replace(key.clone())
             && previous != key
         {
-            self.images.remove(&previous);
-            self.placeholders.remove(&previous);
-            self.image_fades.remove(&previous);
-            self.image_order.retain(|old| old != &previous);
-            // Forgetting this let a tile evicted for memory never load again on a second pass.
-            self.requested_images.remove(&previous);
+            self.forget_image(&previous);
         }
         let tile = info.tile_of(info.thumbnail_at(ms));
         if let Some(url) = client.trickplay_url(&item.id, width, tile) {
@@ -259,6 +314,9 @@ impl State {
                         fallback,
                         priority,
                     );
+                } else if key.contains("-Trickplay-") {
+                    self.worker
+                        .request_trickplay_image(client.clone(), key, url, priority);
                 } else {
                     self.worker
                         .request_image(client.clone(), key, url, priority);

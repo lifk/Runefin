@@ -2140,16 +2140,29 @@ fn seek_preview(s: &State, session: &crate::state::InAppSession, _t: &tok::Theme
         .item
         .chapter_at(ms)
         .map(|chapter| chapter.name.clone());
+    let manifest = session
+        .item
+        .trickplay_manifest_for(s.in_app_trickplay_min_width());
+    // The panel is sized from the set the server actually has: 320×180 when a 960/1280 set can
+    // fill a 4K TV, 240×135 otherwise. 4:3 thumbnails keep their own height instead of being
+    // stretched into a 16:9 box.
+    let (preview_w, preview_h) = manifest
+        .map(|(_, info)| {
+            let width = if info.width >= 960 { 320.0 } else { 240.0 };
+            let height = width * info.height.max(1) as f32 / info.width.max(1) as f32;
+            (width, height)
+        })
+        .unwrap_or((240.0, 135.0));
     let frame = s.trickplay_key(&session.item, ms).and_then(|key| {
         let image = s.images.get(&key)?;
-        let (_, info) = session.item.trickplay_manifest()?;
+        let (_, info) = manifest?;
         let tile_width = info.tile_width.max(1);
         let tile_height = info.tile_height.max(1);
         let thumb_width = info.width.max(1);
         let thumb_height = info.height.max(1);
         let thumb = info.thumbnail_at(ms);
         let (column, row) = info.cell_of(thumb);
-        let scale = 240.0 / thumb_width as f32;
+        let scale = preview_w / thumb_width as f32;
         let sprite_width = thumb_width as f32 * tile_width as f32 * scale;
         let sprite_height = thumb_height as f32 * tile_height as f32 * scale;
         Some(
@@ -2162,12 +2175,13 @@ fn seek_preview(s: &State, session: &crate::state::InAppSession, _t: &tok::Theme
             .pixels_fit(image.pixels(), SurfaceFit::Fill),
         )
     });
-    // A 300-wide panel keeps 30 pt of margin around the 240×135 frame; 150 is its half.
-    let left = (x - 150.0).clamp(0.0, (s.in_app_seek_width - 300.0).max(0.0));
+    let panel_w = preview_w + 60.0;
+    let panel_h = preview_h + 39.0;
+    let left = (x - panel_w * 0.5).clamp(0.0, (s.in_app_seek_width - panel_w).max(0.0));
     let window = el()
         .absolute(30.0, 30.0)
-        .w(240.0)
-        .h(135.0)
+        .w(preview_w)
+        .h(preview_h)
         .radius(8.0)
         .clip_rounded(8.0)
         .fill(Color::BLACK)
@@ -2175,7 +2189,7 @@ fn seek_preview(s: &State, session: &crate::state::InAppSession, _t: &tok::Theme
         .shadow(0.0, 12.0, Color::BLACK.alpha(0.6));
     let window = match frame {
         Some(sprite) => window.child(sprite).child(
-            el().absolute(0.0, 107.0)
+            el().absolute(0.0, preview_h - 28.0)
                 .w_full()
                 .h(28.0)
                 .fill(Color::BLACK.alpha(0.66))
@@ -2185,6 +2199,24 @@ fn seek_preview(s: &State, session: &crate::state::InAppSession, _t: &tok::Theme
                         .key("in-app-trickplay-time")
                         .font(type_::mono_caption())
                         .color(Color::WHITE),
+                ),
+        ),
+        None if manifest.is_some() => window.fill(Color::WHITE.alpha(0.06)).child(
+            col()
+                .w_full()
+                .h_full()
+                .center()
+                .gap(4.0)
+                .child(
+                    text(format_time(ms))
+                        .key("in-app-trickplay-time")
+                        .font(type_::title())
+                        .color(Color::WHITE.alpha(0.92)),
+                )
+                .child(
+                    text("Loading preview…")
+                        .font(type_::mono_caption())
+                        .color(Color::WHITE.alpha(0.55)),
                 ),
         ),
         None => window.fill(Color::WHITE.alpha(0.06)).child(
@@ -2208,9 +2240,9 @@ fn seek_preview(s: &State, session: &crate::state::InAppSession, _t: &tok::Theme
     };
     Some(
         el().key("in-app-trickplay")
-            .absolute(left, -186.0)
-            .w(300.0)
-            .h(174.0)
+            .absolute(left, -(panel_h + 12.0))
+            .w(panel_w)
+            .h(panel_h)
             .inert()
             .children(chapter.map(|name| {
                 el().absolute(0.0, 0.0)

@@ -189,6 +189,36 @@ fn trickplay_picks_the_640_set_and_maps_time_to_its_tile_cell() {
 }
 
 #[test]
+fn trickplay_can_ask_for_the_size_it_will_draw() {
+    let body = r#"{"Id":"e1","Name":"Episode","Type":"Episode","Trickplay":{"e1":{
+      "640":{"Width":640,"Height":360,"TileWidth":10,"TileHeight":10,
+             "ThumbnailCount":100,"Interval":10000},
+      "1280":{"Width":1280,"Height":720,"TileWidth":5,"TileHeight":5,
+              "ThumbnailCount":25,"Interval":10000}}}}"#;
+    let item: Item = serde_json::from_str(body).expect("the trickplay body parses");
+    let (width, info) = item
+        .trickplay_manifest_for(960)
+        .expect("a manifest is chosen");
+    assert_eq!(width, 1280, "the TV preview asks for 1280");
+    assert_eq!(info.thumbnails_per_tile(), 25);
+    assert_eq!(info.cell_of(24), (4, 4));
+    // A desktop preview asking for 480 still gets 640, not the 4K set.
+    let (width, _) = item
+        .trickplay_manifest_for(480)
+        .expect("a manifest is chosen");
+    assert_eq!(width, 640);
+    // A server with only one set falls back to it rather than returning none.
+    let body = r#"{"Id":"e1","Name":"Episode","Type":"Episode","Trickplay":{"e1":{
+      "640":{"Width":640,"Height":360,"TileWidth":10,"TileHeight":10,
+             "ThumbnailCount":100,"Interval":10000}}}}"#;
+    let item: Item = serde_json::from_str(body).expect("the trickplay body parses");
+    let (width, _) = item
+        .trickplay_manifest_for(960)
+        .expect("the only set is used");
+    assert_eq!(width, 640);
+}
+
+#[test]
 fn trickplay_falls_back_to_the_widest_set_deterministically() {
     let body = r#"{"Id":"e1","Name":"Episode","Type":"Episode","Trickplay":{"e1":{
       "160":{"Width":160,"Height":90,"TileWidth":5,"TileHeight":5,"ThumbnailCount":9,

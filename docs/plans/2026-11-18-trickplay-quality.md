@@ -11,6 +11,12 @@ sharper preview needs a server-side trickplay profile. The best profile keeps th
 size as today: **1280×720 thumbnails in 5×5 tiles** (6400×3600, like the current 640 in 10×10),
 then the client loads that set for the TV. Client-side prefetch/debounce/fallback fixes the wait.
 
+**2026-11-18: the client half shipped** — prefetch at playback/OSD, 140 ms tile debounce, loading
+state instead of a blank card, stale-response drop, no placeholder decode for sprites, per-screen
+set choice (TV 960+/desktop 480), adaptive 320/240 preview, and a 256 MiB decoded-image budget.
+The server profile is still the only way to get sharper than 640; the client already takes 1280
+when it appears.
+
 ---
 
 ## 1. How it works now

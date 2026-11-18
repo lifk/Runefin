@@ -2492,6 +2492,7 @@ impl State {
     pub fn clear_in_app_hover(&mut self) {
         self.in_app_hover = None;
         self.in_app_hover_armed = false;
+        self.trickplay_due = None;
     }
 
     /// A leave event only clears a preview that a real pointer move put there.
@@ -2504,9 +2505,27 @@ impl State {
         }
     }
 
-    /// The tile key for the thumbnail at `ms`, if the item has a trickplay manifest.
+    /// The set the player's scrub preview should sample. A TV at 3× draws the 320 pt panel at
+    /// 960 device pixels, so it asks for 960+ and takes 1280 when the server has it; a desktop
+    /// preview is 240 pt and is served by 640. A server with only one set falls back to it.
+    pub(crate) fn in_app_trickplay_min_width(&self) -> u32 {
+        if self.big_screen { 960 } else { 480 }
+    }
+
+    /// A poster hover is CARD_W points wide; at 1× a 320 set is enough, on a TV 640 is the
+    /// matching one. Never ask a card for the 4K scrub set.
+    pub(crate) fn hover_trickplay_min_width(&self) -> u32 {
+        if self.big_screen { 640 } else { 320 }
+    }
+
+    /// The tile key for the thumbnail at `ms` at the preview's own size.
     pub fn trickplay_key(&self, item: &Item, ms: i64) -> Option<String> {
-        let (width, info) = item.trickplay_manifest()?;
+        self.trickplay_key_for(item, ms, self.in_app_trickplay_min_width())
+    }
+
+    /// The tile key for a specific set width.
+    pub fn trickplay_key_for(&self, item: &Item, ms: i64, min_width: u32) -> Option<String> {
+        let (width, info) = item.trickplay_manifest_for(min_width)?;
         let tile = info.tile_of(info.thumbnail_at(ms));
         Some(crate::image::key(
             &self.config.server_url,
@@ -2624,7 +2643,10 @@ impl State {
         self.pending_subtitle_before = None;
         self.in_app_hover = None;
         self.in_app_hover_armed = false;
-        self.in_app_trickplay_key = None;
+        if let Some(key) = self.in_app_trickplay_key.take() {
+            self.forget_image(&key);
+        }
+        self.trickplay_due = None;
         self.in_app_subtitle_load.cancel();
         self.in_app_streams_load.cancel();
         self.in_app_neighbours_load.cancel();

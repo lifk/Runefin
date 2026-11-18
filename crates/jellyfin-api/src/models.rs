@@ -265,6 +265,13 @@ impl Item {
     /// The trickplay manifest to sample: the 640 px set when the server generated it,
     /// otherwise the widest one it has, so the choice never depends on map order.
     pub fn trickplay_manifest(&self) -> Option<(u32, &TrickplayInfo)> {
+        self.trickplay_manifest_for(640)
+    }
+
+    /// The smallest set at least `min_width` wide, else the widest the server has. A caller
+    /// asks for the size it will actually draw (device pixels), not a fixed 640: the sprite
+    /// under a small poster need not be the one under a 4K TV's scrub preview.
+    pub fn trickplay_manifest_for(&self, min_width: u32) -> Option<(u32, &TrickplayInfo)> {
         let sets = self.trickplay.as_ref()?;
         let mut sets: Vec<(u32, &TrickplayInfo)> = sets
             .values()
@@ -273,7 +280,7 @@ impl Item {
             .collect();
         sets.sort_by_key(|(width, _)| *width);
         sets.iter()
-            .find(|(width, _)| *width == 640)
+            .find(|(width, _)| *width >= min_width)
             .or_else(|| sets.last())
             .map(|(width, info)| (*width, *info))
     }

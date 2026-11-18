@@ -34,6 +34,20 @@ const BACKDROP_WIDTH: u32 = 1600;
 const HOME_BACKDROP_WIDTH: u32 = 1280;
 /// Decoded posters held at once; evicting one drops its handles and frees its pixels.
 const IMAGE_CACHE_LIMIT: usize = 256;
+/// A decoded image cache in bytes, not handles: one 6400×3600 trickplay sprite is ~88 MB
+/// before mips, while a poster is a few hundred kilobytes. The count cap alone cannot bound
+/// the former. The mip chain is approximated at a third on top of the base pixels.
+const IMAGE_CACHE_BYTES: usize = 256 * 1024 * 1024;
+
+fn decoded_image_bytes(image: &Image) -> usize {
+    image.size().map_or(0, |[width, height]| {
+        (width as usize)
+            .saturating_mul(height as usize)
+            .saturating_mul(4)
+            .saturating_mul(4)
+            / 3
+    })
+}
 
 mod card_menu_state;
 mod detail_state;
@@ -745,6 +759,8 @@ pub struct State {
     /// fresh frame is not a leave, so it must not clear a preview the scene seeded.
     in_app_hover_armed: bool,
     in_app_trickplay_key: Option<String>,
+    /// A tile fetch waiting for the pointer to settle; the old tile stays while it waits.
+    trickplay_due: Option<(Item, i64, Instant)>,
     pub in_app_launching: bool,
     pending_in_app: Option<PendingInApp>,
     waker: Option<rune::Waker>,
@@ -1149,6 +1165,7 @@ impl State {
             in_app_seek_width: 0.0,
             in_app_hover_armed: false,
             in_app_trickplay_key: None,
+            trickplay_due: None,
             in_app_launching: false,
             pending_in_app: None,
             waker: None,
@@ -2153,6 +2170,18 @@ impl State {
             self.apply_deep_link_item(item);
             deep_linked = true;
         }
+        let trickplay_changed = self.poll_trickplay();
+        // With the player's chrome up, warm the tile under the playhead before a pointer reaches
+        // the timeline. A prefetched tile is already current; a different one waits for a hover.
+        if self.in_app.is_some()
+            && self.osd_visible
+            && self.in_app_hover.is_none()
+            && self.in_app_trickplay_key.is_none()
+            && let Some(session) = &self.in_app
+        {
+            let (item, ms) = (session.item.clone(), session.position_ms);
+            self.ensure_trickplay_tile(&item, ms);
+        }
         let mut revealed = false;
         self.image_fades.retain(|_, started| {
             if started.elapsed() >= Duration::from_millis(120) {
@@ -2163,7 +2192,8 @@ impl State {
             }
         });
         let messages = self.worker.drain();
-        let mut changed = booted || deep_linked || revealed || !messages.is_empty();
+        let mut changed =
+            booted || deep_linked || trickplay_changed || revealed || !messages.is_empty();
         let tray_events: Vec<rune::TrayEvent> = self
             .tray_events
             .lock()
@@ -2212,6 +2242,7 @@ impl State {
         for message in messages {
             self.apply(message);
         }
+        self.trim_image_cache();
         if let Some(watching) = self.home_watching.take() {
             changed = true;
             match watching {
@@ -2670,53 +2701,40 @@ impl State {
                 key,
                 bytes,
                 placeholder,
-            } => match (bytes, &self.image_cache) {
-                (Ok(bytes), Some(cache)) => {
-                    let image = cache.load(bytes);
-                    let first = self.images.insert(key.clone(), image).is_none();
-                    if let Some(rgba) = placeholder {
-                        let pixels = Pixels::new();
-                        pixels.set(
-                            crate::image::PLACEHOLDER_WIDTH,
-                            crate::image::PLACEHOLDER_HEIGHT,
-                            rgba,
-                        );
-                        self.placeholders.insert(key.clone(), pixels);
-                    }
-                    if first {
-                        self.image_order.push_back(key.clone());
-                        if self.placeholders.contains_key(&key) {
-                            self.image_fades.insert(key, Instant::now());
-                        }
-                    }
-                    // Evict around the current screen: skip a key the screen is showing and
-                    // take the next oldest. If everything left is current, the oldest goes.
-                    let mut scanned = 0usize;
-                    while self.images.len() > IMAGE_CACHE_LIMIT {
-                        let Some(old) = self.image_order.pop_front() else {
-                            break;
-                        };
-                        if self.current_images.contains(&old) && scanned < self.image_order.len() {
-                            self.image_order.push_back(old);
-                            scanned += 1;
-                            continue;
-                        }
-                        scanned = 0;
-                        if self.images.remove(&old).is_some() {
-                            // A later visible-row pass may ask for it again.
-                            self.requested_images.remove(&old);
-                            self.current_images.remove(&old);
-                            self.placeholders.remove(&old);
-                            self.image_fades.remove(&old);
-                        }
-                    }
+            } => {
+                // A tile evicted while its request was in flight must not come back: the
+                // request set is forgotten by `forget_image` before the answer lands.
+                if !self.requested_images.contains(&key) {
+                    return;
                 }
-                // Let the next visible/page pass retry a failed fetch.
-                (Err(_), _) => {
-                    self.requested_images.remove(&key);
+                match (bytes, &self.image_cache) {
+                    (Ok(bytes), Some(cache)) => {
+                        let image = cache.load(bytes);
+                        let first = self.images.insert(key.clone(), image).is_none();
+                        if let Some(rgba) = placeholder {
+                            let pixels = Pixels::new();
+                            pixels.set(
+                                crate::image::PLACEHOLDER_WIDTH,
+                                crate::image::PLACEHOLDER_HEIGHT,
+                                rgba,
+                            );
+                            self.placeholders.insert(key.clone(), pixels);
+                        }
+                        if first {
+                            self.image_order.push_back(key.clone());
+                            if self.placeholders.contains_key(&key) {
+                                self.image_fades.insert(key, Instant::now());
+                            }
+                        }
+                        self.trim_image_cache();
+                    }
+                    // Let the next visible/page pass retry a failed fetch.
+                    (Err(_), _) => {
+                        self.requested_images.remove(&key);
+                    }
+                    _ => {}
                 }
-                _ => {}
-            },
+            }
             Msg::Playback { generation, event } => self.on_playback_event(generation, event),
             Msg::Reported { kind, result } => self.on_reported(kind, result),
             Msg::Remote(result) => self.remote_command_finished(result),
@@ -3739,6 +3757,36 @@ impl State {
         self.image_fades.remove(key);
         self.image_order.retain(|old| old != key);
         self.requested_images.remove(key);
+        self.current_images.remove(key);
+    }
+
+    /// Evict around the current screen until both the handle cap and the byte budget hold.
+    /// Pending images have no size yet; the frame that wakes after their decode trims again.
+    fn trim_image_cache(&mut self) {
+        if self.images.is_empty() {
+            return;
+        }
+        let mut total: usize = self.images.values().map(decoded_image_bytes).sum();
+        let mut scanned = 0usize;
+        while self.images.len() > IMAGE_CACHE_LIMIT || total > IMAGE_CACHE_BYTES {
+            let Some(old) = self.image_order.pop_front() else {
+                break;
+            };
+            if self.current_images.contains(&old) && scanned < self.image_order.len() {
+                self.image_order.push_back(old);
+                scanned += 1;
+                continue;
+            }
+            scanned = 0;
+            if let Some(image) = self.images.remove(&old) {
+                total = total.saturating_sub(decoded_image_bytes(&image));
+                // A later visible-row pass may ask for it again.
+                self.requested_images.remove(&old);
+                self.current_images.remove(&old);
+                self.placeholders.remove(&old);
+                self.image_fades.remove(&old);
+            }
+        }
     }
 
     /// Fetch the manifest once, then one tile at a time. Returns true when the drawn frame
@@ -3805,8 +3853,9 @@ impl State {
     }
 
     fn ensure_hover_tile(&mut self, item: &Item, ms: i64) -> Option<String> {
-        let (width, info) = item.trickplay_manifest()?;
-        let key = self.trickplay_key(item, ms)?;
+        let min_width = self.hover_trickplay_min_width();
+        let (width, info) = item.trickplay_manifest_for(min_width)?;
+        let key = self.trickplay_key_for(item, ms, min_width)?;
         if !self.images.contains_key(&key) && !self.requested_images.contains(&key) {
             let client = self.client()?;
             let tile = info.tile_of(info.thumbnail_at(ms));
@@ -5178,6 +5227,7 @@ mod tests {
             in_app_seek_width: 0.0,
             in_app_hover_armed: false,
             in_app_trickplay_key: None,
+            trickplay_due: None,
             in_app_launching: false,
             pending_in_app: None,
             waker: None,
@@ -5333,12 +5383,67 @@ mod tests {
     }
 
     #[test]
+    fn a_late_image_for_a_forgotten_key_is_dropped() {
+        let mut s = state();
+        s.image_cache = Some(ImageCache::new(Arc::new(|| {})));
+        s.apply(Msg::Image {
+            key: "late-tile".into(),
+            bytes: Ok(vec![0]),
+            placeholder: None,
+        });
+        assert!(
+            !s.images.contains_key("late-tile"),
+            "an answer for a key nobody requests must not resurrect it"
+        );
+    }
+
+    #[test]
+    fn the_image_cache_counts_decoded_bytes() {
+        let cache = ImageCache::new(Arc::new(|| {}));
+        let pixels = vec![0; 64 * 64 * 4];
+        let image = cache.rgba(64, 64, pixels);
+        image.wait().expect("the RGBA image decodes");
+        assert_eq!(decoded_image_bytes(&image), (64 * 64 * 4) * 4 / 3);
+    }
+
+    #[test]
+    fn a_tile_change_waits_for_the_pointer_to_settle() {
+        let mut s = state();
+        let mut item = crate::demo::in_app().item;
+        item.trickplay = Some(crate::demo::trickplay_manifest());
+        s.in_app_trickplay_key = Some("old-tile".into());
+        s.ensure_trickplay_tile(&item, 16 * 60_000);
+        let (_, _, due) = s.trickplay_due.expect("a tile change is debounced");
+        assert!(
+            due > Instant::now(),
+            "not fetched while the pointer is moving"
+        );
+        // As if 140 ms passed without another move: the fetch is attempted (no session here,
+        // so it stops after the request point, which is enough to prove the debounce fired).
+        s.trickplay_due = Some((item, 16 * 60_000, Instant::now() - Duration::from_millis(1)));
+        assert!(s.poll_trickplay());
+        assert!(s.trickplay_due.is_none());
+    }
+
+    #[test]
+    fn trickplay_width_follows_the_screen_it_draws_on() {
+        let mut s = state();
+        assert_eq!(s.in_app_trickplay_min_width(), 480, "desktop preview");
+        assert_eq!(s.hover_trickplay_min_width(), 320, "desktop card");
+        s.big_screen = true;
+        assert_eq!(s.in_app_trickplay_min_width(), 960, "TV scrub preview");
+        assert_eq!(s.hover_trickplay_min_width(), 640, "TV card");
+    }
+
+    #[test]
     fn decoded_images_are_bounded_and_failed_fetches_can_retry() {
         let mut s = state();
         s.image_cache = Some(ImageCache::new(Arc::new(|| {})));
         for index in 0..(IMAGE_CACHE_LIMIT + 10) {
+            let key = format!("image-{index}");
+            s.requested_images.insert(key.clone());
             s.apply(Msg::Image {
-                key: format!("image-{index}"),
+                key,
                 bytes: Ok(vec![0]),
                 placeholder: None,
             });
@@ -5365,8 +5470,10 @@ mod tests {
             placeholder: None,
         });
         for index in 0..(IMAGE_CACHE_LIMIT + 10) {
+            let key = format!("other-{index}");
+            s.requested_images.insert(key.clone());
             s.apply(Msg::Image {
-                key: format!("other-{index}"),
+                key,
                 bytes: Ok(vec![0]),
                 placeholder: None,
             });
@@ -5382,6 +5489,7 @@ mod tests {
     fn a_placeholder_lifts_after_the_short_blur_beat() {
         let mut s = state();
         s.image_cache = Some(ImageCache::new(Arc::new(|| {})));
+        s.requested_images.insert("poster".into());
         s.apply(Msg::Image {
             key: "poster".into(),
             bytes: Ok(vec![0]),

@@ -115,6 +115,9 @@ struct ImageRequest {
     /// Tried when the first URL answers with an empty body. Jellyfin's home server has a few
     /// items whose Primary image is 0 bytes while their Backdrop is fine.
     fallback_url: Option<String>,
+    /// Decode the 27×17 poster placeholder too. A trickplay sprite is tens of megabytes and
+    /// its preview never fades in as a poster, so it opts out.
+    placeholder: bool,
 }
 
 #[derive(Default)]
@@ -160,10 +163,15 @@ fn image_worker(
             started.elapsed().as_millis().min(u128::from(u64::MAX)) as u64,
             Ordering::Relaxed,
         );
-        let placeholder = bytes
-            .as_ref()
-            .ok()
-            .and_then(|bytes| crate::image::placeholder(bytes).ok());
+        let placeholder = request
+            .placeholder
+            .then(|| {
+                bytes
+                    .as_ref()
+                    .ok()
+                    .and_then(|bytes| crate::image::placeholder(bytes).ok())
+            })
+            .flatten();
         if let Ok(mut queue) = queue.lock() {
             queue.push(Msg::Image {
                 key: request.key,
@@ -241,7 +249,32 @@ impl Worker {
 
     /// Queue one Jellyfin poster. The worker reads the disk cache first and only then the network.
     pub fn request_image(&self, client: Client, key: String, url: String, priority: ImagePriority) {
-        self.push_image(ImageSource::Jellyfin(client), key, url, None, priority);
+        self.push_image(
+            ImageSource::Jellyfin(client),
+            key,
+            url,
+            None,
+            priority,
+            true,
+        );
+    }
+
+    /// A trickplay sprite: never decode the poster placeholder for it.
+    pub fn request_trickplay_image(
+        &self,
+        client: Client,
+        key: String,
+        url: String,
+        priority: ImagePriority,
+    ) {
+        self.push_image(
+            ImageSource::Jellyfin(client),
+            key,
+            url,
+            None,
+            priority,
+            false,
+        );
     }
 
     /// A poster with a second URL for the empty-body case (a broken Primary, a valid Backdrop).
@@ -259,12 +292,13 @@ impl Worker {
             url,
             Some(fallback),
             priority,
+            true,
         );
     }
 
     /// Queue one public (TMDB) poster. No Jellyfin client and no token.
     pub fn request_public_image(&self, key: String, url: String, priority: ImagePriority) {
-        self.push_image(ImageSource::Public, key, url, None, priority);
+        self.push_image(ImageSource::Public, key, url, None, priority, true);
     }
 
     fn push_image(
@@ -274,6 +308,7 @@ impl Worker {
         url: String,
         fallback_url: Option<String>,
         priority: ImagePriority,
+        placeholder: bool,
     ) {
         let (slot, ready) = &*self.images;
         let mut slot = slot.lock().unwrap_or_else(|e| e.into_inner());
@@ -282,6 +317,7 @@ impl Worker {
             key,
             url,
             fallback_url,
+            placeholder,
         };
         match priority {
             ImagePriority::High => slot.high.push_back(request),
@@ -563,6 +599,7 @@ mod tests {
                 key: key.into(),
                 url: String::new(),
                 fallback_url: None,
+                placeholder: true,
             };
             match priority {
                 ImagePriority::High => queue.high.push_back(request),

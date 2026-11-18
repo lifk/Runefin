@@ -2658,7 +2658,7 @@ pub(super) fn card(item: &Item, rail: &str, s: &State, t: &tok::Theme) -> El {
         && let Some(key) = preview.tile.as_deref()
         && let Some(image) = s.images.get(key)
         && let Some(manifest) = preview.item.as_ref()
-        && let Some((_, info)) = manifest.trickplay_manifest()
+        && let Some((_, info)) = manifest.trickplay_manifest_for(s.hover_trickplay_min_width())
     {
         let frame_ms = preview.frame_ms;
         let (column, row) = info.cell_of(info.thumbnail_at(frame_ms));
