@@ -1,11 +1,12 @@
 [Desktop Entry]
 Name=Runefin
 Comment=Jellyfin client for the desktop and the big screen
-Exec=runefin
+Exec=runefin %u
 Icon=io.github.lifk.Runefin
 Terminal=false
 Type=Application
 Categories=AudioVideo;Video;Player;TV;
+MimeType=x-scheme-handler/runefin;
 Keywords=jellyfin;media;player;tv;
 StartupNotify=true
 StartupWMClass=runefin

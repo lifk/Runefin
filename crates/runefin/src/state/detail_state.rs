@@ -1120,3 +1120,43 @@ mod playlist_removal_tests {
         assert_eq!(on_server.expect("read"), 1, "and the server agrees");
     }
 }
+
+impl State {
+    /// A `runefin://` link from the system: parse happened before this. Before sign-in or the
+    /// home boot it waits, so a link that launched the app still lands on the item.
+    pub fn open_deep_link(&mut self, link: crate::deep_link::DeepLink) {
+        if !self.fetch_home || !self.is_signed_in() {
+            self.pending_deep_link = Some(link);
+            return;
+        }
+        self.apply_deep_link(link);
+    }
+
+    pub(super) fn apply_deep_link(&mut self, link: crate::deep_link::DeepLink) {
+        if self.in_app.is_some() {
+            self.show_toast("A film is playing. Close it before opening that link.");
+            return;
+        }
+        match link {
+            crate::deep_link::DeepLink::Item(id) => self.open_detail(id),
+            crate::deep_link::DeepLink::Play(id) => {
+                let Some(client) = self.client() else {
+                    self.show_toast("Sign in to open that link.");
+                    return;
+                };
+                self.deep_link_load.request(id, move |id| {
+                    client.item(&id).map_err(|error| error.user_message())
+                });
+            }
+        }
+    }
+
+    /// A `runefin://play/<id>` fetch landed: play a film/episode, or show a series/folder.
+    pub(super) fn apply_deep_link_item(&mut self, item: Result<Item, String>) {
+        match item {
+            Ok(item) if item.primary_media_source().is_some() => self.play_in_app(item),
+            Ok(item) => self.open_detail(item.id),
+            Err(message) => self.show_toast(message),
+        }
+    }
+}

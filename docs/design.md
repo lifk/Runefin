@@ -454,6 +454,7 @@ no second decoder or async runtime.
 crates/runefin
   main.rs        AppSpec: setup(waker), poll(state, clock, Tx) -> bool
   state.rs       App state + Msg enum + the navigation stack
+  deep_link.rs   the `runefin://` grammar (item/play) and its validation
   state/seerr_state.rs  Seerr Settings buffers + connection probe
   net.rs         every call that can block: Jellyfin/Seerr requests, image fetch, mpv spawn/IPC
   image.rs       fetch → disk cache → ImageCache::load(bytes)
@@ -483,6 +484,13 @@ blocks; `poll` drains finished work and returns `true` only when something visib
 El`. Navigation is a `Vec<Route>` of `(route, scroll, focus_key)`. No global singletons, no
 observable graph — Rune's model is "re-run the view between frames, retarget property tracks", and
 that is the whole state story.
+
+**External links.** `runefin://item/<id>` opens an item and `runefin://play/<id>` starts it (or
+opens it when it has no media source). Rune's `App::on_open_url` and `single_instance` deliver the
+link that launched the app and the link of a later launch; `deep_link.rs` accepts only those two
+hosts and a Jellyfin id, and the app defers a link until sign-in/home rather than guessing. A link
+that arrives while a film plays is refused with a visible message, so a remote control cannot
+silently replace the current session. The scheme is registered by the exported desktop entry.
 
 **Persistence.**
 - `~/.config/runefin/config.toml` — server URL, user id, token (0600), device id, player args,

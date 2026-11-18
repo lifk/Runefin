@@ -421,6 +421,10 @@ pub struct State {
     person_latest: Latest<Result<PersonLoad, String>>,
     seerr_person_load: Latest<Result<PersonBundle, String>>,
     pub detail_page: Latest<DetailPage>,
+    /// A `runefin://play/<id>` link's item fetch, before it becomes a player.
+    deep_link_load: Latest<Result<Item, String>>,
+    /// A link that arrived before sign-in/home, applied once both are ready.
+    pending_deep_link: Option<crate::deep_link::DeepLink>,
     /// "More like this" loads beside the page: recommendations must never delay the hero.
     detail_similar_load: Latest<Result<Vec<Item>, String>>,
     /// The item the pending recommendations belong to, so a late answer for a page the reader
@@ -908,6 +912,8 @@ impl State {
             person_latest: Latest::default(),
             seerr_person_load: Latest::default(),
             detail_page: Latest::default(),
+            deep_link_load: Latest::default(),
+            pending_deep_link: None,
             detail_similar_load: Latest::default(),
             detail_similar_for: None,
             detail_episodes: Latest::default(),
@@ -2007,6 +2013,7 @@ impl State {
         self.cast_send_load.set_waker(waker.clone());
         self.discovery_load.set_waker(waker.clone());
         self.detail_page.set_waker(waker.clone());
+        self.deep_link_load.set_waker(waker.clone());
         self.detail_similar_load.set_waker(waker.clone());
         self.detail_imdb_load.set_waker(waker.clone());
         self.detail_extras_load.set_waker(waker.clone());
@@ -2132,6 +2139,20 @@ impl State {
             self.load_home();
             booted = true;
         }
+        // A link that launched the app waits for sign-in; one that arrived while signed in
+        // applies on this frame either way.
+        let mut deep_linked = false;
+        if self.fetch_home
+            && self.is_signed_in()
+            && let Some(link) = self.pending_deep_link.take()
+        {
+            self.apply_deep_link(link);
+            deep_linked = true;
+        }
+        if let Some(item) = self.deep_link_load.take() {
+            self.apply_deep_link_item(item);
+            deep_linked = true;
+        }
         let mut revealed = false;
         self.image_fades.retain(|_, started| {
             if started.elapsed() >= Duration::from_millis(120) {
@@ -2142,7 +2163,7 @@ impl State {
             }
         });
         let messages = self.worker.drain();
-        let mut changed = booted || revealed || !messages.is_empty();
+        let mut changed = booted || deep_linked || revealed || !messages.is_empty();
         let tray_events: Vec<rune::TrayEvent> = self
             .tray_events
             .lock()
@@ -4931,6 +4952,8 @@ mod tests {
             person_latest: Latest::default(),
             seerr_person_load: Latest::default(),
             detail_page: Latest::default(),
+            deep_link_load: Latest::default(),
+            pending_deep_link: None,
             detail_similar_load: Latest::default(),
             detail_similar_for: None,
             detail_episodes: Latest::default(),
@@ -5584,6 +5607,22 @@ mod tests {
         s.cycle_text_scale();
         assert_eq!(s.text_scale, 1.0);
         crate::theme::set_text_scale(1.0);
+    }
+
+    #[test]
+    fn a_deep_link_waits_for_sign_in_before_it_navigates() {
+        let mut s = state();
+        let link = crate::deep_link::DeepLink::Item("8f2a1c4e5b6d7f8091a2b3c4d5e6f708".into());
+        s.open_deep_link(link.clone());
+        assert_eq!(
+            s.pending_deep_link,
+            Some(link),
+            "the link is kept, not dropped"
+        );
+        assert!(
+            s.detail.is_none(),
+            "nothing opens before there is a session"
+        );
     }
 
     #[test]

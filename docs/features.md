@@ -409,6 +409,10 @@ separate window. `scripts/check.sh` builds it; the player's contract is
   missing, an `org.freedesktop.login1.Inhibit` call through D-Bus takes its place.
 - **Tray icon**: play/pause, next, previous, stop, **Show Runefin** and **Quit**; clicking the
   icon raises the window.
+- **`runefin://` links**: `item/<id>` opens an item and `play/<id>` starts it (or opens its page
+  when it is a series or folder). The scheme is registered by the exported desktop entry, a
+  second launch is handed to the running instance, and a link that arrives before sign-in waits
+  instead of being dropped. A link while a film plays is refused with a visible message.
 - **MPRIS2** on the session bus: identity, PlaybackStatus, title/series/album, length,
   position, volume, rate, seek, next/previous, and the root `Fullscreen`, `Quit` and `Raise`
   actions. The desktop-entry id matches the installed `io.github.lifk.Runefin.desktop`.

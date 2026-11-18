@@ -12,6 +12,7 @@ mod audio_probe;
 mod bench;
 mod checkpoint;
 mod config;
+mod deep_link;
 mod demo;
 mod detail;
 mod discovery;
@@ -234,6 +235,15 @@ fn setup(s: &mut State, waker: rune::Waker) {
 }
 
 /// Every frame. Drains finished work; true only when something visible changed.
+/// `runefin://` links from the system. Rune hands over the link that launched the app and,
+/// through `single_instance`, the link of a later launch; parsing and refusing invalid shapes
+/// happens here, before any state changes.
+fn open_url(s: &mut State, url: &str, _tx: &mut Tx) {
+    if let Some(link) = crate::deep_link::DeepLink::parse(url) {
+        s.open_deep_link(link);
+    }
+}
+
 fn poll(s: &mut State, _clock: f64, tx: &mut Tx) -> bool {
     let started = std::time::Instant::now();
     let mut changed = s.poll();
@@ -2243,6 +2253,7 @@ fn main() {
     })
     .tab_visits_controls(true)
     .hdr(startup.hdr().into())
+    .on_open_url(open_url)
     .on_window(move |window| {
         // A launch from a terminal or another app can create the window without focus. Ask
         // for it once the native window exists, then once more after the host has settled.
