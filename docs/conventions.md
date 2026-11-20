@@ -30,7 +30,7 @@ exist because Rune's author enforces the same ones upstream.
 
 ## Releases
 
-- **A green `main` publishes.** The release workflow runs after CI succeeds on a push to `main`:
+- **A green `main` publishes.** The `release` job in CI runs after the checks pass on a push to `main`:
   it builds the Flatpak, signs it, replaces the `gh-pages` repository, tags the commit if no tag
   exists, and attaches the bundle to the GitHub release. A `v*` tag or a dispatch with a tag does
   the same for an already-tagged commit; a version that already has a release is skipped.

@@ -85,7 +85,7 @@ a new `.flatpakrepo` and telling users to re-add it.
 
 ### Publishing a release
 
-A push to `main` runs `.github/workflows/release.yml` once CI on that commit is green: it builds
+A push to `main` that passes CI releases it — the `release` job in `.github/workflows/ci.yml` builds
 against Freedesktop 26.08 inside the sandbox, signs with the release key, replaces `gh-pages`, and
 attaches `Runefin-<version>-x86_64.flatpak` to a GitHub release. The version comes from
 `Cargo.toml`, so shipping a change means bumping it in the same commit alongside the metainfo

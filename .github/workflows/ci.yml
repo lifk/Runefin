@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: [main]
+    tags: ["v*"]
   pull_request:
   workflow_dispatch:
 
@@ -93,3 +94,150 @@ jobs:
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  release:
+    name: Release
+    # Only a green main (or a tag) publishes. The version lives in Cargo.toml, so a change that
+    # ships bumps it, adds the metainfo entry and docs/releases/<version>.md, and re-renders the
+    # settings snapshot. A version that already has a release is skipped, which makes a re-run,
+    # a tag push and a main push of one commit all safe.
+    needs: [check, hardening]
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    concurrency:
+      group: release
+      cancel-in-progress: false
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Decide whether this commit is a release
+        id: meta
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(sed -n 's/^version = "\([^"]*\)"/\1/p' Cargo.toml | head -1)
+          [ -n "$version" ] || { echo "no version in Cargo.toml"; exit 1; }
+          tag="v$version"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "### $tag already has a release" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          # A tag must name the version in the commit it points at, and the commit must be on main.
+          if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+            [ "$(git rev-parse "$tag^{commit}")" = "$(git rev-parse HEAD)" ] || {
+              echo "tag $tag does not point at this commit" >&2; exit 1; }
+          fi
+          git fetch --no-tags origin main
+          git merge-base --is-ancestor HEAD FETCH_HEAD || {
+            echo "$tag is not on main" >&2; exit 1; }
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Install Flatpak, the builder and the SDK
+        if: steps.meta.outputs.skip != 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends flatpak flatpak-builder gnupg
+          sudo flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+          sudo flatpak install -y --noninteractive --arch=x86_64 flathub \
+            org.flatpak.Builder \
+            org.freedesktop.Sdk//26.08 \
+            org.freedesktop.Platform//26.08 \
+            org.freedesktop.Sdk.Extension.rust-stable//26.08
+
+      - name: Restore the release key
+        if: steps.meta.outputs.skip != 'true'
+        env:
+          KEYRING: ${{ secrets.FLATPAK_GPG_KEYRING }}
+        run: |
+          [ -n "$KEYRING" ] || {
+            echo "missing repository secret FLATPAK_GPG_KEYRING" >&2
+            echo 'expected: tar -C ~/.local/share/runefin/release-gnupg -czf - . | base64 -w0' >&2
+            exit 1
+          }
+          umask 077
+          mkdir -p "$RUNNER_TEMP/keyring"
+          printf '%s' "$KEYRING" | base64 -d | tar -C "$RUNNER_TEMP/keyring" -xzf -
+          chmod 700 "$RUNNER_TEMP/keyring"
+
+      - name: Build and sign the bundle
+        if: steps.meta.outputs.skip != 'true'
+        env:
+          GNUPGHOME: ${{ runner.temp }}/keyring
+          FLATPAK_REPO_URL: https://lifk.github.io/Runefin/
+        run: |
+          key=$(gpg --list-secret-keys --with-colons | awk -F: '/^sec:/{print $5; exit}')
+          [ -n "$key" ] || { echo "no secret key in the restored keyring"; exit 1; }
+          # The committed public half is what clients verify against: a different key here would
+          # sign a summary the .flatpakrepo does not list.
+          committed=$(gpg --show-keys --with-colons packaging/flatpak/runefin-releases.gpg 2>/dev/null \
+            | awk -F: '/^fpr:/{print $10; exit}')
+          signing=$(gpg --with-colons --list-keys "$key" | awk -F: '/^fpr:/{print $10; exit}')
+          [ "$committed" = "$signing" ] || {
+            echo "runefin-releases.gpg ($committed) is not the signing key ($signing)" >&2
+            exit 1
+          }
+          # The runner has 4 vCPUs and 16 GB; the manifest's 16 jobs is tuned for the 32-thread
+          # laptop and would oversubscribe this host. Jobs do not change the built bytes.
+          sed -i 's/CARGO_BUILD_JOBS: "16"/CARGO_BUILD_JOBS: "4"/' packaging/flatpak/io.github.lifk.Runefin.yml
+          FLATPAK_GPG_KEY="$key" \
+          FLATPAK_GPG_KEY_FILE="$PWD/packaging/flatpak/runefin-releases.gpg" \
+            ./packaging/flatpak/build.sh
+
+      - name: Publish the hosted repository
+        if: steps.meta.outputs.skip != 'true'
+        env:
+          RUNEFIN_REPO_URL: https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git
+        run: ./scripts/publish-flatpak-repo.sh
+
+      - name: Attach the bundle and publish the release
+        if: steps.meta.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag='${{ steps.meta.outputs.tag }}'
+          version='${{ steps.meta.outputs.version }}'
+          bundle="dist/Runefin-${version}-x86_64.flatpak"
+          cp dist/Runefin.flatpak "$bundle"
+          # The tag can predate its notes; the copy on main is the fallback.
+          notes=""
+          if [ -f "docs/releases/${version}.md" ]; then
+            notes="docs/releases/${version}.md"
+          elif git cat-file -e "origin/main:docs/releases/${version}.md" 2>/dev/null; then
+            git show "origin/main:docs/releases/${version}.md" > "$RUNNER_TEMP/notes.md"
+            notes="$RUNNER_TEMP/notes.md"
+          fi
+          # A new release gets its tag from here when nobody pushed one; an existing tag is used
+          # as it is, and a re-run repairs the asset and the notes instead of failing.
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" "$bundle" --clobber
+            if [ -n "$notes" ]; then
+              gh release edit "$tag" --title "Runefin $version" --notes-file "$notes"
+            fi
+          else
+            target=()
+            git rev-parse -q --verify "refs/tags/$tag" >/dev/null || target=(--target "$(git rev-parse HEAD)")
+            if [ -n "$notes" ]; then
+              gh release create "$tag" "$bundle" --title "Runefin $version" \
+                --notes-file "$notes" "${target[@]}"
+            else
+              gh release create "$tag" "$bundle" --title "Runefin $version" \
+                --generate-notes "${target[@]}"
+            fi
+          fi
+
+      - name: Summary
+        if: steps.meta.outputs.skip != 'true'
+        run: |
+          {
+            echo "### Runefin ${{ steps.meta.outputs.version }}"
+            echo
+            echo "- bundle: \`dist/Runefin-${{ steps.meta.outputs.version }}-x86_64.flatpak\`"
+            echo "- hosted repository: https://lifk.github.io/Runefin/"
+            echo "- release: ${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ steps.meta.outputs.tag }}"
+          } >> "$GITHUB_STEP_SUMMARY"
