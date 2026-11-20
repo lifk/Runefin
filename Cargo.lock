@@ -3061,7 +3061,7 @@ dependencies = [
 [[package]]
 name = "rune"
 version = "0.0.1"
-source = "git+https://github.com/lifk/rune?rev=367ae13f74877d32c1b45d6dde4f5d99da1768ae#367ae13f74877d32c1b45d6dde4f5d99da1768ae"
+source = "git+https://github.com/lifk/rune?rev=e9dcf1a2c5ad59620aa682dc4317bf8396196926#e9dcf1a2c5ad59620aa682dc4317bf8396196926"
 dependencies = [
  "accesskit",
  "accesskit_macos",
@@ -3113,7 +3113,7 @@ dependencies = [
  "spellbook",
  "swash",
  "taffy",
- "tiny-skia-path 0.11.4 (git+https://github.com/lifk/rune?rev=367ae13f74877d32c1b45d6dde4f5d99da1768ae)",
+ "tiny-skia-path 0.11.4 (git+https://github.com/lifk/rune?rev=e9dcf1a2c5ad59620aa682dc4317bf8396196926)",
  "tokio",
  "unicode-segmentation",
  "wasm-bindgen",
@@ -3141,12 +3141,12 @@ dependencies = [
 [[package]]
 name = "rune-motion"
 version = "0.1.0"
-source = "git+https://github.com/lifk/rune?rev=367ae13f74877d32c1b45d6dde4f5d99da1768ae#367ae13f74877d32c1b45d6dde4f5d99da1768ae"
+source = "git+https://github.com/lifk/rune?rev=e9dcf1a2c5ad59620aa682dc4317bf8396196926#e9dcf1a2c5ad59620aa682dc4317bf8396196926"
 
 [[package]]
 name = "rune-staging"
 version = "0.0.1"
-source = "git+https://github.com/lifk/rune?rev=367ae13f74877d32c1b45d6dde4f5d99da1768ae#367ae13f74877d32c1b45d6dde4f5d99da1768ae"
+source = "git+https://github.com/lifk/rune?rev=e9dcf1a2c5ad59620aa682dc4317bf8396196926#e9dcf1a2c5ad59620aa682dc4317bf8396196926"
 dependencies = [
  "wgpu",
 ]
@@ -3154,7 +3154,7 @@ dependencies = [
 [[package]]
 name = "rune-taffy"
 version = "0.0.1"
-source = "git+https://github.com/lifk/rune?rev=367ae13f74877d32c1b45d6dde4f5d99da1768ae#367ae13f74877d32c1b45d6dde4f5d99da1768ae"
+source = "git+https://github.com/lifk/rune?rev=e9dcf1a2c5ad59620aa682dc4317bf8396196926#e9dcf1a2c5ad59620aa682dc4317bf8396196926"
 dependencies = [
  "taffy",
 ]
@@ -3776,7 +3776,7 @@ dependencies = [
 [[package]]
 name = "tiny-skia-path"
 version = "0.11.4"
-source = "git+https://github.com/lifk/rune?rev=367ae13f74877d32c1b45d6dde4f5d99da1768ae#367ae13f74877d32c1b45d6dde4f5d99da1768ae"
+source = "git+https://github.com/lifk/rune?rev=e9dcf1a2c5ad59620aa682dc4317bf8396196926#e9dcf1a2c5ad59620aa682dc4317bf8396196926"
 dependencies = [
  "arrayref",
  "bytemuck",
@@ -4409,7 +4409,7 @@ dependencies = [
 [[package]]
 name = "wgpu-external-frame"
 version = "0.4.0"
-source = "git+https://github.com/lifk/rune?rev=367ae13f74877d32c1b45d6dde4f5d99da1768ae#367ae13f74877d32c1b45d6dde4f5d99da1768ae"
+source = "git+https://github.com/lifk/rune?rev=e9dcf1a2c5ad59620aa682dc4317bf8396196926#e9dcf1a2c5ad59620aa682dc4317bf8396196926"
 dependencies = [
  "ash",
  "glow",
