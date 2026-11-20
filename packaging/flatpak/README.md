@@ -85,16 +85,37 @@ a new `.flatpakrepo` and telling users to re-add it.
 
 ### Publishing a release
 
+A `v*` tag push runs `.github/workflows/release.yml`, which builds against Freedesktop 26.08
+inside the sandbox, signs with the release key, replaces `gh-pages`, and attaches
+`Runefin-<version>-x86_64.flatpak` to a GitHub release. `workflow_dispatch` with a tag input does
+the same for an existing tag, which is how a release whose asset is missing gets repaired.
+
+It needs one repository secret, the keyring as a base64 tarball (Settings → Secrets and variables
+→ Actions → `FLATPAK_GPG_KEYRING`):
+
+```sh
+tar -C "$HOME/.local/share/runefin/release-gnupg" -czf - . | base64 -w0
+```
+
+The workflow refuses to run if that key's fingerprint is not the one in the committed
+`runefin-releases.gpg`, and refuses a tag that is not on `main`. Release notes come from
+`docs/releases/<version>.md`, or from `main` when the tag predates the file; without either it
+falls back to GitHub's generated notes. The same paragraph belongs in the metainfo's `<release>`
+entry, which is what Discover shows.
+
+The repository is replaced rather than appended, so the site stays around 44 MB instead of
+accumulating every build. The branch is force-pushed on purpose: clients only need the current
+commit, and keeping history would grow the site without bound.
+
+For a local publish — a test, or a key the runner does not have:
+
 ```sh
 scripts/publish-flatpak.sh
 ```
 
-It builds a fresh repository (only the current commit, so the site stays around 18 MB instead of
-accumulating every build), signs the summary, writes `dist/Runefin.flatpakrepo`, and replaces the
-`gh-pages` branch with the result. The branch is force-pushed on purpose: clients only need the
-current commit, and keeping history would grow the site without bound.
-
-Override the defaults if needed: `RUNEFIN_GPG_HOME` for the keyring, `FLATPAK_REPO_URL` for the
+It builds, signs, writes `dist/Runefin.flatpakrepo`, and hands the result to
+`scripts/publish-flatpak-repo.sh`, the same push the workflow uses, so a local and a CI publish
+cannot drift apart. Override `RUNEFIN_GPG_HOME` for the keyring and `FLATPAK_REPO_URL` for the
 published address.
 
 ## Sending and updating

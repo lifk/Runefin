@@ -28,6 +28,18 @@ exist because Rune's author enforces the same ones upstream.
    `crates/runefin/Cargo.toml`, run `scripts/check.sh`, render `scripts/snapshots.sh`, include
    the PNG diffs. Never bump inside a feature change.
 
+## Releases
+
+- **A tag publishes; nothing else does.** `git tag -a vX.Y.Z` on a green `main` and push it: the
+  release workflow builds the Flatpak, signs it, replaces the `gh-pages` repository and attaches
+  the bundle to the GitHub release. The version in `Cargo.toml`, the tag, the metainfo entry and
+  `docs/releases/<version>.md` all say the same number in the same commit.
+- **`scripts/publish-flatpak.sh` is for local testing**, never for the public artifact: it
+  publishes whatever is in the worktree, signed by whatever keyring is on this machine.
+- **The release key is a secret, not a file.** CI reads `FLATPAK_GPG_KEYRING`; only the public
+  half lives in `packaging/flatpak/runefin-releases.gpg`. Losing the private half means every
+  client must re-add the remote.
+
 ## Testing
 
 - `cargo test -p jellyfin-api`: parsing and URL tests, no network. A new endpoint gets a test with

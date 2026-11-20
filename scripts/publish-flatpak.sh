@@ -48,26 +48,6 @@ FLATPAK_REPO_URL="$repo_url" \
     echo "GPGKey=$(base64 -w0 "$key_file")"
 } > dist/Runefin.flatpakrepo
 
-pages=$(mktemp -d)
-trap 'rm -rf "$pages"' EXIT
-cp -a dist/flatpak-repo/. "$pages/"
-cp dist/Runefin.flatpakrepo "$pages/runefin.flatpakrepo"
-touch "$pages/.nojekyll"
-git -C "$pages" init -q
-git -C "$pages" checkout -q -b gh-pages
-git -C "$pages" add -A
-git -C "$pages" \
-    -c user.name="Runefin" \
-    -c user.email="lifk@users.noreply.github.com" \
-    commit -qm "Flatpak repository: $(sed -n 's/^Version = //p' dist/flatpak-repo/config 2>/dev/null || date -Idate)"
-git -C "$pages" remote add origin https://github.com/lifk/Runefin.git
-git -C "$pages" push -q --force origin gh-pages
-# A push that GitHub accepts but does not move is worse than a failure: clients keep seeing the
-# previous build. Compare the remote ref with what was just committed.
-remote_head=$(git -C "$pages" ls-remote origin gh-pages | cut -f1)
-local_head=$(git -C "$pages" rev-parse HEAD)
-[ "$remote_head" = "$local_head" ] || die "gh-pages did not move: remote $remote_head, local $local_head"
-say "published $(du -sh "$pages" | cut -f1) to $repo_url"
-say "clients: flatpak remote-add --if-not-exists --user runefin ${repo_url}runefin.flatpakrepo"
-say "         flatpak install --user runefin io.github.lifk.Runefin"
-say "updates: flatpak update --user"
+# Publishing itself lives in one place: the release workflow pushes the same directory, so a
+# local publish and a CI publish cannot drift apart.
+./scripts/publish-flatpak-repo.sh
