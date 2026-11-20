@@ -1,15 +1,22 @@
 name: Release
 
-# One tag push does everything a release needs: the Flatpak is built against Freedesktop 26.08
-# inside the sandbox, signed with the release key, the hosted repository on `gh-pages` is
-# replaced, and the bundle is attached to a GitHub release. `workflow_dispatch` does the same for
-# an existing tag, which is how a release whose asset is missing gets repaired.
+# One path out, three ways in:
+#   - a push to main, once CI on that commit is green (the normal flow);
+#   - a `v*` tag, for a commit that is already tagged;
+#   - workflow_dispatch with a tag, to repair a release whose asset is missing.
 #
-# The keyring is a repository secret, never a checkout: FLATPAK_GPG_KEYRING is
-# `tar -C "$HOME/.local/share/runefin/release-gnupg" -czf - . | base64 -w0`.
+# The version comes from Cargo.toml, so a change that ships bumps it in the same commit. A
+# version that already has a release is skipped, which makes every path idempotent and stops the
+# tag push and the main push of one commit from releasing twice.
+#
+# The signing keyring is the FLATPAK_GPG_KEYRING repository secret:
+#   tar -C ~/.local/share/runefin/release-gnupg -czf - . | base64 -w0
 # Losing it means every client must re-add the remote; see packaging/flatpak/README.md.
 
 on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
   push:
     tags: ["v*"]
   workflow_dispatch:
@@ -22,34 +29,59 @@ permissions:
   contents: write
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release
   cancel-in-progress: false
 
 jobs:
   release:
     name: Build, sign and publish
     runs-on: ubuntu-24.04
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main')
     steps:
+      - name: Resolve the commit
+        id: ref
+        run: |
+          case '${{ github.event_name }}' in
+            workflow_dispatch) ref='${{ inputs.tag }}' ;;
+            push) ref="${GITHUB_REF_NAME}" ;;
+            *) ref='${{ github.event.workflow_run.head_sha }}' ;;
+          esac
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.tag || github.ref }}
+          ref: ${{ steps.ref.outputs.ref }}
           fetch-depth: 0
 
-      - name: Resolve the tag and version
+      - name: Decide whether this commit is a release
         id: meta
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          tag='${{ inputs.tag || github.ref_name }}'
           version=$(sed -n 's/^version = "\([^"]*\)"/\1/p' Cargo.toml | head -1)
           [ -n "$version" ] || { echo "no version in Cargo.toml"; exit 1; }
-          [ "$tag" = "v$version" ] || { echo "tag $tag does not match Cargo.toml $version"; exit 1; }
-          # Publishing an unreviewed commit as the latest release is worse than failing.
+          tag="v$version"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "### $tag already has a release" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          # The published artifact must be a reviewed commit, and a tag must name this version.
+          if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+            [ "$(git rev-parse "$tag^{commit}")" = "$(git rev-parse HEAD)" ] || {
+              echo "tag $tag does not point at this commit" >&2; exit 1; }
+          fi
           git fetch --no-tags origin main
-          git merge-base --is-ancestor HEAD FETCH_HEAD \
-            || { echo "$tag is not on main"; exit 1; }
+          git merge-base --is-ancestor HEAD FETCH_HEAD || {
+            echo "$tag is not on main" >&2; exit 1; }
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Install Flatpak, the builder and the SDK
+        if: steps.meta.outputs.skip != 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends flatpak flatpak-builder gnupg
@@ -61,6 +93,7 @@ jobs:
             org.freedesktop.Sdk.Extension.rust-stable//26.08
 
       - name: Restore the release key
+        if: steps.meta.outputs.skip != 'true'
         env:
           KEYRING: ${{ secrets.FLATPAK_GPG_KEYRING }}
         run: |
@@ -75,6 +108,7 @@ jobs:
           chmod 700 "$RUNNER_TEMP/keyring"
 
       - name: Build and sign the bundle
+        if: steps.meta.outputs.skip != 'true'
         env:
           GNUPGHOME: ${{ runner.temp }}/keyring
           FLATPAK_REPO_URL: https://lifk.github.io/Runefin/
@@ -98,11 +132,13 @@ jobs:
             ./packaging/flatpak/build.sh
 
       - name: Publish the hosted repository
+        if: steps.meta.outputs.skip != 'true'
         env:
           RUNEFIN_REPO_URL: https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git
         run: ./scripts/publish-flatpak-repo.sh
 
       - name: Attach the bundle and publish the release
+        if: steps.meta.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -119,21 +155,27 @@ jobs:
             git show "FETCH_HEAD:docs/releases/${version}.md" > "$RUNNER_TEMP/notes.md"
             notes="$RUNNER_TEMP/notes.md"
           fi
+          # A new release gets its tag from here when nobody pushed one; an existing tag is used
+          # as it is, and a re-run repairs the asset and the notes instead of failing.
           if gh release view "$tag" >/dev/null 2>&1; then
-            # A re-run repairs an asset or notes without failing on the existing release.
             gh release upload "$tag" "$bundle" --clobber
             if [ -n "$notes" ]; then
               gh release edit "$tag" --title "Runefin $version" --notes-file "$notes"
             fi
-          elif [ -n "$notes" ]; then
-            gh release create "$tag" "$bundle" --title "Runefin $version" \
-              --notes-file "$notes" --verify-tag
           else
-            gh release create "$tag" "$bundle" --title "Runefin $version" \
-              --generate-notes --verify-tag
+            target=()
+            git rev-parse -q --verify "refs/tags/$tag" >/dev/null || target=(--target "$(git rev-parse HEAD)")
+            if [ -n "$notes" ]; then
+              gh release create "$tag" "$bundle" --title "Runefin $version" \
+                --notes-file "$notes" "${target[@]}"
+            else
+              gh release create "$tag" "$bundle" --title "Runefin $version" \
+                --generate-notes "${target[@]}"
+            fi
           fi
 
       - name: Summary
+        if: steps.meta.outputs.skip != 'true'
         run: |
           {
             echo "### Runefin ${{ steps.meta.outputs.version }}"

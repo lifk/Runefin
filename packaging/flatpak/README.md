@@ -85,10 +85,13 @@ a new `.flatpakrepo` and telling users to re-add it.
 
 ### Publishing a release
 
-A `v*` tag push runs `.github/workflows/release.yml`, which builds against Freedesktop 26.08
-inside the sandbox, signs with the release key, replaces `gh-pages`, and attaches
-`Runefin-<version>-x86_64.flatpak` to a GitHub release. `workflow_dispatch` with a tag input does
-the same for an existing tag, which is how a release whose asset is missing gets repaired.
+A push to `main` runs `.github/workflows/release.yml` once CI on that commit is green: it builds
+against Freedesktop 26.08 inside the sandbox, signs with the release key, replaces `gh-pages`, and
+attaches `Runefin-<version>-x86_64.flatpak` to a GitHub release. The version comes from
+`Cargo.toml`, so shipping a change means bumping it in the same commit alongside the metainfo
+entry and `docs/releases/<version>.md`. A `v*` tag, or `workflow_dispatch` with a tag input, does
+the same for a commit that is already tagged, which is how a release with a missing asset is
+repaired. A version that already has a release is skipped, so every path is idempotent.
 
 It needs one repository secret, the keyring as a base64 tarball (Settings → Secrets and variables
 → Actions → `FLATPAK_GPG_KEYRING`):

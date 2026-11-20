@@ -30,10 +30,13 @@ exist because Rune's author enforces the same ones upstream.
 
 ## Releases
 
-- **A tag publishes; nothing else does.** `git tag -a vX.Y.Z` on a green `main` and push it: the
-  release workflow builds the Flatpak, signs it, replaces the `gh-pages` repository and attaches
-  the bundle to the GitHub release. The version in `Cargo.toml`, the tag, the metainfo entry and
-  `docs/releases/<version>.md` all say the same number in the same commit.
+- **A green `main` publishes.** The release workflow runs after CI succeeds on a push to `main`:
+  it builds the Flatpak, signs it, replaces the `gh-pages` repository, tags the commit if no tag
+  exists, and attaches the bundle to the GitHub release. A `v*` tag or a dispatch with a tag does
+  the same for an already-tagged commit; a version that already has a release is skipped.
+- **The version is part of the change.** Bump `Cargo.toml`, add the metainfo entry and
+  `docs/releases/<version>.md`, and re-render `docs/snapshots/settings.png` (its About row prints
+  the version) in the same commit.
 - **`scripts/publish-flatpak.sh` is for local testing**, never for the public artifact: it
   publishes whatever is in the worktree, signed by whatever keyring is on this machine.
 - **The release key is a secret, not a file.** CI reads `FLATPAK_GPG_KEYRING`; only the public
