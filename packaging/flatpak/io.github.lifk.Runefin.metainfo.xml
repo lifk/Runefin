@@ -42,6 +42,30 @@
   </screenshots>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.2.0" date="2026-11-19">
+      <description>
+        <p>
+          The HDR release. Runefin now outputs real high dynamic range over scRGB: a 16-bit
+          floating-point surface with linear sRGB primaries when the compositor advertises one,
+          with interface white at 203 cd/m² and absolute PQ/HLG video luminance, and a plain SDR
+          surface when it does not. The switch is a setting, the status it reports is what the
+          surface actually accepted, and no display is asked to do anything it did not advertise.
+          Windows open from a single instance: runefin://item/… and runefin://play/… open the
+          detail page or start playback in the running player, sign in first if needed, and never
+          interrupt something already playing. The same links are registered on the desktop and
+          documented for a Steam tile. If Decky Loader is installed, the host installer's --decky
+          flag adds an optional Quick Access Menu companion (open, transport, quit) that talks to
+          the running player over MPRIS and deep links; Decky is never installed or assumed, and
+          the plugin makes no HDR claim. Scrub previews are warmer and steadier: the tile under the
+          playhead is fetched when the player's chrome appears, a moving pointer no longer queues a
+          sprite per sixteen minutes crossed, the panel shows the time and a loading state instead
+          of an empty box, and it grows to 320×180 when the server publishes a 960 px or wider
+          trickplay set. Caches are bounded by bytes rather than entry counts, so one large
+          trickplay sprite cannot evict a library's posters from memory or disk, and a sprite too
+          large to decode is refused instead of loaded.
+        </p>
+      </description>
+    </release>
     <release version="0.1.38" date="2026-11-17">
       <description>
         <p>

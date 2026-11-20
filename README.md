@@ -89,8 +89,8 @@ the wrapper and the tile.
 The offline bundle is still attached to every release:
 
 ```sh
-curl -LO https://github.com/lifk/Runefin/releases/latest/download/Runefin-0.1.38-x86_64.flatpak
-flatpak install --user ./Runefin-0.1.38-x86_64.flatpak
+curl -LO https://github.com/lifk/Runefin/releases/latest/download/Runefin-0.2.0-x86_64.flatpak
+flatpak install --user ./Runefin-0.2.0-x86_64.flatpak
 ```
 
 Packaging sources, the repository layout, controller notes and the CEC mapping live in
