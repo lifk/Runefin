@@ -102,14 +102,20 @@ jobs:
     # settings snapshot. A version that already has a release is skipped, which makes a re-run,
     # a tag push and a main push of one commit all safe.
     needs: [check, hardening]
-    if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
-    concurrency:
-      group: release
-      cancel-in-progress: false
     permissions:
       contents: write
     steps:
+      # Pull requests run the checks, never a release. The guard is a step, not a job `if`,
+      # because a job-level condition on this workflow was rejected at startup.
+      - name: Skip pull requests
+        id: gate
+        run: |
+          if [ '${{ github.event_name }}' = 'pull_request' ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "### pull request: no release" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -139,7 +145,7 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Install Flatpak, the builder and the SDK
-        if: steps.meta.outputs.skip != 'true'
+        if: steps.gate.outputs.skip != 'true' && steps.meta.outputs.skip != 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends flatpak flatpak-builder gnupg
@@ -151,7 +157,7 @@ jobs:
             org.freedesktop.Sdk.Extension.rust-stable//26.08
 
       - name: Restore the release key
-        if: steps.meta.outputs.skip != 'true'
+        if: steps.gate.outputs.skip != 'true' && steps.meta.outputs.skip != 'true'
         env:
           KEYRING: ${{ secrets.FLATPAK_GPG_KEYRING }}
         run: |
@@ -166,7 +172,7 @@ jobs:
           chmod 700 "$RUNNER_TEMP/keyring"
 
       - name: Build and sign the bundle
-        if: steps.meta.outputs.skip != 'true'
+        if: steps.gate.outputs.skip != 'true' && steps.meta.outputs.skip != 'true'
         env:
           GNUPGHOME: ${{ runner.temp }}/keyring
           FLATPAK_REPO_URL: https://lifk.github.io/Runefin/
@@ -190,13 +196,13 @@ jobs:
             ./packaging/flatpak/build.sh
 
       - name: Publish the hosted repository
-        if: steps.meta.outputs.skip != 'true'
+        if: steps.gate.outputs.skip != 'true' && steps.meta.outputs.skip != 'true'
         env:
           RUNEFIN_REPO_URL: https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git
         run: ./scripts/publish-flatpak-repo.sh
 
       - name: Attach the bundle and publish the release
-        if: steps.meta.outputs.skip != 'true'
+        if: steps.gate.outputs.skip != 'true' && steps.meta.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -232,7 +238,7 @@ jobs:
           fi
 
       - name: Summary
-        if: steps.meta.outputs.skip != 'true'
+        if: steps.gate.outputs.skip != 'true' && steps.meta.outputs.skip != 'true'
         run: |
           {
             echo "### Runefin ${{ steps.meta.outputs.version }}"
