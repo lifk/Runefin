@@ -42,6 +42,20 @@
   </screenshots>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.2.1" date="2026-11-20">
+      <description>
+        <p>
+          A cold start is a quarter faster. The first frame used to register the math fallback
+          faces — Noto Sans Math, Noto Music and Symbola — to draw the sidebar's checkmark, because
+          the UI loaded them for any symbol block whether or not the app's own font already drew
+          the glyph. It now loads them only for a symbol the app cannot draw and for real math
+          alphanumerics, which changes nothing on screen: launch to first frame went from 103.5 ms
+          to 78.3 ms on the machine this was measured on. Everything from 0.2.0 is unchanged:
+          scRGB HDR output, runefin:// deep links, the optional Decky Quick Access Menu companion,
+          and the trickplay preview work.
+        </p>
+      </description>
+    </release>
     <release version="0.2.0" date="2026-11-19">
       <description>
         <p>
