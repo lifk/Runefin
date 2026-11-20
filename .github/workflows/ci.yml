@@ -122,6 +122,7 @@ jobs:
 
       - name: Decide whether this commit is a release
         id: meta
+        if: steps.gate.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -149,8 +150,10 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends flatpak flatpak-builder gnupg
-          sudo flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
-          sudo flatpak install -y --noninteractive --arch=x86_64 flathub \
+          # Per-user, not --system: `flatpak run org.flatpak.Builder` runs as the runner user and
+          # cannot see a system installation ("Unable to find sdk org.freedesktop.Sdk 26.08").
+          flatpak remote-add --if-not-exists --user flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user -y --noninteractive --arch=x86_64 flathub \
             org.flatpak.Builder \
             org.freedesktop.Sdk//26.08 \
             org.freedesktop.Platform//26.08 \
