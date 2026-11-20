@@ -12,11 +12,19 @@ repo=dist/flatpak-repo
 bundle=dist/Runefin.flatpak
 mkdir -p dist
 
-builder=(flatpak run)
-if [[ -n "${GNUPGHOME:-}" ]]; then
-    builder+=(--env=GNUPGHOME="$GNUPGHOME")
+# `FLATPAK_BUILDER=host` uses a flatpak-builder installed on the machine (CI installs it with
+# apt) instead of the org.flatpak.Builder sandbox. The sandboxed app sees only the installation
+# it was set up for, which on a bare runner means it cannot find the SDK ("Unable to find sdk
+# org.freedesktop.Sdk version 26.08") however the SDK was installed.
+if [[ "${FLATPAK_BUILDER:-app}" == host ]]; then
+    builder=(flatpak-builder)
+else
+    builder=(flatpak run)
+    if [[ -n "${GNUPGHOME:-}" ]]; then
+        builder+=(--env=GNUPGHOME="$GNUPGHOME")
+    fi
+    builder+=(--command=flatpak-builder org.flatpak.Builder)
 fi
-builder+=(--command=flatpak-builder org.flatpak.Builder)
 sign=()
 gpg_homedir=()
 if [[ -n "${GNUPGHOME:-}" ]]; then

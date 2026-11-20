@@ -150,11 +150,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends flatpak flatpak-builder gnupg
-          # Per-user, not --system: `flatpak run org.flatpak.Builder` runs as the runner user and
-          # cannot see a system installation ("Unable to find sdk org.freedesktop.Sdk 26.08").
-          flatpak remote-add --if-not-exists --user flathub https://dl.flathub.org/repo/flathub.flatpakrepo
-          flatpak install --user -y --noninteractive --arch=x86_64 flathub \
-            org.flatpak.Builder \
+          # The host flatpak-builder below uses the system installation, so the SDKs go there.
+          sudo flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+          sudo flatpak install -y --noninteractive --arch=x86_64 flathub \
             org.freedesktop.Sdk//26.08 \
             org.freedesktop.Platform//26.08 \
             org.freedesktop.Sdk.Extension.rust-stable//26.08
@@ -194,6 +192,7 @@ jobs:
           # The runner has 4 vCPUs and 16 GB; the manifest's 16 jobs is tuned for the 32-thread
           # laptop and would oversubscribe this host. Jobs do not change the built bytes.
           sed -i 's/CARGO_BUILD_JOBS: "16"/CARGO_BUILD_JOBS: "4"/' packaging/flatpak/io.github.lifk.Runefin.yml
+          FLATPAK_BUILDER=host \
           FLATPAK_GPG_KEY="$key" \
           FLATPAK_GPG_KEY_FILE="$PWD/packaging/flatpak/runefin-releases.gpg" \
             ./packaging/flatpak/build.sh
