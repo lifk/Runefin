@@ -2911,6 +2911,73 @@ mod tests {
         let _ = std::fs::remove_dir_all(root);
     }
 
+    /// Opt-in, real server: a capped download goes through the worker, the rename and the
+    /// manifest, and the file that lands is an MP4 the player can open. Pick a short episode for
+    /// `JELLYFIN_DOWNLOAD_ITEM`; at the shipped caps a film is gigabytes.
+    #[test]
+    #[ignore = "needs a real Jellyfin server; set JELLYFIN_URL, JELLYFIN_USER_ID, JELLYFIN_TOKEN and JELLYFIN_DOWNLOAD_ITEM"]
+    fn a_capped_download_completes_through_the_worker() {
+        let env = |name: &str| std::env::var(name).unwrap_or_else(|_| panic!("set {name}"));
+        let root =
+            std::env::temp_dir().join(format!("runefin-live-download-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let mut state = home_state();
+        state.config.server_url = env("JELLYFIN_URL");
+        state.config.user_id = env("JELLYFIN_USER_ID");
+        state.config.token = env("JELLYFIN_TOKEN");
+        state.config.downloads_path = Some(root.display().to_string());
+        state.config.download_quality = Some(crate::config::PlaybackQuality::Mbps2);
+        state.load_downloads();
+        let item = jellyfin_api::Item {
+            id: env("JELLYFIN_DOWNLOAD_ITEM"),
+            name: "Live download".into(),
+            kind: "Episode".into(),
+            run_time_ticks: Some(24 * 60 * 10_000_000),
+            ..jellyfin_api::Item::default()
+        };
+        state.download_item(&item);
+        let id = item.id.clone();
+        let mut finished = false;
+        for _ in 0..1_800 {
+            state.poll();
+            if state
+                .download_state(&id)
+                .is_some_and(|state_value| state_value.is_done())
+            {
+                finished = true;
+                break;
+            }
+            if let Some(error) = state
+                .download_entry(&id)
+                .and_then(|entry| entry.error.clone())
+            {
+                panic!("the download failed: {error}");
+            }
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        }
+        let entry = state.download_entry(&id).expect("the entry").clone();
+        assert!(finished, "timed out at {} bytes", entry.done);
+        let store = state.downloads.store.clone().expect("the store");
+        let file = store.file_path(&entry);
+        let head = std::fs::read(&file).expect("the file");
+        assert_eq!(
+            &head[4..8],
+            b"ftyp",
+            "a real MP4, whatever the original container was"
+        );
+        assert!(
+            head.len() as u64 > 1_000_000,
+            "{} bytes is not a video",
+            head.len()
+        );
+        eprintln!(
+            "capped download: {} bytes at {}",
+            head.len(),
+            file.display()
+        );
+        let _ = std::fs::remove_dir_all(root);
+    }
+
     #[test]
     fn the_home_contract_orders_every_library_rail() {
         let env = Env {

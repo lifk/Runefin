@@ -179,10 +179,24 @@ ask for a smaller copy, and the DeviceProfile picks which:
   direct-stream capability in the same profile would let the server answer with the original
   file, so the download request turns both off: a cap must mean a smaller copy.
 
-Verified on the live server (12.4.0): a 1.5 Mbps cap with that profile returns
+Verified on the live server (12.4.0): a cap with that profile returns
 `VideoBitrate=1308000&AudioBitrate=192000&TranscodeReasons=ContainerBitrateExceedsLimit` and the
-progressive URL. What could **not** be verified is the bytes: this server has
-`HardwareAccelerationType: qsv` while the box has no Intel GPU, so every transcode request — HLS
-variant or progressive — answers `500 Error processing request` about 150 ms in. Switching the
-encoding settings to `vaapi` (the GPU that runs the app) or `none` should make both paths work;
-until then the download fails with the server's status, and the app says so.
+progressive URL, and pulling it returns a real fragmented MP4 (`ftyp`/`isom`, ~5 MB in six
+seconds at 4 Mbps). The app's own client does the same: `Client::download_source` negotiates and
+`open_stream` reads the copy.
+
+A full capped download then landed through the app's own worker, state, rename and manifest: a
+24-minute episode at 2 Mbps, **307,726,960 bytes** in 166 s, and the file opens as an MP4. That
+run also found a real bug in the shipped slice: the first attempt died after 30 s with
+`timeout: global`. `Client`'s agent sets a 30-second **global** request timeout, which bounds the
+body as well as the request, so any download longer than half a minute would have failed —
+originals of any size included. `open_stream` now clears the global deadline for a stream and
+bounds a single read at 30 s instead, which still catches a dead connection.
+
+**A correction worth keeping.** The first probe answered `500 Error processing request` for every
+transcode, and the server's own `HardwareAccelerationType: qsv` on a non-Intel box looked like the
+cause. It was not. The per-transcode logs showed `ffprobe failed - streams and format are both
+null` and `EBML header parsing failed`, and a byte-range read of those items' static streams
+returned zeros at offsets 0, 1 MB and 300 MB: those particular library files are zero-filled
+(some failed downloads), so nothing could open them — direct play included. Other items in the
+same libraries transcode normally with QSV. Check the file before blaming the encoder.

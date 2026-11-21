@@ -1075,7 +1075,16 @@ impl Client {
         if from > 0 {
             req = req.header("Range", &format!("bytes={from}-"));
         }
-        let res = req.call().map_err(map_err)?;
+        // The agent's 30 s global timeout bounds a request, and with it the whole body: right
+        // for a poster, fatal for a 20 GB file. A stream has no total deadline; a read that
+        // stalls for half a minute is still a dead connection.
+        let res = req
+            .config()
+            .timeout_global(None)
+            .timeout_per_read(Some(std::time::Duration::from_secs(30)))
+            .build()
+            .call()
+            .map_err(map_err)?;
         let status = res.status().as_u16();
         let resumed = status == 206;
         let mut total = None;
