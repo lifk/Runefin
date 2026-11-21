@@ -149,7 +149,8 @@ jobs:
         if: steps.gate.outputs.skip != 'true' && steps.meta.outputs.skip != 'true'
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends flatpak flatpak-builder gnupg
+          # elfutils is flatpak-builder's strip ("Failed to execute child process eu-strip").
+          sudo apt-get install -y --no-install-recommends flatpak flatpak-builder elfutils gnupg
           # The host flatpak-builder below uses the system installation, so the SDKs go there.
           sudo flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
           sudo flatpak install -y --noninteractive --arch=x86_64 flathub \
