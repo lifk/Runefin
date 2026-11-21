@@ -42,6 +42,27 @@
   </screenshots>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.2.2" date="2026-11-21">
+      <description>
+        <p>
+          An engine release. The UI engine moved 143 upstream commits forward into a split
+          workspace, and what it changes is felt rather than seen: focus no longer resets when a
+          rail rebuilds or data lands, so a card's ring and its motion stay put; a rail is one Tab
+          stop instead of one per card; a control that becomes disabled hands focus on instead of
+          stranding it; nested focus groups traverse correctly; video decoders share the engine's
+          task threads; shaders evaluate at exact pixel centres, which moves a handful of pixels per
+          screen by a single step; tooltips open on keyboard focus; a notched wheel glides on
+          Chromium's curve; and a touchscreen tap can be told from a mouse click. Everything from
+          0.2.0 and 0.2.1 carries over: scRGB HDR output with its SDR fallback, HDR video that keeps
+          absolute PQ/HLG light on an HDR display and tone-maps on SDR, runefin:// links, the
+          optional Decky Quick Access Menu companion, the trickplay work, and the faster cold start.
+          Two refinements: horizontal rules are true hairlines, half a point drawn on whole device
+          pixels, so a divider stays a rule at 1.5x and 3x instead of thickening; and the search
+          field's focus ring is drawn by the engine while focus is within it, the same accent ring
+          with no state to drift.
+        </p>
+      </description>
+    </release>
     <release version="0.2.1" date="2026-11-20">
       <description>
         <p>
