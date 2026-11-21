@@ -1623,7 +1623,7 @@ fn subtitle_tracks_panel(s: &State, t: &tok::Theme) -> El {
             .child(tracks),
     );
     panel = panel
-        .child(el().w_full().h(1.0).fill(t.separator).mt(6.0))
+        .child(rune::hairline(t.separator).mt(6.0))
         .child(stepper_row(
             "Delay",
             &format!("{:+.1} s", subs.delay_ms as f32 / 1000.0),
@@ -1700,39 +1700,37 @@ fn subtitle_tracks_panel(s: &State, t: &tok::Theme) -> El {
                 ),
         );
     }
-    panel = panel
-        .child(el().w_full().h(1.0).fill(t.separator).mt(6.0))
-        .child(
-            row()
-                .key("subtitle-search-open")
-                .role("button")
-                .w_full()
-                .h(36.0)
-                .px(10.0)
-                .radius(8.0)
-                .items_center()
-                .gap(8.0)
-                .fill(theme::FOCUS.alpha(0.10))
-                .hover(t.hover)
-                .motion(crate::theme::motion::CONTROL)
-                .focusable(true)
-                .focus_visual(2.0)
-                .press_scale(0.98)
-                .help("Download a subtitle from the server's providers")
-                .cursor(rune::Cursor::Pointer)
-                .on_press(|s: &mut State| s.open_in_app_subtitle_search())
-                .child(
-                    text("＋".to_string())
-                        .font(type_::label())
-                        .color(tok::accent(0, true)),
-                )
-                .child(
-                    text("Search online…".to_string())
-                        .font(type_::label())
-                        .color(t.text)
-                        .truncate(),
-                ),
-        );
+    panel = panel.child(rune::hairline(t.separator).mt(6.0)).child(
+        row()
+            .key("subtitle-search-open")
+            .role("button")
+            .w_full()
+            .h(36.0)
+            .px(10.0)
+            .radius(8.0)
+            .items_center()
+            .gap(8.0)
+            .fill(theme::FOCUS.alpha(0.10))
+            .hover(t.hover)
+            .motion(crate::theme::motion::CONTROL)
+            .focusable(true)
+            .focus_visual(2.0)
+            .press_scale(0.98)
+            .help("Download a subtitle from the server's providers")
+            .cursor(rune::Cursor::Pointer)
+            .on_press(|s: &mut State| s.open_in_app_subtitle_search())
+            .child(
+                text("＋".to_string())
+                    .font(type_::label())
+                    .color(tok::accent(0, true)),
+            )
+            .child(
+                text("Search online…".to_string())
+                    .font(type_::label())
+                    .color(t.text)
+                    .truncate(),
+            ),
+    );
     panel
 }
 

@@ -1272,12 +1272,11 @@ pub(super) fn sidebar(s: &State, t: &tok::Theme) -> El {
     );
     list = list
         .child(
-            el().key("sidebar-footer-separator")
+            rune::hairline(t.separator)
+                .key("sidebar-footer-separator")
                 .w_full()
-                .h(1.0)
                 .mt(6.0)
-                .mb(4.0)
-                .fill(t.separator),
+                .mb(4.0),
         )
         .child(
             nav_item(
@@ -2169,7 +2168,7 @@ pub(super) fn card_menu(s: &State) -> El {
                 .padding(8.0)
                 .truncate(),
         )
-        .child(el().w_full().h(1.0).fill(t.separator).mb(2.0))
+        .child(rune::hairline(t.separator).w_full().mb(2.0))
         .child(menu_row("Open", "card-menu-open", &t, |s: &mut State| {
             s.card_menu_open_item()
         }));

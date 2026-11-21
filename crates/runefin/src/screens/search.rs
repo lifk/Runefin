@@ -53,12 +53,11 @@ pub(super) fn search_screen(s: &State) -> El {
         .px(12.0)
         .center_y()
         .fill(t.card)
-        .outline(
-            if s.search.query.focused { 1.5 } else { 0.0 },
-            0.0,
-            tok::accent(0, true),
-        )
-        .child(input);
+        // The field's own model focus is not a runtime focus source, so the ring follows focus
+        // *within* the box: the same accent ring as before, drawn while the input inside is
+        // focused, with no state to keep in step. The input draws no ring of its own.
+        .focus_within_ring(1.5, 0.0, tok::accent(0, true))
+        .child(input.no_focus_ring());
 
     let header = row()
         .key("search-header")
