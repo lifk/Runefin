@@ -2608,6 +2608,8 @@ mod tests {
         let mut rt = Runtime::new(home_state(), view, (1280.0, 800.0), env);
         rt.frame(0.0);
 
+        // Home mounts only the rails in its window; the page's shell, the first rails and the
+        // cards in them are addressable as before.
         for key in [
             "home-screen",
             "sidebar",
@@ -2615,17 +2617,23 @@ mod tests {
             "library-live-tv",
             "rail-continue-watching",
             "rail-next-up",
-            "rail-collections",
-            "rail-collections-silent-horror-collection",
-            "rail-recent-0",
-            "rail-recently-played",
-            "rail-recently-played-played-arrival",
             "rail-continue-watching-quiet-floor",
             "rail-continue-watching-metropolis",
             "resume-remove-quiet-floor-s2e4",
         ] {
             assert!(rt.find(key).is_some(), "{key} is on screen and addressable");
         }
+        // The rails below the fold are virtualized: they mount when the page is scrolled to
+        // them, and `scroll_into_view` reaches a row no commit has built yet.
+        rt.update(|_, tx| tx.scroll_into_view("rail-collections"));
+        for step in 1..=8 {
+            rt.frame(0.016 * f64::from(step));
+        }
+        assert!(
+            rt.find("rail-collections-silent-horror-collection")
+                .is_some(),
+            "the last rail mounts after scrolling to it"
+        );
     }
 
     #[test]
@@ -2649,6 +2657,23 @@ mod tests {
                 rail
             })
             .collect();
+        // The contract is the page's order and that no library is capped, which is what the
+        // rail list holds; only the windowed part of it is in the tree at any moment.
+        assert_eq!(
+            crate::screens::home_rail_keys(&state),
+            [
+                "rail-continue-watching",
+                "rail-next-up",
+                "rail-on-now",
+                "rail-recent-0",
+                "rail-recent-1",
+                "rail-recent-2",
+                "rail-recent-3",
+                "rail-recently-played",
+                "rail-collections",
+            ],
+            "every library gets a Recently Added rail, in order"
+        );
         let mut rt = Runtime::new(state, view, (1280.0, 800.0), env);
         rt.frame(0.0);
         let top = |key: &str| {
@@ -2657,13 +2682,6 @@ mod tests {
                 .unwrap_or_else(|| panic!("{key} has a rect"))
         };
         assert!(top("rail-continue-watching") < top("rail-next-up"));
-        assert!(top("rail-next-up") < top("rail-recent-0"));
-        assert!(top("rail-recent-0") < top("rail-recently-played"));
-        assert!(top("rail-recently-played") < top("rail-collections"));
-        assert!(
-            rt.find("rail-recent-3").is_some(),
-            "every library gets a Recently Added rail"
-        );
         assert!(rt.find("rail-continue-watching-all").is_some());
         assert!(rt.find("rail-next-up-all").is_some());
     }
@@ -4738,6 +4756,43 @@ mod tests {
                 .is_some_and(|key| key.starts_with("rail-continue-watching-")),
             "Up returns to the rail above"
         );
+    }
+
+    #[test]
+    fn the_tv_router_reaches_the_last_rail_of_a_long_home() {
+        let env = Env {
+            system_dark: true,
+            scale: 1.5,
+        };
+        let mut state = home_state();
+        state.big_screen = true;
+        state.route = Route::Home;
+        let mut rt = Runtime::new(state, view, (1280.0, 720.0), env);
+        rt.on_key = Some(on_key);
+        rt.frame(0.0);
+        let first = rt
+            .state
+            .take_focus_key()
+            .expect("home asks for its first card");
+        rt.update(|_, tx| tx.focus(first.clone(), true));
+        rt.frame(0.016);
+        // The rails below the fold are mounted when the page scrolls to them, so the router's
+        // target may not be in the tree when it is chosen: the move has to scroll it in and
+        // focus must follow the card once it exists.
+        for step in 0..12 {
+            rt.key(KeyEvent {
+                key: Key::Down,
+                mods: Default::default(),
+            });
+            rt.frame(0.032 + f64::from(step) * 0.016);
+        }
+        let focused = rt.focused_key().expect("a card on the last rail");
+        assert!(
+            focused.starts_with("rail-collections"),
+            "Down reaches the end of the page: {focused}"
+        );
+        assert!(rt.find(&focused).is_some(), "the last rail mounted");
+        assert!(rt.presented(&focused).is_some(), "and it is on screen");
     }
 
     #[test]

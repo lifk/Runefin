@@ -132,3 +132,18 @@ the `poll`-timer audit, Q9) are the next work.
 Two upstream bugs surfaced only for external builds and are fixed on the branch: `rune-text`
 asked crates.io `parley_engine` for a feature only Rune's vendored copy has, and the Wayland
 corner rounding called into the vendored winit (now behind `wayland-csd-corners`).
+
+**P1 landed 2026-11-21.** Home's rails are now `El::virtual_rows` over a `HomeRail` descriptor
+list (`944ffe0` carried the focus and hairline primitives; the rails came next). The first
+attempt changed nothing: Rune mounts two viewports of rows either side of the viewport, and a
+Home rail is over half a viewport tall, so with seven rails the window still covered the page.
+The fork gets `El::virtual_overdraw(viewports)` (`83cda583`, default two, clamped 0–8) and Home
+asks for one: the next rail coming is all a reader can see. Measured on the demo server at
+1280×800/2×: **450 → 354 nodes** (21%), glyphs unchanged at 411, and the committed snapshots are
+byte-identical. What the reader can reach is tested rather than assumed — Down from the first
+card now walks to the last rail, which mounts as the page scrolls, and the shell test scrolls to
+`rail-collections` and finds its cards.
+
+The other half of Q10 (image traffic) is untouched: posters are requested by the rails in the
+window, so a server with thirty libraries no longer builds thirty rails but still fetches art for
+the next two ahead. The image-cache byte budget is still the open item.

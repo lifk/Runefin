@@ -8,8 +8,8 @@ use crate::theme::FocusVisual;
 use crate::theme::SurfaceStyle;
 use crate::theme::{self, type_};
 use rune::{
-    Color, Cx, El, Icon, ScrollSpec, SurfaceFit, TextEdit, TextStyle, col, el, icon, row, text,
-    text_input,
+    Color, Cx, El, GrowthSpec, Icon, ScrollSpec, SurfaceFit, TextEdit, TextStyle, col, el, icon,
+    row, text, text_input,
 };
 
 use crate::state::{Route, State, Step};
@@ -1457,6 +1457,11 @@ fn content(s: &State, t: &tok::Theme) -> El {
             .px(theme::gutter())
             .pb(if s.in_app_minimized { 124.0 } else { 32.0 })
             .gap(theme::RAIL_GAP)
+            .children(
+                s.home_error
+                    .as_ref()
+                    .map(|message| error_banner(message, t)),
+            )
             .children(s.home_hero.then(|| home_hero(s, t)).flatten())
             .child(rails(s, t))
     };
@@ -1648,60 +1653,61 @@ fn home_hero(s: &State, t: &tok::Theme) -> Option<El> {
     )
 }
 
-fn rails(s: &State, t: &tok::Theme) -> El {
-    let mut list = col()
-        .key("home-rails")
-        .w_full()
-        .min_w(0.0)
-        .gap(theme::RAIL_GAP);
-    if let Some(message) = &s.home_error {
-        list = list.child(error_banner(message, t));
+/// One Home rail, in the order Home shows them. The list is what the virtual stack builds by
+/// index, so a rail below the viewport costs nothing until it is scrolled to.
+pub(crate) enum HomeRail<'a> {
+    Resume(&'a [Item]),
+    Poster {
+        title: String,
+        key: String,
+        items: &'a [Item],
+        library: Option<(String, String, Option<String>)>,
+        shelf: Option<crate::state::HomeShelf>,
+    },
+    OnNow,
+}
+
+impl HomeRail<'_> {
+    pub(crate) fn key(&self) -> &str {
+        match self {
+            HomeRail::Resume(_) => "rail-continue-watching",
+            HomeRail::Poster { key, .. } => key,
+            HomeRail::OnNow => "rail-on-now",
+        }
     }
-    // Continue Watching -> Next Up -> every library's Recently Added -> Recently Played ->
-    // Collections. A server with many libraries gets many rails; Home scrolls.
+}
+
+/// Home's rails, in reading order: Continue Watching, Next up, Coming up, On now, every
+/// library's Recently added, Recently Played, Collections. A rail with nothing visible (every
+/// item hidden) is left out, which is also what keeps its TV zone empty.
+pub(crate) fn home_rails(s: &State) -> Vec<HomeRail<'_>> {
     let visible = |items: &[Item]| items.iter().any(|item| !s.is_home_hidden(&item.id));
-    if s.home_data
-        .resume
-        .iter()
-        .any(|item| !s.is_home_hidden(&item.id))
-    {
-        list = list.child(resume_rail(
-            "rail-continue-watching",
-            &s.home_data.resume,
-            s,
-            t,
-        ));
+    let mut rails = Vec::new();
+    if visible(&s.home_data.resume) {
+        rails.push(HomeRail::Resume(&s.home_data.resume));
     }
-    if s.home_data
-        .next_up
-        .iter()
-        .any(|item| !s.is_home_hidden(&item.id))
-    {
-        list = list.child(rail(
-            "Next up",
-            "rail-next-up",
-            &s.home_data.next_up,
-            s,
-            t,
-            None,
-            Some(crate::state::HomeShelf::NextUp),
-        ));
+    if visible(&s.home_data.next_up) {
+        rails.push(HomeRail::Poster {
+            title: "Next up".to_string(),
+            key: "rail-next-up".to_string(),
+            items: &s.home_data.next_up,
+            library: None,
+            shelf: Some(crate::state::HomeShelf::NextUp),
+        });
     }
     if visible(&s.home_data.upcoming) {
         // Not "Next up" (that is the next unwatched episode of something you follow): this is
         // the server's air-date lookahead, which is the only Home rail that answers "when?".
-        list = list.child(rail(
-            "Coming up",
-            "rail-upcoming",
-            &s.home_data.upcoming,
-            s,
-            t,
-            None,
-            None,
-        ));
+        rails.push(HomeRail::Poster {
+            title: "Coming up".to_string(),
+            key: "rail-upcoming".to_string(),
+            items: &s.home_data.upcoming,
+            library: None,
+            shelf: None,
+        });
     }
     if visible(&s.home_data.on_now) {
-        list = list.child(on_now_rail(s, t));
+        rails.push(HomeRail::OnNow);
     }
     for (index, recent) in s
         .home_data
@@ -1722,30 +1728,22 @@ fn rails(s: &State, t: &tok::Theme) -> El {
                     library.collection_type.clone(),
                 )
             });
-        list = list.child(rail(
-            &format!("Recently added in {}", recent.library),
-            &format!("rail-recent-{index}"),
-            &recent.items,
-            s,
-            t,
+        rails.push(HomeRail::Poster {
+            title: format!("Recently added in {}", recent.library),
+            key: format!("rail-recent-{index}"),
+            items: &recent.items,
             library,
-            None,
-        ));
+            shelf: None,
+        });
     }
-    if s.home_data
-        .recently_played
-        .iter()
-        .any(|item| !s.is_home_hidden(&item.id))
-    {
-        list = list.child(rail(
-            "Recently Played",
-            "rail-recently-played",
-            &s.home_data.recently_played,
-            s,
-            t,
-            None,
-            Some(crate::state::HomeShelf::RecentlyPlayed),
-        ));
+    if visible(&s.home_data.recently_played) {
+        rails.push(HomeRail::Poster {
+            title: "Recently Played".to_string(),
+            key: "rail-recently-played".to_string(),
+            items: &s.home_data.recently_played,
+            library: None,
+            shelf: Some(crate::state::HomeShelf::RecentlyPlayed),
+        });
     }
     if !s.home_data.collections.is_empty() {
         // The server exposes its box sets as a library too; "See all" opens that rather than a
@@ -1762,17 +1760,80 @@ fn rails(s: &State, t: &tok::Theme) -> El {
                     library.collection_type.clone(),
                 )
             });
-        list = list.child(rail(
-            "Collections",
-            "rail-collections",
-            &s.home_data.collections,
-            s,
-            t,
-            collections_library,
-            None,
-        ));
+        rails.push(HomeRail::Poster {
+            title: "Collections".to_string(),
+            key: "rail-collections".to_string(),
+            items: &s.home_data.collections,
+            library: collections_library,
+            shelf: None,
+        });
     }
-    list
+    rails
+}
+
+/// Home's rail keys in order: the page's contract, without building the page.
+#[cfg(test)]
+pub(crate) fn home_rail_keys(s: &State) -> Vec<String> {
+    home_rails(s)
+        .iter()
+        .map(|rail| rail.key().to_string())
+        .collect()
+}
+
+/// One rail's element, by index in [`home_rails`].
+fn home_rail(s: &State, index: usize, t: &tok::Theme) -> El {
+    let rails = home_rails(s);
+    let Some(descriptor) = rails.get(index) else {
+        return col().key(format!("home-rail-{index}"));
+    };
+    match descriptor {
+        HomeRail::Resume(items) => resume_rail("rail-continue-watching", items, s, t),
+        HomeRail::OnNow => on_now_rail(s, t),
+        HomeRail::Poster {
+            title,
+            key,
+            items,
+            library,
+            shelf,
+        } => rail(title, key, items, s, t, library.clone(), *shelf),
+    }
+}
+
+/// A poster rail's height before it is measured: its title (26), the gap under it (12), the
+/// poster and its two lines (264 + ~44), and the gap to the next rail (40).
+const HOME_RAIL_ESTIMATE_H: f32 = 386.0;
+
+fn rails(s: &State, t: &tok::Theme) -> El {
+    let keys: Vec<String> = home_rails(s)
+        .iter()
+        .map(|rail| rail.key().to_string())
+        .collect();
+    let count = keys.len();
+    let theme = *t;
+    // Only the rails in the mounted window are built: Home used to lay out every rail and
+    // every card on it, three screenfuls below the fold included. Rune keeps a measured height
+    // per rail key, so a page scrolled back to doesn't re-measure, and `Tx::scroll_into_view`
+    // still reaches any rail by key.
+    col()
+        .key("home-rails")
+        .w_full()
+        .min_w(0.0)
+        .growth(GrowthSpec::default())
+        // Home's rows are tall (a rail is over half a viewport), so Rune's default of two
+        // viewports each side mounts nearly every rail. One viewport is the next rail coming,
+        // which is all a reader can see.
+        .virtual_overdraw(1.0)
+        .virtual_rows(
+            count,
+            HOME_RAIL_ESTIMATE_H,
+            move |_s: &State, i| {
+                keys.get(i)
+                    .cloned()
+                    .unwrap_or_else(|| format!("home-rail-{i}"))
+                    .into()
+            },
+            move |s: &State, i| home_rail(s, i, &theme).pb(theme::RAIL_GAP),
+        )
 }
 
 fn rail(

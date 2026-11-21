@@ -117,6 +117,10 @@ Played → Collections. There is no rail cap: a server with many libraries gets 
 scrolls. A rail hidden with “Not interested” is removed. Empty rails are suppressed, never rendered blank. Rails are horizontal,
 momentum-scrolled, snapped to card boundaries. Every card in a rail asks for its poster when the
 rail is built, not when it first scrolls into view, so swiping a rail never uncovers empty boxes.
+The rail list itself is virtualized: a rail is built when it comes within a viewport of the page's
+viewport (one viewport of overdraw, because a Home rail is over half a screen), so the first frame
+costs the same with three libraries as with thirty, and the rails just below the fold are already
+fetching their posters before the reader scrolls to them.
 Coming up is requested after the first rails land: it is one more server query and its rail sits
 below the ones the reader sees first.
 
