@@ -70,6 +70,10 @@ pub struct Entry {
     pub state: State,
     /// The reader asked to keep this copy, so eviction never takes it for space.
     pub kept: bool,
+    /// The bitrate cap the copy was made at, if the server transcoded it. An original file has
+    /// none, and is the only kind that can be resumed.
+    #[serde(default)]
+    pub cap: Option<i64>,
     /// Unix seconds, used to evict the oldest first.
     pub created: i64,
     pub error: Option<String>,
@@ -242,6 +246,17 @@ pub fn root_from(configured: Option<&str>) -> PathBuf {
     PathBuf::from(text)
 }
 
+/// What a copy at `cap` bits per second is expected to weigh: the runtime times the bitrate.
+/// The server sends no length for a transcode, so this is what the budget check and the progress
+/// bar use until the real size is known.
+pub fn expected_size(runtime_ticks: i64, cap: i64) -> u64 {
+    if runtime_ticks <= 0 || cap <= 0 {
+        return 0;
+    }
+    let seconds = runtime_ticks as u64 / 10_000_000;
+    seconds.saturating_mul(cap as u64) / 8
+}
+
 /// The budget in bytes, clamped to something a disk can hold.
 pub fn budget_bytes(gb: f64) -> u64 {
     let gb = if gb.is_finite() {
@@ -320,6 +335,16 @@ pub fn file_name(item: &Item) -> String {
     format!("{}.{}", sanitised(&item.id), container)
 }
 
+/// The file name for a copy the server makes at a cap: the bytes are an MP4, whatever the
+/// original container was.
+pub fn file_name_for(item: &Item, transcoded: bool) -> String {
+    if transcoded {
+        format!("{}.mp4", sanitised(&item.id))
+    } else {
+        file_name(item)
+    }
+}
+
 /// A path component that is safe to join: letters, digits, `-`, `_`, at most 48 of them, plus a
 /// hash of the original so truncation and substitution cannot make two items share a file.
 fn sanitised(id: &str) -> String {
@@ -343,6 +368,16 @@ fn sanitised(id: &str) -> String {
         hash = hash.wrapping_mul(0x0100_0193);
     }
     format!("{stem}-{hash:08x}")
+}
+
+/// `4 Mbps`, `1.3 Mbps` — the bitrate a copy was made at, in the menu's words.
+pub fn quality_label(cap: i64) -> String {
+    let mbps = cap as f64 / 1_000_000.0;
+    if (mbps - mbps.round()).abs() < 0.05 {
+        format!("{mbps:.0} Mbps")
+    } else {
+        format!("{mbps:.1} Mbps")
+    }
 }
 
 /// "812 MB", "4.2 GB", "0 B" — one decimal from a gigabyte up, rounded below it.
@@ -400,6 +435,7 @@ mod tests {
             done: size,
             state,
             kept,
+            cap: None,
             created,
             error: None,
         }
@@ -536,6 +572,34 @@ mod tests {
             },
         ];
         assert_eq!(used(&entries), 150);
+    }
+
+    #[test]
+    fn a_transcoded_copy_is_an_mp4_whatever_the_original_was() {
+        let mut movie = item("metropolis", "Metropolis");
+        movie.media_sources = vec![jellyfin_api::MediaSource {
+            id: "s".into(),
+            container: Some("mkv".into()),
+            ..jellyfin_api::MediaSource::default()
+        }];
+        assert!(
+            file_name(&movie).ends_with(".mkv"),
+            "the original keeps its container"
+        );
+        assert!(file_name_for(&movie, true).ends_with(".mp4"));
+        let _ = movie;
+    }
+
+    #[test]
+    fn a_transcoded_copy_is_estimated_from_its_runtime_and_cap() {
+        // 48 minutes at 4 Mbps: 2880 s * 4_000_000 bits / 8 = 1.44 GB.
+        assert_eq!(
+            expected_size(48 * 60 * 10_000_000, 4_000_000),
+            1_440_000_000
+        );
+        // Nothing to estimate without a runtime or a cap.
+        assert_eq!(expected_size(0, 4_000_000), 0);
+        assert_eq!(expected_size(48 * 60 * 10_000_000, 0), 0);
     }
 
     #[test]

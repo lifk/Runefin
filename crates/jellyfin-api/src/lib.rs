@@ -20,7 +20,10 @@
 pub mod client;
 pub mod models;
 
-pub use client::{Client, Error, ItemQuery, LiveStream, PlaybackInfoRequest, normalise_base_url};
+pub use client::{
+    Client, DownloadSource, Error, ItemQuery, LiveStream, PlaybackInfoRequest, Stream,
+    normalise_base_url,
+};
 pub use models::{
     AudioTrack, AuthResult, ChapterInfo, CurrentProgram, ImageKind, Item, ItemsContainer,
     ItemsResult, LibraryView, MediaSegment, MediaSource, MediaStream, NameGuid, Person,

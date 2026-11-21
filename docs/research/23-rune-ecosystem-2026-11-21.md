@@ -165,3 +165,24 @@ before the credits.
 Still open from the Phase 3 plan: automatic download-on-play with Keep promotion, "download the
 next 3 unwatched episodes", offline browsing of Home/Library/Detail (Q4), flushing playback
 reports queued while the server was away, and posters for rows whose image cache is cold.
+
+**Downloads at a transcoded size, probed live (2026-11-21).** Jellyfin gives a client two ways to
+ask for a smaller copy, and the DeviceProfile picks which:
+
+- `TranscodingProfile` with `Protocol: hls` → the answer's `TranscodingUrl` is
+  `/videos/{id}/master.m3u8`, whose child is `live.m3u8`: a sliding playlist of segments. A
+  downloader would have to walk the playlist and concatenate segments, and a pause throws the
+  session away.
+- `TranscodingProfile` with `Protocol: http`, container `mp4` → the answer's `TranscodingUrl` is
+  `/videos/{id}/stream.mp4?static=false&…`: **one progressive MP4**. That is the one the
+  download worker can write unchanged, and it is what Runefin asks for. A direct-play or
+  direct-stream capability in the same profile would let the server answer with the original
+  file, so the download request turns both off: a cap must mean a smaller copy.
+
+Verified on the live server (12.4.0): a 1.5 Mbps cap with that profile returns
+`VideoBitrate=1308000&AudioBitrate=192000&TranscodeReasons=ContainerBitrateExceedsLimit` and the
+progressive URL. What could **not** be verified is the bytes: this server has
+`HardwareAccelerationType: qsv` while the box has no Intel GPU, so every transcode request — HLS
+variant or progressive — answers `500 Error processing request` about 150 ms in. Switching the
+encoding settings to `vaapi` (the GPU that runs the app) or `none` should make both paths work;
+until then the download fails with the server's status, and the app says so.

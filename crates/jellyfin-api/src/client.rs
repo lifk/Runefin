@@ -21,6 +21,17 @@ pub struct Client {
     agent: ureq::Agent,
 }
 
+/// Where a download's bytes come from.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DownloadSource {
+    /// The item's own file: the exact size is known and the server can resume it.
+    Original(String),
+    /// A copy the server makes at a bitrate cap: one progressive file, not resumable.
+    Transcoded(String),
+    /// The item's own streams in another container (a remux): also progressive.
+    Remux(String),
+}
+
 /// A media stream opened for a download: the body to copy, and the size the server reported.
 pub struct Stream {
     pub reader: Box<dyn std::io::Read + Send>,
@@ -39,6 +50,9 @@ pub enum Error {
     Transport(String),
     /// The body parsed as JSON but not as the expected type.
     Decode(String),
+    /// The server answered, and the answer has nothing to offer for this question (a download
+    /// it will not transcode, for one). The message is written for a reader, not a log.
+    Refused(String),
 }
 
 impl Error {
@@ -48,7 +62,7 @@ impl Error {
         match self {
             Error::Transport(_) => true,
             Error::Status { code, .. } => *code >= 500,
-            Error::Decode(_) => false,
+            Error::Decode(_) | Error::Refused(_) => false,
         }
     }
 }
@@ -63,6 +77,7 @@ impl fmt::Display for Error {
             Error::Decode(e) => {
                 write!(f, "unexpected answer from the server: {}", redact(e))
             }
+            Error::Refused(reason) => write!(f, "{}", redact(reason)),
         }
     }
 }
@@ -116,6 +131,7 @@ impl Error {
             Error::Status { code, .. } => format!("The server refused the request ({code})."),
             Error::Transport(_) => "Can't reach the server.".into(),
             Error::Decode(_) => "The server sent something unexpected.".into(),
+            Error::Refused(reason) => redact(reason),
         }
     }
 }
@@ -403,6 +419,98 @@ impl Client {
             &format!("/Items/{}/PlaybackInfo", urlencode(item_id)),
             request,
         )
+    }
+
+    /// The profile a download negotiates with. Unlike the player's, it asks for **one
+    /// progressive MP4 at the cap** (`Protocol: http`) rather than a playlist: a file on disk
+    /// has no use for segments, and one stream is what the download worker writes.
+    pub fn download_profile() -> serde_json::Value {
+        serde_json::json!({
+            "Name": "Runefin",
+            "MaxStreamingBitrate": 120_000_000,
+            "MaxStaticBitrate": 120_000_000,
+            "DirectPlayProfiles": [
+                {
+                    "Type": "Video",
+                    "Container": "mkv,mp4,m4v,webm,ts,mpegts",
+                    "VideoCodec": "h264",
+                    "AudioCodec": "aac,mp3"
+                }
+            ],
+            "TranscodingProfiles": [
+                {
+                    "Type": "Video",
+                    "Container": "mp4",
+                    "Protocol": "http",
+                    "Context": "Streaming",
+                    "VideoCodec": "h264",
+                    "AudioCodec": "aac",
+                    "MaxAudioChannels": "2"
+                }
+            ],
+            "CodecProfiles": [
+                {
+                    "Type": "Video",
+                    "Codec": "h264",
+                    "Conditions": [
+                        { "Condition": "LessThanEqual", "Property": "VideoBitDepth", "Value": "8", "IsRequired": true }
+                    ]
+                }
+            ]
+        })
+    }
+
+    /// The URL a download should fetch. No cap means the item's own file; a cap asks the server
+    /// for a smaller copy it makes on the way out (`POST /Items/{id}/PlaybackInfo` with the
+    /// download profile), which is a single progressive stream, not HLS.
+    pub fn download_source(
+        &self,
+        item_id: &str,
+        source_id: Option<&str>,
+        cap: Option<i64>,
+    ) -> Result<DownloadSource> {
+        let Some(cap) = cap.filter(|cap| *cap > 0) else {
+            return self
+                .direct_stream_url_with_source(item_id, source_id)
+                .map(DownloadSource::Original)
+                .ok_or_else(|| {
+                    Error::Refused("This session has no token to download with.".into())
+                });
+        };
+        let Some(user_id) = self.user_id.as_deref() else {
+            return Err(Error::Refused(
+                "This session has no user to negotiate a download with.".into(),
+            ));
+        };
+        let request = PlaybackInfoRequest {
+            user_id: user_id.to_string(),
+            start_time_ticks: 0,
+            max_streaming_bitrate: Some(cap),
+            media_source_id: source_id.map(str::to_string),
+            audio_stream_index: None,
+            subtitle_stream_index: None,
+            max_audio_channels: Some(2),
+            // A cap means "give me a smaller copy": letting the server direct-play would hand
+            // back the original file, and the reader would pay the size they asked to avoid.
+            enable_direct_play: false,
+            enable_direct_stream: false,
+            enable_transcoding: true,
+            allow_video_stream_copy: true,
+            allow_audio_stream_copy: true,
+            device_profile: Self::download_profile(),
+        };
+        let response = self.playback_info(item_id, &request)?;
+        let (url, transcoded) = download_source_of(&response, source_id).ok_or_else(|| {
+            Error::Refused(format!(
+                "The server will not make a {} download of this item.",
+                bitrate_label(cap)
+            ))
+        })?;
+        Ok(if transcoded {
+            DownloadSource::Transcoded(self.absolute_url(&url))
+        } else {
+            DownloadSource::Remux(self.absolute_url(&url))
+        })
     }
 
     /// The profile this build sends. It describes the GStreamer plugins the player already
@@ -1662,6 +1770,30 @@ impl ItemQuery {
         push("startIndex", &self.start_index.to_string());
         q
     }
+}
+
+/// Which stream in a PlaybackInfo answer a download should use, and whether it is a transcode:
+/// the server names its transcode first, then its remux.
+fn download_source_of(
+    response: &PlaybackInfoResponse,
+    source_id: Option<&str>,
+) -> Option<(String, bool)> {
+    let source = source_id
+        .and_then(|id| response.media_sources.iter().find(|source| source.id == id))
+        .or_else(|| response.media_sources.first())?;
+    if let Some(url) = &source.transcoding_url {
+        return Some((url.clone(), true));
+    }
+    source
+        .direct_stream_url
+        .clone()
+        .filter(|_| source.supports_direct_stream)
+        .map(|url| (url, false))
+}
+
+/// `4.0 Mbps` / `1.3 Mbps` — the units the quality menu uses.
+fn bitrate_label(bits: i64) -> String {
+    format!("{:.1} Mbps", bits as f64 / 1_000_000.0)
 }
 
 fn map_err(e: ureq::Error) -> Error {

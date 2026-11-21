@@ -154,6 +154,10 @@ pub struct Config {
     /// Storage budget for downloads, in GB. Absent means 20.
     #[serde(default)]
     pub downloads_budget_gb: Option<f64>,
+    /// The size a download asks for: `None` is the item's own file, a value is a bitrate cap
+    /// the server makes a smaller copy at.
+    #[serde(default)]
+    pub download_quality: Option<PlaybackQuality>,
     #[serde(default)]
     pub light_theme: Option<bool>,
     /// `"big-screen"` for the 10-foot layout; absent or `"desktop"` is the desk UI.

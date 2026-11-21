@@ -144,6 +144,32 @@ impl State {
         self.send_images(requests);
     }
 
+    /// The size a new download asks for: the item's own file, or a copy at a bitrate cap.
+    /// `Auto` is a playback choice, not a size, so it means the original here.
+    pub fn download_quality(&self) -> crate::config::PlaybackQuality {
+        use crate::config::PlaybackQuality;
+        match self.config.download_quality {
+            None | Some(PlaybackQuality::Auto) => PlaybackQuality::Original,
+            Some(quality) => quality,
+        }
+    }
+
+    /// Walk the download sizes and remember the choice. `Auto` is skipped: for a copy on disk
+    /// there is no "whatever fits", only the file or a cap.
+    pub fn cycle_download_quality(&mut self) {
+        use crate::config::PlaybackQuality;
+        let next = match self.download_quality() {
+            PlaybackQuality::Auto | PlaybackQuality::Original => PlaybackQuality::Mbps20,
+            PlaybackQuality::Mbps20 => PlaybackQuality::Mbps12,
+            PlaybackQuality::Mbps12 => PlaybackQuality::Mbps8,
+            PlaybackQuality::Mbps8 => PlaybackQuality::Mbps4,
+            PlaybackQuality::Mbps4 => PlaybackQuality::Mbps2,
+            PlaybackQuality::Mbps2 => PlaybackQuality::Original,
+        };
+        self.config.download_quality = Some(next);
+        self.show_toast(format!("Downloads at {}.", next.label()));
+    }
+
     /// The budget in gigabytes: the setting, or the shipped default.
     pub fn downloads_budget(&self) -> f64 {
         self.config
@@ -195,12 +221,18 @@ impl State {
             }
             return;
         }
-        let size = item
-            .media_sources
-            .first()
-            .and_then(|source| source.size)
-            .unwrap_or(0)
-            .max(0) as u64;
+        // A copy at a cap has no length until the server makes it: estimate from the runtime so
+        // the budget check and the progress bar have something to work with.
+        let cap = self.download_quality().max_bitrate();
+        let size = match cap {
+            Some(cap) => downloads::expected_size(item.run_time_ticks.unwrap_or(0), cap),
+            None => item
+                .media_sources
+                .first()
+                .and_then(|source| source.size)
+                .unwrap_or(0)
+                .max(0) as u64,
+        };
         let budget = downloads::budget_bytes(self.downloads_budget());
         match downloads::eviction_plan(&self.downloads.entries, budget, size) {
             Ok(plan) => {
@@ -216,11 +248,12 @@ impl State {
         self.downloads.entries.push(Entry {
             item: item.clone(),
             source_id: None,
-            file: downloads::file_name(item),
+            file: downloads::file_name_for(item, cap.is_some()),
             size,
             done: 0,
             state: EntryState::Queued,
             kept: true,
+            cap,
             created: crate::home_cache::now_secs(),
             error: None,
         });
@@ -299,15 +332,37 @@ impl State {
             // No session: the entry waits as `Queued` and starts on the next sign-in.
             return;
         };
-        let Some(url) = client.direct_stream_url_with_source(id, entry.source_id.as_deref()) else {
-            self.fail_download(id, "The server has no stream for this item.");
-            return;
+        // The entry remembers the size it was queued at, so changing the setting later never
+        // leaves a row promising one thing and holding another. A cap is negotiated with the
+        // server by the worker (the request would block here); the item's own file is just a
+        // URL, and resumes where it stopped.
+        let plan = match entry.cap {
+            Some(cap) => crate::net::DownloadPlan::Transcoded {
+                item_id: id.to_string(),
+                source_id: entry.source_id.clone(),
+                cap,
+            },
+            None => {
+                let Some(url) =
+                    client.direct_stream_url_with_source(id, entry.source_id.as_deref())
+                else {
+                    self.fail_download(id, "The server has no stream for this item.");
+                    return;
+                };
+                crate::net::DownloadPlan::Direct(url)
+            }
         };
+        let transcoded = matches!(plan, crate::net::DownloadPlan::Transcoded { .. });
         let part = store.part_path(&entry);
-        self.worker.download(id.to_string(), client, url, part);
+        self.worker.download(id.to_string(), client, plan, part);
         if let Some(entry) = self.download_entry_mut(id) {
             entry.state = EntryState::Downloading;
             entry.error = None;
+            if transcoded {
+                // A copy the server makes cannot resume: the session it belonged to is gone, so
+                // the server starts the encode over and so does the file.
+                entry.done = 0;
+            }
         }
         self.save_downloads();
     }

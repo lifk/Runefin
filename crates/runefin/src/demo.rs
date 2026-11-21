@@ -305,6 +305,7 @@ pub fn downloads() -> Vec<crate::downloads::Entry> {
                 done,
                 state,
                 kept,
+                cap: None,
                 created,
                 error: None,
             });
@@ -339,14 +340,19 @@ pub fn downloads() -> Vec<crate::downloads::Entry> {
         );
     }
     if let Some(item) = data.recently_played.first() {
+        // A copy the server made at a cap: no length until it ends, so the page shows the
+        // estimate from the runtime.
         push(
             item.clone(),
             DownloadState::Paused,
-            2_400_000_000,
-            930_000_000,
+            1_440_000_000,
+            560_000_000,
             true,
             3,
         );
+        if let Some(entry) = entries.last_mut() {
+            entry.cap = Some(4_000_000);
+        }
     }
     entries
 }

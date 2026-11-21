@@ -209,9 +209,23 @@ struct DownloadControl {
     cancelled: std::sync::atomic::AtomicBool,
 }
 
+/// How a download gets its bytes. The item's own file is a URL already; a smaller copy has to
+/// be negotiated with the server when the worker starts, because that closes on a transcode.
+#[derive(Debug, Clone)]
+pub enum DownloadPlan {
+    /// The item's own file: resumable, and its size is known before the first byte.
+    Direct(String),
+    /// A copy at `cap` bits per second. One progressive stream: no range, no resume.
+    Transcoded {
+        item_id: String,
+        source_id: Option<String>,
+        cap: i64,
+    },
+}
+
 struct DownloadJob {
     client: Client,
-    url: String,
+    plan: DownloadPlan,
     /// The `.part` file the bytes accumulate in.
     part: std::path::PathBuf,
     id: String,
@@ -247,6 +261,33 @@ fn download_worker(
     }
 }
 
+/// The URL to pull, and whether it is a copy the server is making at a cap (which cannot be
+/// resumed and has no size until it ends).
+fn download_url(job: &DownloadJob) -> Result<(String, bool), String> {
+    match &job.plan {
+        DownloadPlan::Direct(url) => Ok((url.clone(), false)),
+        DownloadPlan::Transcoded {
+            item_id,
+            source_id,
+            cap,
+        } => match job
+            .client
+            .download_source(item_id, source_id.as_deref(), Some(*cap))
+        {
+            // Anything the server produces on the way out is a stream, not a file to resume.
+            Ok(source) => Ok((
+                match source {
+                    jellyfin_api::DownloadSource::Transcoded(url)
+                    | jellyfin_api::DownloadSource::Remux(url)
+                    | jellyfin_api::DownloadSource::Original(url) => url,
+                },
+                true,
+            )),
+            Err(error) => Err(error.user_message()),
+        },
+    }
+}
+
 fn run_download(job: DownloadJob, queue: &Arc<Mutex<Vec<Msg>>>, wake: &Arc<Mutex<Option<Waker>>>) {
     let event = |event: DownloadEvent| {
         if let Ok(mut queue) = queue.lock() {
@@ -266,6 +307,10 @@ fn run_download(job: DownloadJob, queue: &Arc<Mutex<Vec<Msg>>>, wake: &Arc<Mutex
         let done = job.part.metadata().map(|meta| meta.len()).unwrap_or(0);
         return event(DownloadEvent::Paused { done });
     }
+    let (url, transcoded) = match download_url(&job) {
+        Ok(source) => source,
+        Err(message) => return event(DownloadEvent::Failed { message }),
+    };
     let mut file = match std::fs::OpenOptions::new()
         .create(true)
         .append(true)
@@ -278,9 +323,19 @@ fn run_download(job: DownloadJob, queue: &Arc<Mutex<Vec<Msg>>>, wake: &Arc<Mutex
             });
         }
     };
-    // Resume from what is actually on disk, not from what the manifest last saved.
-    let mut from = file.metadata().map(|meta| meta.len()).unwrap_or(0);
-    let mut stream = match job.client.open_stream(&job.url, from) {
+    // Resume from what is actually on disk, not from what the manifest last saved. A copy the
+    // server makes at a cap cannot be resumed — the transcode is gone — so start it over.
+    let mut from = if transcoded {
+        if file.set_len(0).is_err() {
+            return event(DownloadEvent::Failed {
+                message: format!("{}: could not restart the file", job.part.display()),
+            });
+        }
+        0
+    } else {
+        file.metadata().map(|meta| meta.len()).unwrap_or(0)
+    };
+    let mut stream = match job.client.open_stream(&url, from) {
         Ok(stream) => stream,
         Err(error) => {
             return event(DownloadEvent::Failed {
@@ -494,14 +549,20 @@ impl Worker {
 
     /// Queue a download of `url` into `part`, resuming at whatever the file already holds.
     /// Returns at once: progress and the ending arrive as `Msg::Download`.
-    pub fn download(&self, id: String, client: Client, url: String, part: std::path::PathBuf) {
+    pub fn download(
+        &self,
+        id: String,
+        client: Client,
+        plan: DownloadPlan,
+        part: std::path::PathBuf,
+    ) {
         let control = Arc::new(DownloadControl::default());
         let (slot, ready) = &*self.downloads;
         let mut slot = slot.lock().unwrap_or_else(|error| error.into_inner());
         slot.controls.insert(id.clone(), Arc::clone(&control));
         slot.jobs.push_back(DownloadJob {
             client,
-            url,
+            plan,
             part,
             id,
             control,

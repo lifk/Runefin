@@ -635,3 +635,40 @@ fn a_collection_can_take_new_members_and_give_them_back() {
         .expect("delete the probe collection");
     eprintln!("collection: created, added, verified 2 members, uploaded a cover, removed, deleted");
 }
+
+/// A download at a cap negotiates one progressive stream, not a playlist. Read-only: the
+/// PlaybackInfo request does not start a transcode (the first byte of the URL would), so this
+/// checks the API shape without making the server encode anything.
+#[test]
+#[ignore = "needs a real Jellyfin server; set JELLYFIN_URL, JELLYFIN_USER_ID and JELLYFIN_TOKEN"]
+fn a_capped_download_negotiates_one_progressive_stream() {
+    let client = Client::new(&env("JELLYFIN_URL"), "runefin-live")
+        .with_session(env("JELLYFIN_TOKEN"), env("JELLYFIN_USER_ID"));
+    let query = ItemQuery {
+        recursive: true,
+        limit: 12,
+        include_types: vec!["Episode", "Movie"],
+        ..ItemQuery::default()
+    };
+    let items = client.items(&query).expect("items");
+    let item = items
+        .items
+        .iter()
+        .find(|item| !item.id.is_empty())
+        .expect("an item");
+    let source = client
+        .download_source(&item.id, None, Some(4_000_000))
+        .expect("a 4 Mbps download offer");
+    match source {
+        jellyfin_api::DownloadSource::Transcoded(url) => {
+            assert!(url.contains("/stream."), "one progressive file: {url}");
+            assert!(!url.contains("m3u8"), "not a playlist: {url}");
+        }
+        other => panic!("the server answered {other:?}; a cap should transcode"),
+    }
+    // The item's own file needs no negotiation and is what "Original" asks for.
+    let direct = client
+        .download_source(&item.id, None, None)
+        .expect("the original file");
+    assert!(matches!(direct, jellyfin_api::DownloadSource::Original(_)));
+}

@@ -168,7 +168,10 @@ fn row_for(s: &State, entry: &Entry, t: &tok::Theme) -> El {
     } else {
         downloads::size(entry.done)
     };
-    let detail = format!("{line} · {size}");
+    let detail = match entry.cap {
+        Some(cap) => format!("{line} · {size} · {} copy", downloads::quality_label(cap)),
+        None => format!("{line} · {size}"),
+    };
 
     let mut row = row()
         .key(format!("download-{id}"))

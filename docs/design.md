@@ -257,6 +257,16 @@ download comes back **Paused** at the size the `.part` actually has. Resume is a
 request; a server that ignores the range restarts the file. One download runs at a time, on its
 own thread, so a background copy never competes with frames or with the player.
 
+Settings → Downloads also chooses **what size** a download is: **Original** keeps the item's own
+file, and a bitrate asks the server for a smaller copy. That copy is negotiated with
+`POST /Items/{id}/PlaybackInfo` using a download profile — `Protocol: http`, container `mp4`, no
+direct play or direct stream, so a cap can never hand back the file it was meant to shrink — and
+the answer's `TranscodingUrl` is a single progressive MP4, not HLS. One stream is what a file on
+disk wants, and it is what the worker writes. A made copy cannot resume: pausing ends the
+transcode, so resuming starts it over, and its length is unknown until it ends, so the budget and
+the progress bar use the runtime times the cap meanwhile. Its file is named `.mp4` whatever the
+original container was, and the row says `4 Mbps copy`.
+
 States are **Queued**, **Downloading**, **Paused**, **On this device** and **Failed**, and each
 row offers Play (finished only), Pause/Resume or Retry, Keep and Remove. **Keep** pins a copy:
 eviction takes unkept finished copies oldest-first when a new download needs room, and a download

@@ -2694,6 +2694,7 @@ mod tests {
             done,
             state: state_value,
             kept,
+            cap: None,
             created: 0,
             error: None,
         }
@@ -2723,6 +2724,7 @@ mod tests {
         state.downloads.root = "/tmp/runefin/downloads".into();
         state.route = Route::Downloads;
         let done = state.downloads.entries[1].item.id.clone();
+        let capped = state.downloads.entries[3].item.id.clone();
         let running = state.downloads.entries[2].item.id.clone();
         let paused = state.downloads.entries[3].item.id.clone();
         let mut rt = Runtime::new(state, view, (1280.0, 800.0), env);
@@ -2738,6 +2740,7 @@ mod tests {
             format!("download-state-{running}"),
             format!("download-pause-{running}"),
             format!("download-resume-{paused}"),
+            format!("download-detail-{capped}"),
         ] {
             assert!(rt.find(&key).is_some(), "{key} is on the downloads page");
         }
@@ -2838,6 +2841,33 @@ mod tests {
             settle(&mut state, |_| !store.file_path(&entry).exists()),
             "removing an entry frees its file"
         );
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn a_download_at_a_cap_is_estimated_before_the_server_makes_it() {
+        let (mut state, root) = downloads_state("capped", Vec::new());
+        // No session: nothing starts, which is exactly what makes this test hermetic. The entry
+        // still knows the size it is asking for.
+        state.step = Step::Idle;
+        state.config.download_quality = Some(crate::config::PlaybackQuality::Mbps4);
+        let item = jellyfin_api::Item {
+            id: "quiet-floor-s2e5".into(),
+            name: "The Long Corridor".into(),
+            kind: "Episode".into(),
+            run_time_ticks: Some(48 * 60 * 10_000_000),
+            ..jellyfin_api::Item::default()
+        };
+        state.download_item(&item);
+        let entry = state.download_entry(&item.id).expect("the entry");
+        assert_eq!(entry.cap, Some(4_000_000), "it asks for a 4 Mbps copy");
+        assert_eq!(
+            entry.size,
+            crate::downloads::expected_size(48 * 60 * 10_000_000, 4_000_000),
+            "the estimate comes from the runtime and the cap"
+        );
+        assert_eq!(entry.state, crate::downloads::State::Queued);
+        assert!(entry.cap.is_some(), "the copy cannot resume");
         let _ = std::fs::remove_dir_all(root);
     }
 

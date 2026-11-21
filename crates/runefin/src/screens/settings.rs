@@ -1469,6 +1469,57 @@ pub(super) fn settings_screen(s: &State) -> El {
         )
         .child(
             row()
+                .key("setting-download-quality")
+                .w_full()
+                .gap(16.0)
+                .items_center()
+                .focus_group()
+                .child(
+                    text("Download quality")
+                        .font(type_::label())
+                        .color(t.text_secondary)
+                        .w(220.0),
+                )
+                .child(el().grow(1.0))
+                .child(
+                    el().key("setting-download-quality-value")
+                        .role("button")
+                        .label("Download quality")
+                        .h(32.0)
+                        .min_w(150.0)
+                        .px(14.0)
+                        .radius(10.0)
+                        .center()
+                        .fill(t.bg)
+                        .hover(t.hover)
+                        .motion(crate::theme::motion::CONTROL)
+                        .focusable(true)
+                        .focus_visual(2.0)
+                        .press_scale(0.97)
+                        .child(
+                            text(s.download_quality().label())
+                                .font(type_::label())
+                                .color(t.text),
+                        )
+                        .child(
+                            text("▾")
+                                .font(type_::caption())
+                                .color(t.text_secondary)
+                                .ml(8.0),
+                        )
+                        .cursor(rune::Cursor::Pointer)
+                        .on_press(|s: &mut State| s.cycle_download_quality()),
+                ),
+        )
+        .child(
+            text("Original keeps the file as the server stores it. A bitrate asks the server to transcode a smaller copy; that copy cannot resume after a pause.")
+                .key("setting-download-quality-note")
+                .font(type_::caption())
+                .color(t.text_secondary)
+                .padding(2.0),
+        )
+        .child(
+            row()
                 .key("setting-downloads-budget-row")
                 .w_full()
                 .gap(10.0)

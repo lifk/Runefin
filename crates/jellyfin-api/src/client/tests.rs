@@ -367,3 +367,72 @@ fn the_video_transcode_profile_offers_five_point_one() {
         .expect("a video profile");
     assert_eq!(video["MaxAudioChannels"], "6");
 }
+
+#[test]
+fn the_download_profile_asks_for_one_progressive_file() {
+    let profile = Client::download_profile();
+    let video = profile["TranscodingProfiles"]
+        .as_array()
+        .expect("transcoding profiles")
+        .iter()
+        .find(|entry| entry["Type"] == "Video")
+        .expect("a video profile");
+    // `http`, not `hls`: a file on disk cannot use a playlist of segments.
+    assert_eq!(video["Protocol"], "http");
+    assert_eq!(video["Container"], "mp4");
+}
+
+#[test]
+fn a_download_prefers_the_transcode_the_server_offers() {
+    let response = playback_info(&[(
+        "src",
+        Some("/videos/x/stream.mp4?static=false"),
+        Some("/videos/x/master.m3u8"),
+    )]);
+    assert_eq!(
+        download_source_of(&response, None),
+        Some(("/videos/x/master.m3u8".to_string(), true)),
+        "a transcode wins: the reader asked for a smaller copy"
+    );
+}
+
+#[test]
+fn a_download_falls_back_to_a_remux_and_then_to_nothing() {
+    let remux = playback_info(&[("src", Some("/videos/x/stream.mkv?static=false"), None)]);
+    assert_eq!(
+        download_source_of(&remux, None),
+        Some(("/videos/x/stream.mkv?static=false".to_string(), false))
+    );
+    let empty = playback_info(&[("src", None, None)]);
+    assert_eq!(download_source_of(&empty, None), None);
+}
+
+#[test]
+fn a_download_picks_the_source_it_asked_for() {
+    let response = playback_info(&[
+        ("first", None, Some("/videos/first/master.m3u8")),
+        ("second", None, Some("/videos/second/master.m3u8")),
+    ]);
+    assert_eq!(
+        download_source_of(&response, Some("second")),
+        Some(("/videos/second/master.m3u8".to_string(), true))
+    );
+}
+
+/// A PlaybackInfo answer with one source per tuple: `(id, direct stream, transcode)`.
+fn playback_info(sources: &[(&str, Option<&str>, Option<&str>)]) -> PlaybackInfoResponse {
+    PlaybackInfoResponse {
+        media_sources: sources
+            .iter()
+            .map(|(id, direct, transcode)| PlaybackMediaSource {
+                id: (*id).to_string(),
+                direct_stream_url: direct.map(str::to_string),
+                transcoding_url: transcode.map(str::to_string),
+                supports_direct_stream: direct.is_some(),
+                supports_transcoding: transcode.is_some(),
+                ..PlaybackMediaSource::default()
+            })
+            .collect(),
+        play_session_id: None,
+    }
+}
