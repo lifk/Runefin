@@ -33,7 +33,7 @@ zeroize = "1"
 # dep means a red build nobody changed.
 zbus = { version = "6", default-features = false, features = ["tokio", "service"] }
 tokio = { version = "1", features = ["rt", "net", "time"] }
-rune = { git = "https://github.com/lifk/rune", rev = "e9dcf1a2c5ad59620aa682dc4317bf8396196926", default-features = false, features = ["embedded-fonts", "svg", "dbus", "accessibility"] }
+rune = { git = "https://github.com/lifk/rune", rev = "7ceb1c5c5affcfcfcca64f4da553bd0f1358c88b", default-features = false, features = ["embedded-fonts", "svg", "dbus", "accessibility"] }
 gilrs = "0.11.2"
 # A Steam "Exit game" (and Ctrl+C in a terminal) sends SIGTERM/SIGINT, which would bypass every
 # save and playback-stop path. signal-hook turns both into the app's own quit; see design.md §7.

@@ -387,7 +387,7 @@ pub(super) fn playlist_create_modal(s: &State, item: &Item, t: &tok::Theme) -> E
             // The field owns the arrow keys; Down is how a remote reaches Create.
             if s.big_screen && key.key == rune::Key::Down {
                 s.note_focus("playlist-create-submit".into());
-                tx.focus_key("playlist-create-submit".to_string());
+                tx.focus("playlist-create-submit".to_string(), true);
                 return true;
             }
             false

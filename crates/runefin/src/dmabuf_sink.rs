@@ -5,7 +5,6 @@
 //! `BaseSink` gives us the pad template, the `VideoMeta`, and the buffer lifetime without mapping
 //! a byte.
 
-use std::os::fd::OwnedFd;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -23,34 +22,15 @@ use rune::NativeSurface;
 
 use crate::playback_trace::Trace;
 use crate::player::ColourFacts;
-use rune::native_surface::dmabuf::{DmabufFrame, Lease, Plane};
-use rune::native_surface::{ColorInfo, Format, Matrix, Transfer};
+use rune::native_surface::linux::{Dmabuf, DmabufBuffer, DmabufPlane};
+use rune::native_surface::{ColorInfo, Matrix, Transfer};
 
 struct DrmCaps {
     width: u32,
     height: u32,
-    format: Format,
+    /// `DRM_FORMAT_ARGB8888`: this Rune imports linear BGRA dmabufs only.
+    fourcc: u32,
     modifier: u64,
-    color: ColorInfo,
-}
-
-struct BufferLease {
-    _buffer: gst::Buffer,
-}
-
-impl std::fmt::Debug for BufferLease {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("BufferLease").finish_non_exhaustive()
-    }
-}
-
-impl Lease for BufferLease {
-    fn presented(&mut self) {}
-
-    fn release(self: Box<Self>, _release_fence: Option<OwnedFd>) {
-        // Dropping the buffer returns it to GStreamer's pool. Rune releases the lease only after
-        // the GPU work that sampled it has completed.
-    }
 }
 
 #[derive(Default)]
@@ -122,8 +102,15 @@ impl BaseSinkImpl for Imp {
             .map_err(|_| gst::loggable_error!(gst::CAT_RUST, "caps have no drm-format"))?;
         let (fourcc, modifier) = parse_drm_format(drm)
             .map_err(|message| gst::loggable_error!(gst::CAT_RUST, "{}", message))?;
-        let format = DmabufFrame::from_fourcc(fourcc)
-            .ok_or_else(|| gst::loggable_error!(gst::CAT_RUST, "unsupported DRM format {drm}"))?;
+        // Rune's dmabuf path imports one linear BGRA8 plane; a P010/NV12 surface would need the
+        // colour pipeline this port has not restored yet (see docs/plans).
+        const DRM_FORMAT_ARGB8888: u32 = u32::from_le_bytes(*b"AR24");
+        if fourcc != DRM_FORMAT_ARGB8888 {
+            return Err(gst::loggable_error!(
+                gst::CAT_RUST,
+                "unsupported DRM format {drm}: expected BGRA8 (ARGB8888) dmabufs"
+            ));
+        }
         let info = VideoInfo::from_caps(caps)
             .map_err(|error| gst::loggable_error!(gst::CAT_RUST, "{}", error))?;
         let colorimetry = info.colorimetry();
@@ -146,13 +133,7 @@ impl BaseSinkImpl for Imp {
             .unwrap_or_else(|poison| poison.into_inner())
             .lock()
         {
-            *label = Some(match (format, color.transfer) {
-                (Format::P010Video | Format::P010Full, Transfer::Pq) => "P010 PQ",
-                (Format::P010Video | Format::P010Full, Transfer::Hlg) => "P010 HLG",
-                (Format::P010Video | Format::P010Full, _) => "P010",
-                (Format::Nv12Video | Format::Nv12Full, _) => "NV12",
-                (Format::Bgra, _) => "BGRA",
-            });
+            *label = Some("BGRA");
         }
         // Static HDR metadata lives in the caps. Keep it for the Statistics panel and for the
         // tone-map work that follows; absent boxes leave zeroes.
@@ -192,9 +173,8 @@ impl BaseSinkImpl for Imp {
             .unwrap_or_else(|poison| poison.into_inner()) = Some(DrmCaps {
             width: info.width(),
             height: info.height(),
-            format,
+            fourcc,
             modifier,
-            color,
         });
         Ok(())
     }
@@ -224,9 +204,8 @@ impl BaseSinkImpl for Imp {
             .map(|caps| DrmCaps {
                 width: caps.width,
                 height: caps.height,
-                format: caps.format,
+                fourcc: caps.fourcc,
                 modifier: caps.modifier,
-                color: caps.color,
             })
         else {
             return Err(gst::FlowError::NotNegotiated);
@@ -238,37 +217,22 @@ impl BaseSinkImpl for Imp {
         if planes == 0 {
             return Err(gst::FlowError::Error);
         }
-        let mut imported = Vec::with_capacity(planes);
-        for index in 0..planes {
-            let stride = meta.stride()[index];
-            if stride <= 0 {
-                return Err(gst::FlowError::Error);
-            }
-            let memory = buffer.peek_memory(index.min(buffer.n_memory() - 1));
-            let dmabuf = memory
-                .downcast_memory_ref::<DmaBufMemory>()
-                .ok_or(gst::FlowError::NotNegotiated)?;
-            let plane = Plane::from_raw_fd(dmabuf.fd(), meta.offset()[index] as u64, stride as u64)
-                .map_err(|message| {
-                    if let Ok(mut error) = self
-                        .error
-                        .lock()
-                        .unwrap_or_else(|poison| poison.into_inner())
-                        .lock()
-                    {
-                        *error = Some(message);
-                    }
-                    gst::FlowError::Error
-                })?;
-            imported.push(plane);
+        if planes != 1 {
+            return Err(gst::FlowError::NotNegotiated);
         }
-        let frame = DmabufFrame::new(
-            caps.width,
-            caps.height,
-            caps.format,
-            caps.color,
+        let stride = meta.stride()[0];
+        if stride <= 0 {
+            return Err(gst::FlowError::Error);
+        }
+        let memory = buffer.peek_memory(0);
+        let dmabuf = memory
+            .downcast_memory_ref::<DmaBufMemory>()
+            .ok_or(gst::FlowError::NotNegotiated)?;
+        let plane = DmabufPlane::from_raw_fd(
+            dmabuf.fd(),
+            meta.offset()[0] as u32,
+            stride as u32,
             caps.modifier,
-            imported,
         )
         .map_err(|message| {
             if let Ok(mut error) = self
@@ -280,10 +244,24 @@ impl BaseSinkImpl for Imp {
                 *error = Some(message);
             }
             gst::FlowError::Error
-        })?
-        .with_lease(Box::new(BufferLease {
-            _buffer: buffer.clone(),
-        }));
+        })?;
+        let image = DmabufBuffer::new(plane, [caps.width, caps.height], caps.fourcc).map_err(
+            |message| {
+                if let Ok(mut error) = self
+                    .error
+                    .lock()
+                    .unwrap_or_else(|poison| poison.into_inner())
+                    .lock()
+                {
+                    *error = Some(message);
+                }
+                gst::FlowError::Error
+            },
+        )?;
+        // Holding the GStreamer buffer until Rune has read the frame keeps its pool from reusing
+        // the memory; the callback runs on Rune's thread after the GPU copy.
+        let hold = buffer.clone();
+        let frame = Dmabuf::new(std::sync::Arc::new(image)).on_read(move |_| drop(hold));
         let id = self
             .frame_id
             .lock()

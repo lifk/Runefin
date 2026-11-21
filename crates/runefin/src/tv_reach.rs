@@ -54,7 +54,7 @@ fn frame(rt: &mut Runtime<State>) {
 }
 
 fn focus(rt: &mut Runtime<State>, key: &str) {
-    rt.update(|_, tx| tx.focus_key(key.to_string()));
+    rt.update(|_, tx| tx.focus(key.to_string(), true));
     frame(rt);
     frame(rt);
 }

@@ -556,7 +556,7 @@ fn search_box(s: &State, t: &tok::Theme) -> El {
             // The field owns the arrows; on a TV Up/Down must leave for the zones.
             if let Some(target) = crate::tv_focus::step(s, Some("seerr-search"), action) {
                 s.note_focus(target.clone());
-                tx.focus_key(target);
+                tx.focus(target, true);
             }
             true
         })

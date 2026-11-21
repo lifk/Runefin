@@ -141,6 +141,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ar_archive_writer"
+version = "0.5.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "523e5e187fff36fcb8d1d19ccf0ca4ca43ec3d158316057f66dc6f72716bc5ec"
+dependencies = [
+ "object",
+]
+
+[[package]]
 name = "arboard"
 version = "3.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -185,7 +194,7 @@ version = "0.38.0+1.3.281"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0bb44936d800fea8f016d7f2311c6a4f97aebd5dc86f09906139ec848cf3a46f"
 dependencies = [
- "libloading 0.8.9",
+ "libloading",
 ]
 
 [[package]]
@@ -737,7 +746,7 @@ version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ab8ecd87370524b461f8557c119c405552c396ed91fc0a8eec68679eab26f94a"
 dependencies = [
- "libloading 0.8.9",
+ "libloading",
 ]
 
 [[package]]
@@ -1154,17 +1163,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "gl_generator"
-version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1a95dfc23a2b4a9a2f5ab41d194f8bfda3cabec42af4e39f08c339eb2a0c124d"
-dependencies = [
- "khronos_api",
- "log",
- "xml-rs",
-]
-
-[[package]]
 name = "glib"
 version = "0.22.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1205,27 +1203,6 @@ checksum = "99b38907e67e40dec9b60f858bcada952598719cb512a13eb13d6cdcd16f8295"
 dependencies = [
  "libc",
  "system-deps",
-]
-
-[[package]]
-name = "glow"
-version = "0.17.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "29038e1c483364cc6bb3cf78feee1816002e127c331a1eec55a4d202b9e1adb5"
-dependencies = [
- "js-sys",
- "slotmap",
- "wasm-bindgen",
- "web-sys",
-]
-
-[[package]]
-name = "glutin_wgl_sys"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2c4ee00b289aba7a9e5306d57c2d05499b2e5dc427f84ac708bd2c090212cf3e"
-dependencies = [
- "gl_generator",
 ]
 
 [[package]]
@@ -1786,23 +1763,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "khronos-egl"
-version = "6.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6aae1df220ece3c0ada96b8153459b67eebe9ae9212258bb0134ae60416fdf76"
-dependencies = [
- "libc",
- "libloading 0.8.9",
- "pkg-config",
-]
-
-[[package]]
-name = "khronos_api"
-version = "3.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2db585e1d738fc771bf08a151420d3ed193d9d895a36df7f6f8a9456b911ddc"
-
-[[package]]
 name = "kstring"
 version = "2.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1844,16 +1804,6 @@ name = "libloading"
 version = "0.8.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d7c4b02199fee7c5d21a5ae7d8cfa79a6ef5bb2fc834d6e9058e89c825efdc55"
-dependencies = [
- "cfg-if",
- "windows-link",
-]
-
-[[package]]
-name = "libloading"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "754ca22de805bb5744484a5b151a9e1a8e837d5dc232c2d7d8c2e3492edc8b60"
 dependencies = [
  "cfg-if",
  "windows-link",
@@ -2192,6 +2142,7 @@ checksum = "d49e936b501e5c5bf01fda3a9452ff86dc3ea98ad5f283e1455153142d97518c"
 dependencies = [
  "bitflags 2.13.2",
  "objc2 0.6.5",
+ "objc2-core-foundation",
  "objc2-core-graphics",
  "objc2-foundation 0.3.2",
 ]
@@ -2276,9 +2227,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2a180dd8642fa45cdb7dd721cd4c11b1cadd4929ce112ebd8b9f5803cc79d536"
 dependencies = [
  "bitflags 2.13.2",
- "block2 0.6.2",
  "dispatch2",
- "libc",
  "objc2 0.6.5",
 ]
 
@@ -2351,7 +2300,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d425caf1df73233f29fd8a5c3e5edbc30d2d4307870f802d18f00d83dc5141a6"
 dependencies = [
  "bitflags 2.13.2",
- "block2 0.6.2",
  "objc2 0.6.5",
  "objc2-core-foundation",
  "objc2-core-graphics",
@@ -2407,10 +2355,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "180788110936d59bab6bd83b6060ffdfffb3b922ba1396b312ae795e1de9d81d"
 dependencies = [
  "bitflags 2.13.2",
- "libc",
  "objc2 0.6.5",
  "objc2-core-foundation",
- "objc2-foundation 0.3.2",
 ]
 
 [[package]]
@@ -2445,11 +2391,9 @@ checksum = "a0125f776a10d00af4152d74616409f0d4a2053a6f57fa5b7d6aa2854ac04794"
 dependencies = [
  "bitflags 2.13.2",
  "block2 0.6.2",
- "dispatch2",
  "objc2 0.6.5",
  "objc2-core-foundation",
  "objc2-foundation 0.3.2",
- "objc2-io-surface",
 ]
 
 [[package]]
@@ -2532,6 +2476,15 @@ dependencies = [
  "objc2 0.5.3",
  "objc2-core-location",
  "objc2-foundation 0.2.2",
+]
+
+[[package]]
+name = "object"
+version = "0.39.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2e5a6c098c7a3b6547378093f5cc30bc54fd361ce711e05293a5cc589562739b"
+dependencies = [
+ "memchr",
 ]
 
 [[package]]
@@ -2897,6 +2850,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3d595e54a326bc53c1c197b32d295e14b169e3cfeaa8dc82b529f947fba6bcf5"
 
 [[package]]
+name = "psm"
+version = "0.1.32"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4dcd034599e63b970727f70d79e02d62390a4a84f7c6b827c27c46d5ac3fa622"
+dependencies = [
+ "ar_archive_writer",
+ "cc",
+]
+
+[[package]]
 name = "pxfm"
 version = "0.1.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3061,60 +3024,52 @@ dependencies = [
 [[package]]
 name = "rune"
 version = "0.0.1"
-source = "git+https://github.com/lifk/rune?rev=e9dcf1a2c5ad59620aa682dc4317bf8396196926#e9dcf1a2c5ad59620aa682dc4317bf8396196926"
+source = "git+https://github.com/lifk/rune?rev=7ceb1c5c5affcfcfcca64f4da553bd0f1358c88b#7ceb1c5c5affcfcfcca64f4da553bd0f1358c88b"
 dependencies = [
  "accesskit",
  "accesskit_macos",
  "accesskit_unix",
  "accesskit_windows",
  "arboard",
+ "async-channel",
+ "async-executor",
+ "async-io",
  "blake3",
- "block2 0.5.1",
  "block2 0.6.2",
  "bytemuck",
  "console_error_panic_hook",
- "fontique",
- "futures-util",
+ "futures-lite",
  "half",
- "icu_properties",
- "icu_segmenter",
  "image",
  "js-sys",
  "libc",
- "libloading 0.8.9",
- "objc2 0.5.3",
+ "libloading",
  "objc2 0.6.5",
- "objc2-app-kit 0.2.2",
- "objc2-av-foundation",
+ "objc2-app-kit 0.3.2",
  "objc2-core-foundation",
  "objc2-core-graphics",
- "objc2-core-media",
- "objc2-core-text",
  "objc2-core-video",
- "objc2-foundation 0.2.2",
  "objc2-foundation 0.3.2",
- "objc2-io-surface",
  "objc2-metal 0.3.2",
  "parley",
- "parley_engine",
  "png 0.18.1",
  "pollster",
- "portable-atomic",
  "raw-window-handle",
- "resvg",
+ "rune-core",
+ "rune-edit",
+ "rune-gpu",
+ "rune-image",
+ "rune-media",
  "rune-motion",
+ "rune-spell",
  "rune-staging",
  "rune-taffy",
+ "rune-text",
  "rustc-demangle",
  "rustc-hash 2.1.3",
  "serde",
  "serde_json",
- "skrifa",
- "spellbook",
- "swash",
  "taffy",
- "tiny-skia-path 0.11.4 (git+https://github.com/lifk/rune?rev=e9dcf1a2c5ad59620aa682dc4317bf8396196926)",
- "tokio",
  "unicode-segmentation",
  "wasm-bindgen",
  "wasm-bindgen-futures",
@@ -3123,40 +3078,180 @@ dependencies = [
  "wayland-protocols",
  "wayland-protocols-wlr",
  "web-sys",
- "web-time",
  "wgpu",
- "wgpu-core",
- "wgpu-external-frame",
- "wgpu-hal",
  "windows",
  "windows-core",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
  "winit",
  "x11rb",
  "xkbcommon",
- "zbus 6.3.0",
+ "zbus 5.19.0",
  "zeroize",
+]
+
+[[package]]
+name = "rune-core"
+version = "0.0.1"
+source = "git+https://github.com/lifk/rune?rev=7ceb1c5c5affcfcfcca64f4da553bd0f1358c88b#7ceb1c5c5affcfcfcca64f4da553bd0f1358c88b"
+dependencies = [
+ "js-sys",
+ "libc",
+ "portable-atomic",
+ "rune-motion",
+ "rustc-hash 2.1.3",
+ "serde",
+ "serde_json",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
+ "web-time",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "rune-edit"
+version = "0.0.1"
+source = "git+https://github.com/lifk/rune?rev=7ceb1c5c5affcfcfcca64f4da553bd0f1358c88b#7ceb1c5c5affcfcfcca64f4da553bd0f1358c88b"
+dependencies = [
+ "js-sys",
+ "parley",
+ "rune-core",
+ "rune-text",
+ "serde_json",
+ "unicode-segmentation",
+ "zeroize",
+]
+
+[[package]]
+name = "rune-gpu"
+version = "0.0.1"
+source = "git+https://github.com/lifk/rune?rev=7ceb1c5c5affcfcfcca64f4da553bd0f1358c88b#7ceb1c5c5affcfcfcca64f4da553bd0f1358c88b"
+dependencies = [
+ "bytemuck",
+ "objc2 0.6.5",
+ "pollster",
+ "rune-core",
+ "rune-motion",
+ "rune-staging",
+ "wayland-client",
+ "wayland-protocols",
+ "wgpu",
+ "windows",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "rune-image"
+version = "0.0.1"
+source = "git+https://github.com/lifk/rune?rev=7ceb1c5c5affcfcfcca64f4da553bd0f1358c88b#7ceb1c5c5affcfcfcca64f4da553bd0f1358c88b"
+dependencies = [
+ "blake3",
+ "image",
+ "js-sys",
+ "objc2 0.6.5",
+ "objc2-foundation 0.3.2",
+ "resvg",
+ "rune-core",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "rune-media"
+version = "0.0.1"
+source = "git+https://github.com/lifk/rune?rev=7ceb1c5c5affcfcfcca64f4da553bd0f1358c88b#7ceb1c5c5affcfcfcca64f4da553bd0f1358c88b"
+dependencies = [
+ "ash",
+ "block2 0.6.2",
+ "bytemuck",
+ "libc",
+ "objc2 0.6.5",
+ "objc2-av-foundation",
+ "objc2-core-foundation",
+ "objc2-core-graphics",
+ "objc2-core-media",
+ "objc2-core-video",
+ "objc2-foundation 0.3.2",
+ "objc2-io-surface",
+ "objc2-metal 0.3.2",
+ "rune-core",
+ "rune-gpu",
+ "rune-image",
+ "rune-staging",
+ "wgpu",
+ "windows",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
 name = "rune-motion"
 version = "0.1.0"
-source = "git+https://github.com/lifk/rune?rev=e9dcf1a2c5ad59620aa682dc4317bf8396196926#e9dcf1a2c5ad59620aa682dc4317bf8396196926"
+source = "git+https://github.com/lifk/rune?rev=7ceb1c5c5affcfcfcca64f4da553bd0f1358c88b#7ceb1c5c5affcfcfcca64f4da553bd0f1358c88b"
+
+[[package]]
+name = "rune-spell"
+version = "0.0.1"
+source = "git+https://github.com/lifk/rune?rev=7ceb1c5c5affcfcfcca64f4da553bd0f1358c88b#7ceb1c5c5affcfcfcca64f4da553bd0f1358c88b"
+dependencies = [
+ "js-sys",
+ "objc2-app-kit 0.3.2",
+ "objc2-foundation 0.3.2",
+ "rune-core",
+ "rustc-hash 2.1.3",
+ "spellbook",
+ "unicode-segmentation",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
+ "windows",
+ "windows-sys 0.61.2",
+]
 
 [[package]]
 name = "rune-staging"
 version = "0.0.1"
-source = "git+https://github.com/lifk/rune?rev=e9dcf1a2c5ad59620aa682dc4317bf8396196926#e9dcf1a2c5ad59620aa682dc4317bf8396196926"
+source = "git+https://github.com/lifk/rune?rev=7ceb1c5c5affcfcfcca64f4da553bd0f1358c88b#7ceb1c5c5affcfcfcca64f4da553bd0f1358c88b"
 dependencies = [
  "wgpu",
+ "windows",
 ]
 
 [[package]]
 name = "rune-taffy"
 version = "0.0.1"
-source = "git+https://github.com/lifk/rune?rev=e9dcf1a2c5ad59620aa682dc4317bf8396196926#e9dcf1a2c5ad59620aa682dc4317bf8396196926"
+source = "git+https://github.com/lifk/rune?rev=7ceb1c5c5affcfcfcca64f4da553bd0f1358c88b#7ceb1c5c5affcfcfcca64f4da553bd0f1358c88b"
 dependencies = [
+ "stacker",
  "taffy",
+]
+
+[[package]]
+name = "rune-text"
+version = "0.0.1"
+source = "git+https://github.com/lifk/rune?rev=7ceb1c5c5affcfcfcca64f4da553bd0f1358c88b#7ceb1c5c5affcfcfcca64f4da553bd0f1358c88b"
+dependencies = [
+ "bytemuck",
+ "fontique",
+ "icu_properties",
+ "icu_segmenter",
+ "objc2-core-foundation",
+ "objc2-core-text",
+ "parley",
+ "parley_engine",
+ "rune-core",
+ "rune-image",
+ "rune-motion",
+ "rustc-hash 2.1.3",
+ "skrifa",
+ "swash",
+ "tiny-skia-path 0.11.4 (git+https://github.com/lifk/rune?rev=7ceb1c5c5affcfcfcca64f4da553bd0f1358c88b)",
+ "unicode-segmentation",
+ "wasm-bindgen",
+ "windows",
+ "windows-core",
+ "windows-sys 0.61.2",
+ "zeroize",
 ]
 
 [[package]]
@@ -3561,6 +3656,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ce2be8dc25455e1f91df71bfa12ad37d7af1092ae736f3a6cd0e37bc7810596"
 
 [[package]]
+name = "stacker"
+version = "0.1.25"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "707f49d46706bacf8a2b00d51dace3f9de527c13eec3778f570c411f89e69967"
+dependencies = [
+ "cc",
+ "cfg-if",
+ "libc",
+ "psm",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
 name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3623,12 +3731,6 @@ dependencies = [
  "quote",
  "unicode-ident",
 ]
-
-[[package]]
-name = "sync_wrapper"
-version = "1.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0bf256ce5efdfa370213c1dabab5935a12e49f2c58d15e9eac2870d3b4f27263"
 
 [[package]]
 name = "synstructure"
@@ -3776,7 +3878,7 @@ dependencies = [
 [[package]]
 name = "tiny-skia-path"
 version = "0.11.4"
-source = "git+https://github.com/lifk/rune?rev=e9dcf1a2c5ad59620aa682dc4317bf8396196926#e9dcf1a2c5ad59620aa682dc4317bf8396196926"
+source = "git+https://github.com/lifk/rune?rev=7ceb1c5c5affcfcfcca64f4da553bd0f1358c88b#7ceb1c5c5affcfcfcca64f4da553bd0f1358c88b"
 dependencies = [
  "arrayref",
  "bytemuck",
@@ -3806,19 +3908,7 @@ dependencies = [
  "pin-project-lite",
  "signal-hook-registry",
  "socket2",
- "tokio-macros",
  "windows-sys 0.61.2",
-]
-
-[[package]]
-name = "tokio-macros"
-version = "2.7.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "78773a2a397f451582ce068015985c33193cf6dea8b74d2a639fe457b2f07b0e"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 3.0.9",
 ]
 
 [[package]]
@@ -4372,7 +4462,6 @@ dependencies = [
  "smallvec",
  "thiserror 2.0.21",
  "wgpu-core-deps-apple",
- "wgpu-core-deps-emscripten",
  "wgpu-core-deps-windows-linux-android",
  "wgpu-hal",
  "wgpu-naga-bridge",
@@ -4389,41 +4478,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "wgpu-core-deps-emscripten"
-version = "30.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d98b86cf4abf524a902dd35f18ca6a3f08fc2ae9847c8f10b48e30491b1f0b86"
-dependencies = [
- "wgpu-hal",
-]
-
-[[package]]
 name = "wgpu-core-deps-windows-linux-android"
 version = "30.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7586165fd5f6d881cb9ce4bb71f40d6caab2c0f1837e3fc1d9788a197fb6004f"
 dependencies = [
  "wgpu-hal",
-]
-
-[[package]]
-name = "wgpu-external-frame"
-version = "0.4.0"
-source = "git+https://github.com/lifk/rune?rev=e9dcf1a2c5ad59620aa682dc4317bf8396196926#e9dcf1a2c5ad59620aa682dc4317bf8396196926"
-dependencies = [
- "ash",
- "glow",
- "libc",
- "libloading 0.9.0",
- "ndk",
- "objc2 0.6.5",
- "objc2-core-foundation",
- "objc2-io-surface",
- "objc2-metal 0.3.2",
- "sync_wrapper",
- "thiserror 2.0.21",
- "wgpu",
- "windows",
 ]
 
 [[package]]
@@ -4441,18 +4501,13 @@ dependencies = [
  "bytemuck",
  "cfg-if",
  "cfg_aliases",
- "glow",
- "glutin_wgl_sys",
  "gpu-allocator",
  "hashbrown 0.17.1",
- "js-sys",
- "khronos-egl",
  "libc",
- "libloading 0.8.9",
+ "libloading",
  "log",
  "naga",
  "naga-types",
- "ndk-sys",
  "objc2 0.6.5",
  "objc2-core-foundation",
  "objc2-core-graphics",
@@ -4472,14 +4527,10 @@ dependencies = [
  "smallvec",
  "static_assertions",
  "thiserror 2.0.21",
- "wasm-bindgen",
- "wayland-sys",
- "web-sys",
  "wgpu-naga-bridge",
  "wgpu-types",
  "windows",
  "windows-core",
- "windows-result",
 ]
 
 [[package]]
@@ -4838,7 +4889,7 @@ dependencies = [
  "as-raw-xcb-connection",
  "gethostname",
  "libc",
- "libloading 0.8.9",
+ "libloading",
  "once_cell",
  "rustix 1.1.6",
  "x11rb-protocol",
@@ -4885,12 +4936,6 @@ name = "xkeysym"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b9cc00251562a284751c9973bace760d86c0276c471b4be569fe6b068ee97a56"
-
-[[package]]
-name = "xml-rs"
-version = "0.8.29"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e450f9b2ed1dff33c94c12589a87338689467b9c4f5d8a5710bd09a847d2c8a7"
 
 [[package]]
 name = "xmlwriter"

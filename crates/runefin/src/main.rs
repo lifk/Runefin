@@ -303,7 +303,7 @@ fn poll(s: &mut State, _clock: f64, tx: &mut Tx) -> bool {
     }
     if let Some(key) = s.take_focus_key() {
         s.note_focus(key.clone());
-        tx.focus_key(key);
+        tx.focus(key, true);
         changed = true;
     }
     // The end card is a picture of the next episode: a screen reader hears it open once. The
@@ -425,7 +425,7 @@ fn tv_key(s: &mut State, key: &KeyEvent, tx: &mut Tx) -> bool {
             // The sidebar is its own focus group: Up/Down rove it, Right enters the form.
             if matches!(action, tv_input::TvAction::Right) {
                 s.note_focus("setting-ui-mode-value".into());
-                tx.focus_key("setting-ui-mode-value".to_string());
+                tx.focus("setting-ui-mode-value".to_string(), true);
                 return true;
             }
             return false;
@@ -462,7 +462,7 @@ fn tv_key(s: &mut State, key: &KeyEvent, tx: &mut Tx) -> bool {
                 s.note_focus(target.clone());
                 // Quiet focus: Rune's own reveal would jump the page to the new control
                 // before the glide below. The router animates every move itself.
-                tx.focus_key_quiet(target.clone());
+                tx.focus(target.clone(), true);
                 if target == "detail-back" {
                     // Back sits above the detail page's scroll viewport, so centring it would
                     // find nothing to move. Going up to it means going back to the top.
@@ -472,7 +472,7 @@ fn tv_key(s: &mut State, key: &KeyEvent, tx: &mut Tx) -> bool {
                     tx.scroll_center(target.clone());
                 } else {
                     // A sideways move reveals the card just enough, on the same spring.
-                    tx.scroll_into_view_animated(target.clone());
+                    tx.scroll_into_view(target.clone());
                 }
             }
             return true;
@@ -692,7 +692,7 @@ fn on_key(s: &mut State, key: &KeyEvent, tx: &mut Tx) -> bool {
         && s.route == Route::Home
         && matches!(s.step, Step::Ready { .. })
     {
-        tx.focus_key("nav-home");
+        tx.focus("nav-home", true);
         return true;
     }
     if key.key != Key::Escape {
@@ -3070,7 +3070,7 @@ mod tests {
             .take_focus_key()
             .expect("home asks for its first card");
         assert!(key.starts_with("rail-continue-watching-"), "{key}");
-        rt.update(|_, tx| tx.focus_key(key.clone()));
+        rt.update(|_, tx| tx.focus(key.clone(), true));
         rt.frame(0.016);
         assert_eq!(
             rt.focused_key().as_deref(),
@@ -4713,7 +4713,7 @@ mod tests {
             .state
             .take_focus_key()
             .expect("home asks for its first card");
-        rt.update(|_, tx| tx.focus_key(first.clone()));
+        rt.update(|_, tx| tx.focus(first.clone(), true));
         rt.frame(0.016);
         assert_eq!(rt.focused_key().as_deref(), Some(first.as_str()));
 
@@ -4753,7 +4753,7 @@ mod tests {
         let mut rt = Runtime::new(state, view, (1280.0, 720.0), env);
         rt.on_key = Some(on_key);
         rt.frame(0.0);
-        rt.update(|_, tx| tx.focus_key("in-app-volume-slider"));
+        rt.update(|_, tx| tx.focus("in-app-volume-slider", true));
         rt.frame(0.016);
 
         rt.key(KeyEvent {
@@ -4797,7 +4797,7 @@ mod tests {
             .take_focus_key()
             .expect("the detail page asks for its primary action");
         assert_eq!(key, "detail-play");
-        rt.update(|_, tx| tx.focus_key(key));
+        rt.update(|_, tx| tx.focus(key, true));
         rt.frame(0.016);
 
         rt.key(KeyEvent {
@@ -4858,7 +4858,7 @@ mod tests {
             .take_focus_key()
             .expect("home asks for its first card");
         rt.state.note_focus(key.clone());
-        rt.update(|_, tx| tx.focus_key(key));
+        rt.update(|_, tx| tx.focus(key, true));
         for step in 1..=4 {
             rt.frame(step as f64 * 0.016);
         }
@@ -5042,7 +5042,7 @@ mod tests {
             .take_focus_key()
             .expect("home asks for its first card");
         rt.state.note_focus(key.clone());
-        rt.update(|_, tx| tx.focus_key(key));
+        rt.update(|_, tx| tx.focus(key, true));
         let mut t = 0.0;
         for _ in 0..8 {
             t += 0.016;
@@ -5259,7 +5259,7 @@ mod tests {
         let key = "rail-next-up-quiet-floor".to_string();
         assert!(rt.find(&key).is_some(), "the next-up card is drawn");
         rt.state.note_focus(key.clone());
-        rt.update(|_, tx| tx.focus_key(key));
+        rt.update(|_, tx| tx.focus(key, true));
         rt.frame(0.016);
         rt.key(KeyEvent {
             key: Key::Text(" ".into()),
@@ -5295,7 +5295,7 @@ mod tests {
         rt.frame(0.0);
         let key = format!("rail-on-now-{channel}");
         rt.state.note_focus(key.clone());
-        rt.update(|_, tx| tx.focus_key(key.clone()));
+        rt.update(|_, tx| tx.focus(key.clone(), true));
         let mut t = 0.0;
         for _ in 0..6 {
             t += 0.016;
@@ -5330,7 +5330,7 @@ mod tests {
         let mut rt = Runtime::new(state, view, (1280.0, 720.0), env);
         rt.on_key = Some(on_key);
         rt.frame(0.0);
-        rt.update(|_, tx| tx.focus_key("search-input"));
+        rt.update(|_, tx| tx.focus("search-input", true));
         rt.frame(0.016);
         assert_eq!(rt.focused_key().as_deref(), Some("search-input"));
         assert!(
@@ -5361,7 +5361,7 @@ mod tests {
         let mut rt = Runtime::new(state, view, (1280.0, 720.0), env);
         rt.on_key = Some(on_key);
         rt.frame(0.0);
-        rt.update(|_, tx| tx.focus_key("settings-jump-subtitles"));
+        rt.update(|_, tx| tx.focus("settings-jump-subtitles", true));
         rt.frame(0.016);
         assert_eq!(rt.focused_key().as_deref(), Some("settings-jump-subtitles"));
         rt.key(KeyEvent {
@@ -5391,7 +5391,7 @@ mod tests {
         let mut rt = Runtime::new(state, view, (1280.0, 720.0), env);
         rt.on_key = Some(on_key);
         rt.frame(0.0);
-        rt.update(|_, tx| tx.focus_key("subtitle-track-off"));
+        rt.update(|_, tx| tx.focus("subtitle-track-off", true));
         rt.frame(0.016);
         rt.key(KeyEvent {
             key: Key::Down,
@@ -5442,7 +5442,7 @@ mod tests {
         let mut rt = Runtime::new(state, view, (1280.0, 720.0), env);
         rt.on_key = Some(on_key);
         rt.frame(0.0);
-        rt.update(|_, tx| tx.focus_key("in-app-subtitles"));
+        rt.update(|_, tx| tx.focus("in-app-subtitles", true));
         rt.frame(0.016);
         assert_eq!(rt.focused_key().as_deref(), Some("in-app-subtitles"));
         rt.key(KeyEvent {
@@ -5505,7 +5505,7 @@ mod tests {
         let mut rt = Runtime::new(state, view, (1280.0, 720.0), env);
         rt.on_key = Some(on_key);
         rt.frame(0.0);
-        rt.update(|_, tx| tx.focus_key("in-app-seek"));
+        rt.update(|_, tx| tx.focus("in-app-seek", true));
         rt.frame(0.016);
         assert_eq!(rt.focused_key().as_deref(), Some("in-app-seek"));
 
@@ -8492,7 +8492,7 @@ mod tv_reach_tests {
         rt.frame(0.0);
         rt.frame(0.016);
         rt.frame(0.032);
-        rt.update(|_, tx| tx.focus_key("rail-continue-watching-quiet-floor"));
+        rt.update(|_, tx| tx.focus("rail-continue-watching-quiet-floor", true));
         rt.frame(0.048);
         let before = rt
             .presented("rail-next-up-quiet-floor")
@@ -8544,7 +8544,7 @@ mod tv_reach_tests {
         rt.frame(0.0);
         rt.frame(0.016);
         rt.frame(0.032);
-        rt.update(|_, tx| tx.focus_key("detail-cast-mara-ellison"));
+        rt.update(|_, tx| tx.focus("detail-cast-mara-ellison", true));
         rt.frame(0.048);
         for step in 0..3 {
             rt.key(KeyEvent {
