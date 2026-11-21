@@ -121,4 +121,14 @@ Our workspace already forbids `unsafe`, so this is upstream meeting us halfway.
    `wake_after`; OSD auto-hide and the still-watching countdown need checking.
 5. Then **Q9**, modelled on Wholeseek's stream-and-keep rather than a plain download queue.
 
-The pin stays at `e9dcf1a2` (released as 0.2.1) until step 1 lands.
+**Landed 2026-11-21.** Steps 1–2 are in: the fork's `clean/2026-11-17` is now upstream/dev
+(143 commits, 25 crates) plus the HDR window and video paths, the 10-foot input and scale, the
+injected keys and `focused_key`; the app is ported onto it (`7ceb1c5c`, merged to main) and
+`scripts/check.sh` passes with every committed view rendering byte-identical. The vendored
+`wgpu-external-frame` stays out: the app's sink now pushes upstream `Dmabuf` frames, with the
+HDR colour carried by our `rune-media` extension. Steps 3–5 (focus and hairline primitives,
+the `poll`-timer audit, Q9) are the next work.
+
+Two upstream bugs surfaced only for external builds and are fixed on the branch: `rune-text`
+asked crates.io `parley_engine` for a feature only Rune's vendored copy has, and the Wayland
+corner rounding called into the vendored winit (now behind `wayland-csd-corners`).
