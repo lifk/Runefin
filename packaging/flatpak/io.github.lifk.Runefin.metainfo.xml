@@ -42,6 +42,26 @@
   </screenshots>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.3.0" date="2026-11-21">
+      <description>
+        <p>
+          Downloads. A Download action sits on every film's and episode's page, and a series page
+          downloads the episode Play would start. What lands is the item's own file, written with a
+          resumable partial file, so a quit, a crash or a pause continues at the byte it reached.
+          The Downloads page shows each copy's state, progress and size, with Play, Pause/Resume or
+          Retry, Keep and Remove; Keep pins a copy, and when a new download needs room the oldest
+          finished copies that were not kept make space. A finished copy plays through the same
+          in-app player straight from the file, reporting while a server is reachable and playing
+          anyway when it is not. Settings gains the folder, a storage budget and the quality:
+          Original keeps the server's file, a bitrate asks the server for a smaller progressive MP4
+          that cannot resume after a pause. The same release fixes a thirty-second whole-request
+          timeout that would have cut every real download short, and virtualizes Home's rails so a
+          server with many libraries builds only what is on screen. Everything from 0.2.2 carries
+          over: scRGB HDR output with its SDR fallback, runefin:// links, the optional Decky Quick
+          Access Menu companion, trickplay previews and true hairlines.
+        </p>
+      </description>
+    </release>
     <release version="0.2.2" date="2026-11-21">
       <description>
         <p>
