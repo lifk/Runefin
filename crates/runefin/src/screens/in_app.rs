@@ -321,7 +321,7 @@ fn goto_panel(s: &State, t: &tok::Theme) -> El {
                             // reach the Go button.
                             if s.big_screen && key.key == rune::Key::Down {
                                 s.note_focus("in-app-goto-submit".into());
-                                tx.focus_key("in-app-goto-submit".to_string());
+                                tx.focus("in-app-goto-submit".to_string(), true);
                                 return true;
                             }
                             false

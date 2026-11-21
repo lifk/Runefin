@@ -231,7 +231,7 @@ pub(super) fn settings_screen(s: &State) -> El {
                             .on_press_tx(move |_s: &mut State, tx: &mut rune::Tx| {
                                 // The chip is both a jump and a focus move: the selector lands
                                 // on the section's first control, and the page glides there.
-                                tx.focus_key(first);
+                                tx.focus(first, true);
                                 tx.scroll_center(target);
                             })
                     }),

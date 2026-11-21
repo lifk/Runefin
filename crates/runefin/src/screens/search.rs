@@ -35,7 +35,7 @@ pub(super) fn search_screen(s: &State) -> El {
                     // Rune keeps a field that still asks for focus; the text edit's own flag
                     // has to follow the runtime focus out.
                     s.search.query.focused = false;
-                    tx.focus_key(target);
+                    tx.focus(target, true);
                 }
                 true
             } else {

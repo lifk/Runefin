@@ -5,7 +5,6 @@
 //! `BaseSink` gives us the pad template, the `VideoMeta`, and the buffer lifetime without mapping
 //! a byte.
 
-use std::os::fd::OwnedFd;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -24,7 +23,7 @@ use rune::NativeSurface;
 use crate::playback_trace::Trace;
 use crate::player::ColourFacts;
 use rune::native_surface::linux::{Dmabuf, DmabufBuffer, DmabufPlane};
-use rune::native_surface::{ColorInfo, Format, Matrix, Transfer};
+use rune::native_surface::{ColorInfo, Matrix, Transfer};
 
 struct DrmCaps {
     width: u32,
@@ -229,8 +228,25 @@ impl BaseSinkImpl for Imp {
         let dmabuf = memory
             .downcast_memory_ref::<DmaBufMemory>()
             .ok_or(gst::FlowError::NotNegotiated)?;
-        let plane = DmabufPlane::from_raw_fd(dmabuf.fd(), meta.offset()[0] as u32, stride as u32, caps.modifier)
-            .map_err(|message| {
+        let plane = DmabufPlane::from_raw_fd(
+            dmabuf.fd(),
+            meta.offset()[0] as u32,
+            stride as u32,
+            caps.modifier,
+        )
+        .map_err(|message| {
+            if let Ok(mut error) = self
+                .error
+                .lock()
+                .unwrap_or_else(|poison| poison.into_inner())
+                .lock()
+            {
+                *error = Some(message);
+            }
+            gst::FlowError::Error
+        })?;
+        let image = DmabufBuffer::new(plane, [caps.width, caps.height], caps.fourcc).map_err(
+            |message| {
                 if let Ok(mut error) = self
                     .error
                     .lock()
@@ -240,19 +256,8 @@ impl BaseSinkImpl for Imp {
                     *error = Some(message);
                 }
                 gst::FlowError::Error
-            })?;
-        let image = DmabufBuffer::new(plane, [caps.width, caps.height], caps.fourcc)
-            .map_err(|message| {
-                if let Ok(mut error) = self
-                    .error
-                    .lock()
-                    .unwrap_or_else(|poison| poison.into_inner())
-                    .lock()
-                {
-                    *error = Some(message);
-                }
-                gst::FlowError::Error
-            })?;
+            },
+        )?;
         // Holding the GStreamer buffer until Rune has read the frame keeps its pool from reusing
         // the memory; the callback runs on Rune's thread after the GPU copy.
         let hold = buffer.clone();

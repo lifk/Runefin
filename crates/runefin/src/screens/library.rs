@@ -305,7 +305,7 @@ fn library_toolbar(s: &State, library: &LibraryState, t: &tok::Theme) -> El {
                                 crate::tv_focus::step(s, Some("library-search"), action)
                             {
                                 s.note_focus(target.clone());
-                                tx.focus_key(target);
+                                tx.focus(target, true);
                             }
                             true
                         })
