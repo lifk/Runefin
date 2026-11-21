@@ -148,6 +148,12 @@ pub struct Config {
     /// Opt-in trickplay previews on a poster hover. Off by default; always silent.
     #[serde(default)]
     pub hover_preview: Option<bool>,
+    /// Where downloads live. Empty or absent means `<cache>/runefin/downloads`.
+    #[serde(default)]
+    pub downloads_path: Option<String>,
+    /// Storage budget for downloads, in GB. Absent means 20.
+    #[serde(default)]
+    pub downloads_budget_gb: Option<f64>,
     #[serde(default)]
     pub light_theme: Option<bool>,
     /// `"big-screen"` for the 10-foot layout; absent or `"desktop"` is the desk UI.

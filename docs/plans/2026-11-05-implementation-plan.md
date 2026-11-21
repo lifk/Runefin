@@ -310,6 +310,14 @@ off; the chosen path is visible in Settings; deleting the download frees the fil
 **Risk:** storage/cleanup, path permissions, DRM-free local files, and the size of the feature.
 Do not start before P4/P1/P2; it is the largest item in the backlog.
 
+**Landed 2026-11-21 (first slice).** Storage and settings (folder, budget, free space, an error
+state for an unusable folder), one resumable worker with `Range`, atomic manifest and rename,
+queue that survives restart, Downloads page with pause/resume/retry/remove/Keep, eviction of
+unkept copies against the budget, and playback of a finished file with the server off. The
+page's contract is `design.md` §3. Not in this slice: download-on-play with Keep promotion,
+"download next 3 unwatched episodes", offline browsing (Q4), report flush, and posters for a cold
+image cache.
+
 ---
 
 ## Phase 4 — Later / not scheduled

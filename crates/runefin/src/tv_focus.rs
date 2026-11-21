@@ -39,6 +39,7 @@ pub fn owns_screen(s: &State) -> bool {
             | Route::SeerrDetail { .. }
             | Route::LiveTv
             | Route::Remote
+            | Route::Downloads
             | Route::Settings
     ) || (s.in_app.is_some() && s.osd_visible)
 }
@@ -153,6 +154,7 @@ fn nav_key(s: &State) -> Option<String> {
         Route::Library { id } => Some(format!("library-{id}")),
         Route::Search { .. } => Some("nav-search".into()),
         Route::Remote => Some("nav-remote".into()),
+        Route::Downloads => Some("nav-downloads".into()),
         Route::Settings => Some("nav-settings".into()),
         Route::Seerr | Route::SeerrDetail { .. } => Some("nav-seerr".into()),
         Route::LiveTv => s
@@ -187,6 +189,7 @@ fn zones(s: &State) -> (Vec<Zone>, bool) {
         Route::Seerr => (seerr_zones(s), false),
         Route::LiveTv => (live_zones(s), true),
         Route::Remote => (remote_zones(s), true),
+        Route::Downloads => (download_zones(s), false),
         Route::SeerrDetail { .. } => (seerr_detail_zones(s), false),
         _ => (Vec::new(), false),
     }
@@ -205,9 +208,15 @@ fn sidebar(s: &State) -> Zone {
         keys.push("nav-seerr".into());
     }
     keys.extend(
-        ["nav-search", "nav-remote", "nav-controls", "nav-settings"]
-            .into_iter()
-            .map(String::from),
+        [
+            "nav-search",
+            "nav-remote",
+            "nav-downloads",
+            "nav-controls",
+            "nav-settings",
+        ]
+        .into_iter()
+        .map(String::from),
     );
     Zone {
         keys,
@@ -608,6 +617,11 @@ fn detail_zones(s: &State) -> Vec<Zone> {
     }
     actions.push("detail-favorite".into());
     actions.push("detail-played".into());
+    // Mirror `detail::detail_screen`: Download sits between Played and Playlist, and reaches an
+    // episode from a series page by downloading the one Play would start.
+    if !is_boxset && detail.play_target().is_some() {
+        actions.push("detail-download".into());
+    }
     if !is_boxset && crate::state::is_playable(&detail.item) {
         actions.push("detail-playlist".into());
         actions.push("detail-collection-add".into());
@@ -1046,6 +1060,34 @@ fn live_zones(s: &State) -> Vec<Zone> {
             keys.push(format!("live-remind-{}", channel.id));
         }
         keys.push(format!("live-favorite-{}", channel.id));
+        zones.push(Zone {
+            keys,
+            columns: 0,
+            parent: Some(0),
+        });
+    }
+    zones
+}
+
+/// One zone per download: play, pause or resume, keep, remove, in that order.
+fn download_zones(s: &State) -> Vec<Zone> {
+    let mut zones = vec![sidebar(s)];
+    for entry in &s.downloads.entries {
+        let id = &entry.item.id;
+        let mut keys = Vec::new();
+        if entry.state.is_watchable() {
+            keys.push(format!("download-play-{id}"));
+        }
+        match entry.state {
+            crate::downloads::State::Downloading => keys.push(format!("download-pause-{id}")),
+            crate::downloads::State::Paused => keys.push(format!("download-resume-{id}")),
+            crate::downloads::State::Queued | crate::downloads::State::Failed => {
+                keys.push(format!("download-retry-{id}"))
+            }
+            crate::downloads::State::Done => {}
+        }
+        keys.push(format!("download-keep-{id}"));
+        keys.push(format!("download-remove-{id}"));
         zones.push(Zone {
             keys,
             columns: 0,

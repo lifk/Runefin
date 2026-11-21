@@ -43,12 +43,12 @@ scrolls without a dropped frame, choosing an item starts mpv at the right positi
 mpv makes the item reappear in Continue Watching at that position — with a snapshot for every
 screen in the repo.
 
-**Explicitly not v1:** music, sync-play, mobile, Windows and macOS. In-app decoding, Live TV and
-the subtitle surface were added after v1; their current contract is §5 and
-[`design-player.md`](design-player.md). Transcoding (P4, direct-play-first) and downloads (Q9, a
-Settings storage path, queue and offline playback) are post-v1 projects tracked in
+**Explicitly not v1:** music, sync-play, mobile, Windows and macOS. In-app decoding, Live TV,
+the subtitle surface and downloads were added after v1; their current contract is §3 and
+[`design-player.md`](design-player.md). Transcoding (P4, direct-play-first) is the remaining
+post-v1 project tracked in
 [`research/07-feature-opportunities-2026-11.md`](research/07-feature-opportunities-2026-11.md);
-they amend this contract when implemented.
+it amends this contract when implemented.
 
 ---
 
@@ -245,6 +245,36 @@ A provider URL (usually YouTube) is downloaded by `yt-dlp` into
 it never enters Continue Watching. `yt-dlp` is an optional runtime tool: without it (or without
 ffmpeg for the merge), the Trailer action falls back to opening the URL in the browser. No web
 view is involved either way.
+**Downloads.** A **Download** action on a film's or episode's detail page, and a **Downloads**
+page under Tools. A download is the item's own file — the same `static=true` stream a player
+opens, so nothing is transcoded — written to `<folder>/<sanitised id>.<container>.part` and
+renamed into place when the last byte lands. The folder defaults to
+`~/.cache/runefin/downloads` and is chosen in Settings (with the storage budget, 20 GB by
+default, and the free space beside it); a folder that cannot be written leaves the page with an
+error and the rest of the app working. `downloads.json` beside the files is the queue: it is
+rewritten atomically, so a crash costs at most the bytes since the last save, and an interrupted
+download comes back **Paused** at the size the `.part` actually has. Resume is an HTTP `Range`
+request; a server that ignores the range restarts the file. One download runs at a time, on its
+own thread, so a background copy never competes with frames or with the player.
+
+States are **Queued**, **Downloading**, **Paused**, **On this device** and **Failed**, and each
+row offers Play (finished only), Pause/Resume or Retry, Keep and Remove. **Keep** pins a copy:
+eviction takes unkept finished copies oldest-first when a new download needs room, and a download
+that still cannot fit is refused with the shortfall rather than started. Removing deletes the
+entry and its file together. A finished copy plays through the same in-app player from
+`file://`, reporting like any play while the server is reachable, and playing anyway when it is
+not: the page and its rows come from the manifest, so a download is usable with no server at all.
+The posters are the one thing still missing offline — they come from the image cache only when it
+is warm.
+
+The first slice is deliberately a queue rather than "keep what you watch". Recording the stream
+while it plays needs a local proxy in front of the file: GStreamer opens the server URL directly,
+and teeing a demuxed pipeline does not give back the original bytes. What is here instead is the
+storage and queue that model needs, plus the Keep flag it will use; downloading automatically on
+play, "download next 3 unwatched episodes", offline browsing of Home/Library/Detail (Q4) and
+flushing reports on reconnect are the next steps in
+[`research/23-rune-ecosystem-2026-11-21.md`](research/23-rune-ecosystem-2026-11-21.md).
+
 `More like this` is the server's `/Items/{id}/Similar` rail, loaded beside the page rather than
 inside it: the hero paints from the item request, and a slow or empty recommendation list never
 delays or empties the page. It is a horizontal rail of the same cards used everywhere else, so a
@@ -464,9 +494,10 @@ crates/runefin
   image.rs       fetch → disk cache → ImageCache::load(bytes)
   image_subtitles.rs  ffmpeg extraction + libbitsub-core PGS/VobSub decode → RGBA bitmaps
   trailer.rs     optional yt-dlp download → cached MP4 for in-app trailers
+  downloads.rs   the download manifest, safe file names, the budget and eviction plan
   imdb.rs        IMDb's public ratings dataset → sorted index → binary search
   ratings.rs     optional OMDb fallback for IMDb
-  screens/       connect, home, library, detail, search, settings, now_playing
+  screens/       connect, home, library, detail, search, downloads, settings, now_playing
   theme.rs       the token table from §5
 crates/jellyfin-api
   the blocking client that net.rs calls (already written and tested)

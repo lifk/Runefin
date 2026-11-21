@@ -701,6 +701,12 @@ pub mod icon {
         view: 20.0,
         body: r#"<circle cx="10" cy="10" r="6" stroke="currentColor" stroke-width="1.6" fill="none"/><circle cx="10" cy="10" r="2" fill="currentColor"/>"#,
     };
+    /// An arrow into a tray: the Downloads page.
+    pub static DOWNLOAD: Icon = Icon {
+        name: "runefin-download",
+        view: 20.0,
+        body: r#"<path d="M10 2.8v9.4M6.4 8.8L10 12.4l3.6-3.6" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.4 13.2v2.6a1.6 1.6 0 0 0 1.6 1.6h10a1.6 1.6 0 0 0 1.6-1.6v-2.6" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/>"#,
+    };
     pub static LIBRARY: Icon = Icon {
         name: "runefin-library",
         view: 20.0,

@@ -1269,6 +1269,78 @@ fn hero(s: &State, detail: &DetailState, t: &tok::Theme) -> El {
                     ));
             }
             actions = actions.child(favorite).child(played);
+            // Download is about the item this page opens: a film, or one episode. A series
+            // page's action is its Next Up episode, the same one Play would start.
+            if !is_boxset && let Some(target) = detail.play_target().cloned() {
+                // A series page downloads the episode Play would start, not the series.
+                let episode = !crate::state::is_playable(&detail.item);
+                let item = target;
+                let state = s.download_state(&item.id);
+                let caption = match state {
+                    None => "Download".to_string(),
+                    Some(crate::downloads::State::Queued) => "Queued".to_string(),
+                    Some(crate::downloads::State::Downloading) => format!(
+                        "Downloading {}%",
+                        s.download_entry(&item.id)
+                            .and_then(|entry| entry.progress())
+                            .map_or(0, |progress| (progress * 100.0).round() as i64)
+                    ),
+                    Some(crate::downloads::State::Paused) => "Paused".to_string(),
+                    Some(crate::downloads::State::Done) => "Downloaded".to_string(),
+                    Some(crate::downloads::State::Failed) => "Retry download".to_string(),
+                };
+                let label = if state.is_none() {
+                    if episode {
+                        format!("Download {} to this device", item.name)
+                    } else {
+                        "Download to this device".to_string()
+                    }
+                } else {
+                    format!("{caption} — open Downloads")
+                };
+                let downloaded = state.is_some_and(|state| state.is_done());
+                actions = actions.child(
+                    el().key("detail-download")
+                        .role("button")
+                        .label(label)
+                        .h(36.0)
+                        .px(12.0)
+                        .radius(9.0)
+                        .center()
+                        .fill(t.card)
+                        .outline(
+                            1.0,
+                            0.0,
+                            if downloaded {
+                                theme::status::success().alpha(0.55)
+                            } else {
+                                t.card_border
+                            },
+                        )
+                        .hover(t.hover)
+                        .motion(crate::theme::motion::CONTROL)
+                        .focusable(true)
+                        .focus_visual(2.0)
+                        .press_scale(0.97)
+                        .cursor(rune::Cursor::Pointer)
+                        .child(
+                            text(caption.clone())
+                                .font(type_::label())
+                                .color(if downloaded {
+                                    theme::status::success()
+                                } else {
+                                    t.text
+                                }),
+                        )
+                        .on_press(move |s: &mut State| {
+                            if state.is_none() {
+                                s.download_item(&item);
+                            } else {
+                                s.open_downloads();
+                            }
+                        }),
+                );
+            }
             if !is_boxset && crate::state::is_playable(&detail.item) {
                 actions = actions.child(
                     el().key("detail-playlist")

@@ -51,6 +51,7 @@ fn decoded_image_bytes(image: &Image) -> usize {
 
 mod card_menu_state;
 mod detail_state;
+mod downloads_state;
 mod idle;
 mod image_state;
 mod in_app_state;
@@ -67,6 +68,7 @@ mod search_state;
 mod seerr_state;
 
 pub use card_menu_state::CardMenu;
+pub use downloads_state::DownloadsState;
 pub use in_app_state::InAppSession;
 use in_app_state::{PendingInApp, PlaybackStreams, SubtitleCues};
 pub use live_state::LiveState;
@@ -101,6 +103,7 @@ pub enum Route {
         scope: Option<String>,
     },
     Remote,
+    Downloads,
     LiveTv,
     Settings,
     Seerr,
@@ -493,8 +496,12 @@ pub struct State {
     imdb_ratings_load: Latest<Result<crate::imdb::ImdbRatings, String>>,
     /// OMDb API key, typed in Settings and stored in the 0600 config.
     pub omdb_key: TextEdit,
+    /// The Downloads folder as typed in Settings; "Use this folder" applies it.
+    pub downloads_path: TextEdit,
     /// The optional Seerr companion's Settings buffers and last probe.
     pub seerr: SeerrState,
+    /// Downloads: the manifest the page draws, and the queue the worker fills.
+    pub downloads: DownloadsState,
     seerr_probe: Latest<Result<SeerrProbe, String>>,
     seerr_requests: Latest<Result<seerr_state::SeerrRequestsLoad, String>>,
     seerr_counts: Latest<Result<RequestCounts, String>>,
@@ -967,7 +974,9 @@ impl State {
             imdb_ratings_error: None,
             imdb_ratings_load: Latest::default(),
             omdb_key: TextEdit::new(config.omdb_api_key.clone().unwrap_or_default()).secure(),
+            downloads_path: TextEdit::new(config.downloads_path.clone().unwrap_or_default()),
             seerr: SeerrState::new(&config),
+            downloads: DownloadsState::default(),
             seerr_probe: Latest::default(),
             seerr_requests: Latest::default(),
             seerr_counts: Latest::default(),
@@ -1915,6 +1924,7 @@ impl State {
                 ),
                 Route::Search { .. } => "Search — Runefin".to_string(),
                 Route::Remote => "Remote — Runefin".to_string(),
+                Route::Downloads => "Downloads — Runefin".to_string(),
                 Route::LiveTv => "Live TV — Runefin".to_string(),
                 Route::Settings => "Settings — Runefin".to_string(),
                 Route::Seerr => "Discover — Runefin".to_string(),
@@ -1957,6 +1967,7 @@ impl State {
         self.config.hidden_home = Some(self.hidden_home.iter().cloned().collect());
         self.config.spoiler_guard = Some(self.spoiler_guard);
         self.config.saved_views = Some(self.saved_views.clone());
+        self.config.downloads_budget_gb = Some(self.downloads_budget());
         self.config.home_hero = Some(self.home_hero);
         self.config.hover_preview = Some(self.hover_preview_enabled);
         self.config.light_theme = Some(self.light_theme);
@@ -1998,6 +2009,7 @@ impl State {
         // setup, so fixtures stay hermetic.
         self.checkpoints = crate::checkpoint::load();
         self.history = crate::history::load(50);
+        self.load_downloads();
         crate::bench::mark("bench.setup.disk");
         self.start_tray(&waker);
         crate::bench::mark("bench.setup.tray");
@@ -2045,6 +2057,10 @@ impl State {
         self.search_latest.set_waker(waker.clone());
         self.search_hints.set_waker(waker.clone());
         self.remote_latest.set_waker(waker.clone());
+        self.downloads.save.set_waker(waker.clone());
+        self.downloads.commit.set_waker(waker.clone());
+        self.downloads.free_load.set_waker(waker.clone());
+        self.downloads.reload.set_waker(waker.clone());
         self.seerr_probe.set_waker(waker.clone());
         self.seerr_requests.set_waker(waker.clone());
         self.seerr_counts.set_waker(waker.clone());
@@ -2171,6 +2187,23 @@ impl State {
             self.apply_deep_link_item(item);
             deep_linked = true;
         }
+        let mut downloads_changed = false;
+        if let Some(result) = self.downloads.save.take() {
+            self.apply_download_saved(result);
+            downloads_changed = true;
+        }
+        if let Some(result) = self.downloads.commit.take() {
+            self.apply_download_commit(result);
+            downloads_changed = true;
+        }
+        if let Some(free) = self.downloads.free_load.take() {
+            self.downloads.free = free;
+            downloads_changed = true;
+        }
+        if let Some(result) = self.downloads.reload.take() {
+            self.apply_download_reload(result);
+            downloads_changed = true;
+        }
         let trickplay_changed = self.poll_trickplay();
         // With the player's chrome up, warm the tile under the playhead before a pointer reaches
         // the timeline. A prefetched tile is already current; a different one waits for a hover.
@@ -2193,8 +2226,12 @@ impl State {
             }
         });
         let messages = self.worker.drain();
-        let mut changed =
-            booted || deep_linked || trickplay_changed || revealed || !messages.is_empty();
+        let mut changed = booted
+            || deep_linked
+            || downloads_changed
+            || trickplay_changed
+            || revealed
+            || !messages.is_empty();
         let tray_events: Vec<rune::TrayEvent> = self
             .tray_events
             .lock()
@@ -2736,6 +2773,7 @@ impl State {
                     _ => {}
                 }
             }
+            Msg::Download { id, event } => self.apply_download(id, event),
             Msg::Playback { generation, event } => self.on_playback_event(generation, event),
             Msg::Reported { kind, result } => self.on_reported(kind, result),
             Msg::Remote(result) => self.remote_command_finished(result),
@@ -3424,6 +3462,13 @@ impl State {
             }
             Route::Search { .. } => Some("search-input".into()),
             Route::Remote => Some("remote-refresh".into()),
+            Route::Downloads => self.downloads.entries.first().map(|entry| {
+                if entry.state.is_watchable() {
+                    format!("download-play-{}", entry.item.id)
+                } else {
+                    format!("download-keep-{}", entry.item.id)
+                }
+            }),
             Route::Settings => Some("setting-ui-mode-value".into()),
             Route::Seerr => Some("seerr-tab-discover".into()),
             Route::SeerrDetail { .. } => self
@@ -4945,6 +4990,15 @@ impl State {
         self.server.focused = true;
     }
 
+    /// Whether the pending in-app start is a file on this device, and whether it reports.
+    /// Test-only: the flags decide whether a download plays with no server at all.
+    #[cfg(test)]
+    pub(crate) fn pending_is_local(&self) -> Option<(bool, bool)> {
+        self.pending_in_app
+            .as_ref()
+            .map(|pending| (pending.local, pending.report))
+    }
+
     pub fn is_signed_in(&self) -> bool {
         matches!(self.step, Step::Ready { .. })
     }
@@ -5040,7 +5094,9 @@ mod tests {
             imdb_ratings_error: None,
             imdb_ratings_load: Latest::default(),
             omdb_key: TextEdit::new("").secure(),
+            downloads_path: TextEdit::new(""),
             seerr: SeerrState::new(&Config::default()),
+            downloads: DownloadsState::default(),
             seerr_probe: Latest::default(),
             seerr_requests: Latest::default(),
             seerr_counts: Latest::default(),

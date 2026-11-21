@@ -15,6 +15,7 @@ use rune::{
 use crate::state::{Route, State, Step};
 
 mod detail;
+mod downloads;
 mod in_app;
 mod library;
 mod live;
@@ -69,6 +70,7 @@ pub fn view(s: &State, _cx: &mut Cx<State>) -> El {
             },
             Route::Search { .. } => search::search_screen(s),
             Route::Remote => remote::remote_screen(s),
+            Route::Downloads => downloads::downloads_screen(s),
             Route::LiveTv => live::live_tv_screen(s),
             Route::Settings => settings::settings_screen(s),
             Route::Seerr => seerr::seerr_screen(s),
@@ -1246,6 +1248,17 @@ pub(super) fn sidebar(s: &State, t: &tok::Theme) -> El {
                 collapsed,
             )
             .on_press(|s: &mut State| s.open_remote()),
+        )
+        .child(
+            nav_item(
+                "Downloads",
+                "nav-downloads",
+                matches!(s.route, Route::Downloads),
+                t,
+                &theme::icon::DOWNLOAD,
+                collapsed,
+            )
+            .on_press(|s: &mut State| s.open_downloads()),
         )
         .children(s.big_screen.then(|| {
             nav_item(

@@ -4,9 +4,11 @@
 //! a thread that pushes one outcome and rings the waker Rune handed us in `setup`; `poll` drains
 //! the queue and returns whether anything visible changed.
 
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
+use std::io::{Read, Write};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
+use std::time::Instant;
 
 use jellyfin_api::{Client, PlaybackReport, PlaybackStop};
 use rune::Waker;
@@ -84,6 +86,20 @@ pub enum Msg {
     ImagesCleared(Result<usize, String>),
     /// A Seerr request write finished. Boxed: the 201 body is much larger than every other Msg.
     SeerrRequested(Result<Box<seerr_api::MediaRequest>, String>),
+    /// One download's progress or ending, for the entry with that item id.
+    Download {
+        id: String,
+        event: DownloadEvent,
+    },
+}
+
+/// What a running download reports. Progress is throttled by the worker, not sent per chunk.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DownloadEvent {
+    Progress { done: u64, total: Option<u64> },
+    Finished { size: u64 },
+    Paused { done: u64 },
+    Failed { message: String },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -185,10 +201,149 @@ fn image_worker(
     }
 }
 
+/// A download's controls. The worker reads them between chunks, so a pause or cancel lands
+/// within one read rather than at the end of the file.
+#[derive(Default)]
+struct DownloadControl {
+    paused: std::sync::atomic::AtomicBool,
+    cancelled: std::sync::atomic::AtomicBool,
+}
+
+struct DownloadJob {
+    client: Client,
+    url: String,
+    /// The `.part` file the bytes accumulate in.
+    part: std::path::PathBuf,
+    id: String,
+    control: Arc<DownloadControl>,
+}
+
+#[derive(Default)]
+struct DownloadQueue {
+    jobs: VecDeque<DownloadJob>,
+    /// Every job the UI may still pause or cancel, running or queued.
+    controls: HashMap<String, Arc<DownloadControl>>,
+}
+
+/// One download at a time, on its own thread: a background copy must never compete with the
+/// frames or with the playback pipeline, and a second connection is only useful after the first.
+fn download_worker(
+    queue: Arc<Mutex<Vec<Msg>>>,
+    wake: Arc<Mutex<Option<Waker>>>,
+    downloads: Arc<(Mutex<DownloadQueue>, Condvar)>,
+) {
+    loop {
+        let job = {
+            let (slot, ready) = &*downloads;
+            let mut slot = slot.lock().unwrap_or_else(|error| error.into_inner());
+            loop {
+                if let Some(job) = slot.jobs.pop_front() {
+                    break job;
+                }
+                slot = ready.wait(slot).unwrap_or_else(|error| error.into_inner());
+            }
+        };
+        run_download(job, &queue, &wake);
+    }
+}
+
+fn run_download(job: DownloadJob, queue: &Arc<Mutex<Vec<Msg>>>, wake: &Arc<Mutex<Option<Waker>>>) {
+    let event = |event: DownloadEvent| {
+        if let Ok(mut queue) = queue.lock() {
+            queue.push(Msg::Download {
+                id: job.id.clone(),
+                event,
+            });
+        }
+        if let Some(wake) = wake.lock().ok().and_then(|slot| slot.clone()) {
+            wake();
+        }
+    };
+    if job.control.cancelled.load(Ordering::Relaxed) {
+        return;
+    }
+    if job.control.paused.load(Ordering::Relaxed) {
+        let done = job.part.metadata().map(|meta| meta.len()).unwrap_or(0);
+        return event(DownloadEvent::Paused { done });
+    }
+    let mut file = match std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&job.part)
+    {
+        Ok(file) => file,
+        Err(error) => {
+            return event(DownloadEvent::Failed {
+                message: format!("{}: {error}", job.part.display()),
+            });
+        }
+    };
+    // Resume from what is actually on disk, not from what the manifest last saved.
+    let mut from = file.metadata().map(|meta| meta.len()).unwrap_or(0);
+    let mut stream = match job.client.open_stream(&job.url, from) {
+        Ok(stream) => stream,
+        Err(error) => {
+            return event(DownloadEvent::Failed {
+                message: error.user_message(),
+            });
+        }
+    };
+    if !stream.resumed {
+        // The server sent the whole file despite the range: start the file over.
+        if file.set_len(0).is_err() {
+            return event(DownloadEvent::Failed {
+                message: format!("{}: could not restart the file", job.part.display()),
+            });
+        }
+        from = 0;
+    }
+    let total = stream.total;
+    let mut done = from;
+    let mut buffer = vec![0u8; 256 * 1024];
+    let mut last = Instant::now();
+    loop {
+        if job.control.cancelled.load(Ordering::Relaxed) {
+            return; // the UI removed the entry and its files
+        }
+        if job.control.paused.load(Ordering::Relaxed) {
+            let _ = file.flush();
+            return event(DownloadEvent::Paused { done });
+        }
+        match stream.reader.read(&mut buffer) {
+            Ok(0) => break,
+            Ok(count) => {
+                if let Err(error) = file.write_all(&buffer[..count]) {
+                    return event(DownloadEvent::Failed {
+                        message: format!("{}: {error}", job.part.display()),
+                    });
+                }
+                done += count as u64;
+                if last.elapsed() >= std::time::Duration::from_millis(120) {
+                    last = Instant::now();
+                    event(DownloadEvent::Progress { done, total });
+                }
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {}
+            Err(error) => {
+                return event(DownloadEvent::Failed {
+                    message: error.to_string(),
+                });
+            }
+        }
+    }
+    if let Err(error) = file.flush() {
+        return event(DownloadEvent::Failed {
+            message: format!("{}: {error}", job.part.display()),
+        });
+    }
+    event(DownloadEvent::Finished { size: done });
+}
+
 pub struct Worker {
     queue: Arc<Mutex<Vec<Msg>>>,
     wake: Arc<Mutex<Option<Waker>>>,
     images: Arc<(Mutex<ImageQueue>, Condvar)>,
+    downloads: Arc<(Mutex<DownloadQueue>, Condvar)>,
 }
 
 impl Default for Worker {
@@ -214,10 +369,21 @@ impl Worker {
                 .spawn(move || image_worker(queue, wake, images))
                 .expect("image worker");
         }
+        let downloads = Arc::new((Mutex::new(DownloadQueue::default()), Condvar::new()));
+        {
+            let queue = Arc::clone(&queue);
+            let wake = Arc::clone(&wake);
+            let downloads = Arc::clone(&downloads);
+            std::thread::Builder::new()
+                .name("runefin-downloads".into())
+                .spawn(move || download_worker(queue, wake, downloads))
+                .expect("download worker");
+        }
         Worker {
             queue,
             wake,
             images,
+            downloads,
         }
     }
 
@@ -324,6 +490,41 @@ impl Worker {
             ImagePriority::Low => slot.low.push_back(request),
         }
         ready.notify_one();
+    }
+
+    /// Queue a download of `url` into `part`, resuming at whatever the file already holds.
+    /// Returns at once: progress and the ending arrive as `Msg::Download`.
+    pub fn download(&self, id: String, client: Client, url: String, part: std::path::PathBuf) {
+        let control = Arc::new(DownloadControl::default());
+        let (slot, ready) = &*self.downloads;
+        let mut slot = slot.lock().unwrap_or_else(|error| error.into_inner());
+        slot.controls.insert(id.clone(), Arc::clone(&control));
+        slot.jobs.push_back(DownloadJob {
+            client,
+            url,
+            part,
+            id,
+            control,
+        });
+        ready.notify_one();
+    }
+
+    /// Stop a download at its next chunk, keeping what it has for a resume.
+    pub fn download_pause(&self, id: &str) {
+        let (slot, _) = &*self.downloads;
+        let slot = slot.lock().unwrap_or_else(|error| error.into_inner());
+        if let Some(control) = slot.controls.get(id) {
+            control.paused.store(true, Ordering::Relaxed);
+        }
+    }
+
+    /// Stop a download and throw its bytes away. The caller removes the entry and its files.
+    pub fn download_cancel(&self, id: &str) {
+        let (slot, _) = &*self.downloads;
+        let slot = slot.lock().unwrap_or_else(|error| error.into_inner());
+        if let Some(control) = slot.controls.get(id) {
+            control.cancelled.store(true, Ordering::Relaxed);
+        }
     }
 
     /// Read mpv's IPC until the player exits. Runs on its own thread, so a dead socket or a

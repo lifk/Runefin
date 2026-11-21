@@ -17,6 +17,7 @@ mod demo;
 mod detail;
 mod discovery;
 mod dmabuf_sink;
+mod downloads;
 mod handoff;
 mod history;
 mod home;
@@ -1410,6 +1411,13 @@ fn main() {
                     s.images.insert(key, backdrop);
                 }
             }),
+            ("downloads", |s| {
+                demo::signed_in(s);
+                s.downloads.entries = demo::downloads();
+                s.downloads.booted = true;
+                s.downloads.root = crate::downloads::default_root().display().to_string();
+                s.open_downloads();
+            }),
             ("home-contract", |s| {
                 s.step = Step::Ready {
                     server_name: "example".into(),
@@ -2634,6 +2642,243 @@ mod tests {
                 .is_some(),
             "the last rail mounts after scrolling to it"
         );
+    }
+
+    /// A download's store in a scratch folder, with the state's manifest pointing at it.
+    fn downloads_state(
+        name: &str,
+        entries: Vec<crate::downloads::Entry>,
+    ) -> (State, std::path::PathBuf) {
+        let root = std::env::temp_dir().join(format!(
+            "runefin-download-test-{name}-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        let (store, _) = crate::downloads::Store::open(root.clone()).expect("a scratch store");
+        let mut state = home_state();
+        state.downloads.store = Some(store);
+        state.downloads.booted = true;
+        state.downloads.entries = entries;
+        state.downloads.root = root.display().to_string();
+        (state, root)
+    }
+
+    fn download_entry(
+        id: &str,
+        state_value: crate::downloads::State,
+        size: u64,
+        done: u64,
+        kept: bool,
+    ) -> crate::downloads::Entry {
+        let item = jellyfin_api::Item {
+            id: id.into(),
+            name: format!("Item {id}"),
+            kind: "Movie".into(),
+            run_time_ticks: Some(90 * 60 * 10_000_000),
+            media_sources: vec![jellyfin_api::MediaSource {
+                id: format!("{id}-source"),
+                container: Some("mkv".into()),
+                size: Some(size as i64),
+                ..jellyfin_api::MediaSource::default()
+            }],
+            ..jellyfin_api::Item::default()
+        };
+        crate::downloads::Entry {
+            file: crate::downloads::file_name(&item),
+            item,
+            source_id: None,
+            size,
+            done,
+            state: state_value,
+            kept,
+            created: 0,
+            error: None,
+        }
+    }
+
+    /// Poll until `done`, with a bound: the manifest and the rename run on a worker.
+    fn settle(state: &mut State, done: impl Fn(&State) -> bool) -> bool {
+        for _ in 0..200 {
+            state.poll();
+            if done(state) {
+                return true;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        done(state)
+    }
+
+    #[test]
+    fn the_downloads_page_shows_a_row_and_its_controls() {
+        let env = Env {
+            system_dark: true,
+            scale: 2.0,
+        };
+        let mut state = home_state();
+        state.downloads.booted = true;
+        state.downloads.entries = demo::downloads();
+        state.downloads.root = "/tmp/runefin/downloads".into();
+        state.route = Route::Downloads;
+        let done = state.downloads.entries[1].item.id.clone();
+        let running = state.downloads.entries[2].item.id.clone();
+        let paused = state.downloads.entries[3].item.id.clone();
+        let mut rt = Runtime::new(state, view, (1280.0, 800.0), env);
+        rt.frame(0.0);
+        for key in [
+            "downloads-screen".to_string(),
+            "downloads-summary".to_string(),
+            "nav-downloads".to_string(),
+            format!("download-{done}"),
+            format!("download-play-{done}"),
+            format!("download-keep-{done}"),
+            format!("download-remove-{done}"),
+            format!("download-state-{running}"),
+            format!("download-pause-{running}"),
+            format!("download-resume-{paused}"),
+        ] {
+            assert!(rt.find(&key).is_some(), "{key} is on the downloads page");
+        }
+        // A paused copy has no Play: a `.part` is not a file a player can open.
+        assert!(rt.find(&format!("download-play-{paused}")).is_none());
+    }
+
+    #[test]
+    fn a_finished_download_becomes_a_file_the_page_can_play() {
+        let entry = download_entry(
+            "metropolis",
+            crate::downloads::State::Downloading,
+            64,
+            0,
+            true,
+        );
+        let (mut state, root) = downloads_state("finish", vec![entry.clone()]);
+        let store = state.downloads.store.clone().expect("the store");
+        std::fs::write(store.part_path(&entry), vec![7u8; 64]).expect("a partial file");
+        state.apply_download(
+            "metropolis".into(),
+            crate::net::DownloadEvent::Progress {
+                done: 32,
+                total: Some(64),
+            },
+        );
+        assert_eq!(
+            state.download_entry("metropolis").map(|entry| entry.done),
+            Some(32)
+        );
+        state.apply_download(
+            "metropolis".into(),
+            crate::net::DownloadEvent::Finished { size: 64 },
+        );
+        assert!(
+            settle(&mut state, |state| state
+                .download_state("metropolis")
+                .is_some_and(|state| state.is_done())),
+            "the rename lands"
+        );
+        let entry = state
+            .download_entry("metropolis")
+            .expect("the entry")
+            .clone();
+        assert_eq!(entry.size, 64);
+        assert!(store.file_path(&entry).exists(), "the file is in place");
+        assert!(!store.part_path(&entry).exists(), "and the .part is gone");
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn a_downloaded_file_plays_with_no_server_at_all() {
+        let entry = download_entry("quiet-floor", crate::downloads::State::Done, 32, 32, true);
+        let (mut state, root) = downloads_state("offline", vec![entry.clone()]);
+        let store = state.downloads.store.clone().expect("the store");
+        std::fs::write(store.file_path(&entry), vec![1u8; 32]).expect("the file");
+        // No session: the store is enough.
+        state.step = Step::Idle;
+        state.downloads.booted = true;
+        state.play_download("quiet-floor");
+        assert_eq!(
+            state.pending_is_local(),
+            Some((true, true)),
+            "the file plays from this device, and still reports when a server is there"
+        );
+        assert!(state.in_app_launching);
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn a_missing_downloaded_file_is_reported_not_played() {
+        let entry = download_entry("gone", crate::downloads::State::Done, 8, 8, true);
+        let (mut state, root) = downloads_state("missing", vec![entry]);
+        state.play_download("gone");
+        assert_eq!(
+            state.download_state("gone"),
+            Some(crate::downloads::State::Failed)
+        );
+        assert!(state.pending_is_local().is_none(), "nothing started");
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn keeping_and_removing_a_download() {
+        let entry = download_entry("harbour", crate::downloads::State::Done, 16, 16, false);
+        let (mut state, root) = downloads_state("keep", vec![entry.clone()]);
+        let store = state.downloads.store.clone().expect("the store");
+        std::fs::write(store.file_path(&entry), vec![0u8; 16]).expect("the file");
+        state.keep_download("harbour");
+        assert!(
+            state
+                .download_entry("harbour")
+                .is_some_and(|entry| entry.kept)
+        );
+        state.remove_download("harbour");
+        assert!(state.download_entry("harbour").is_none());
+        assert!(
+            settle(&mut state, |_| !store.file_path(&entry).exists()),
+            "removing an entry frees its file"
+        );
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn the_budget_refuses_a_download_that_cannot_fit() {
+        let held = download_entry(
+            "kept",
+            crate::downloads::State::Done,
+            5_000_000_000,
+            5_000_000_000,
+            true,
+        );
+        let (mut state, root) = downloads_state("budget", vec![held.clone()]);
+        let store = state.downloads.store.clone().expect("the store");
+        std::fs::write(store.file_path(&held), vec![0u8; 8]).expect("a file");
+        state.config.downloads_budget_gb = Some(5.0);
+        let item = jellyfin_api::Item {
+            id: "too-big".into(),
+            name: "Too Big".into(),
+            kind: "Movie".into(),
+            media_sources: vec![jellyfin_api::MediaSource {
+                id: "too-big-source".into(),
+                size: Some(4_000_000_000),
+                ..jellyfin_api::MediaSource::default()
+            }],
+            ..jellyfin_api::Item::default()
+        };
+        state.download_item(&item);
+        assert!(
+            state.download_entry("too-big").is_none(),
+            "nothing is queued"
+        );
+        assert!(
+            state
+                .toast
+                .as_deref()
+                .is_some_and(|toast| toast.contains("budget")),
+            "the page says why: {:?}",
+            state.toast
+        );
+        let _ = std::fs::remove_dir_all(root);
     }
 
     #[test]
@@ -8888,6 +9133,16 @@ mod tv_reach_tests {
         let mut state = base();
         state.route = Route::Settings;
         check("settings", state);
+    }
+
+    #[test]
+    fn every_downloads_control_is_reachable() {
+        let mut state = base();
+        state.downloads.booted = true;
+        state.downloads.entries = demo::downloads();
+        state.downloads.root = "/tmp/runefin/downloads".into();
+        state.open_downloads();
+        check("downloads", state);
     }
 
     #[test]

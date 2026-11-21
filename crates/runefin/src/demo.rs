@@ -288,6 +288,69 @@ pub fn home() -> HomeData {
     }
 }
 
+/// The Downloads page's fixture: a finished film, a finished episode, one on its way and one
+/// paused. No image tags, like every other fixture: the geometry is what a snapshot freezes.
+pub fn downloads() -> Vec<crate::downloads::Entry> {
+    use crate::downloads::{Entry, State as DownloadState};
+
+    let data = home();
+    let mut entries = Vec::new();
+    let mut push =
+        |item: Item, state: DownloadState, size: u64, done: u64, kept: bool, created: i64| {
+            entries.push(Entry {
+                file: crate::downloads::file_name(&item),
+                item,
+                source_id: None,
+                size,
+                done,
+                state,
+                kept,
+                created,
+                error: None,
+            });
+        };
+    if let Some(item) = data.resume.first() {
+        push(
+            item.clone(),
+            DownloadState::Done,
+            4_200_000_000,
+            4_200_000_000,
+            true,
+            0,
+        );
+    }
+    let metropolis = movie_detail().item;
+    push(
+        metropolis,
+        DownloadState::Done,
+        8_900_000_000,
+        8_900_000_000,
+        true,
+        1,
+    );
+    if let Some(item) = data.next_up.first() {
+        push(
+            item.clone(),
+            DownloadState::Downloading,
+            1_800_000_000,
+            756_000_000,
+            false,
+            2,
+        );
+    }
+    if let Some(item) = data.recently_played.first() {
+        push(
+            item.clone(),
+            DownloadState::Paused,
+            2_400_000_000,
+            930_000_000,
+            true,
+            3,
+        );
+    }
+    entries
+}
+
 pub fn detail() -> DetailState {
     let seasons = vec![
         Item {

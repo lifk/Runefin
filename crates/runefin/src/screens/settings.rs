@@ -194,6 +194,12 @@ pub(super) fn settings_screen(s: &State) -> El {
                             "setting-seerr-url",
                         ),
                         (
+                            "Downloads",
+                            "settings-jump-downloads",
+                            "settings-section-downloads",
+                            "setting-downloads-path",
+                        ),
+                        (
                             "Storage",
                             "settings-jump-storage",
                             "settings-section-storage",
@@ -1367,7 +1373,165 @@ pub(super) fn settings_screen(s: &State) -> El {
                         .on_press(|s: &mut State| s.open_remote()),
                 ),
         );
+    // Downloads: where the copies live and how much room they may take. The folder applies on
+    // a button rather than per keystroke: moving the store is a real change, not typing.
+    let budget = s.downloads_budget();
+    let downloads = col()
+        .w_full()
+        .padding(18.0)
+        .gap(12.0)
+        .fill(t.card)
+        .surface_sheen()
+        .radius(12.0)
+        .outline(1.0, 0.0, t.card_border)
+        .box_shadow(rune::Shadow {
+            y: 1.0,
+            blur: 0.0,
+            spread: 0.0,
+            color: Color::WHITE.alpha(0.05),
+            inset: true,
+            ..rune::Shadow::default()
+        })
+        .shadow(1.0, 2.0, t.shadow)
+        .shadow(6.0, 18.0, t.shadow_soft)
+        .child(
+            text("Downloads are copies of your own files, kept under this folder. Leave the field empty for the default.")
+                .font(type_::meta())
+                .color(t.text_secondary),
+        )
+        .child(
+            row()
+                .key("setting-downloads-path-row")
+                .w_full()
+                .gap(10.0)
+                .items_center()
+                .focus_group()
+                .child(
+                    text("Folder")
+                        .font(type_::label())
+                        .color(t.text_secondary)
+                        .w(110.0),
+                )
+                .child(
+                    el().grow(1.0).min_w(0.0).child(arrows_leave(
+                        text_input(&s.downloads_path, type_::body())
+                            .key("setting-downloads-path")
+                            .label("Downloads folder")
+                            .role("textbox")
+                            .single_line()
+                            .w_full()
+                            .padding(6.0)
+                            .radius(7.0)
+                            .fill(t.bg)
+                            .outline(1.0, 0.0, t.card_border)
+                            .color(t.text)
+                            .on_edit(|s: &mut State| &mut s.downloads_path),
+                    )),
+                )
+        )
+        // Beside a text field the arrows belong to the caret, so the button that applies it
+        // sits under the field: Down (or Tab) from the field reaches it.
+        .child(
+            row()
+                .key("setting-downloads-path-actions")
+                .w_full()
+                .gap(10.0)
+                .items_center()
+                .focus_group()
+                .child(
+                    el().key("setting-downloads-path-apply")
+                        .role("button")
+                        .label("Use this folder")
+                        .h(32.0)
+                        .px(12.0)
+                        .radius(8.0)
+                        .center()
+                        .fill(t.bg)
+                        .outline(1.0, 0.0, t.card_border)
+                        .hover(t.hover)
+                        .motion(crate::theme::motion::CONTROL)
+                        .focusable(true)
+                        .focus_visual(2.0)
+                        .press_scale(0.97)
+                        .child(
+                            text("Use this folder")
+                                .font(type_::label())
+                                .color(t.text),
+                        )
+                        .cursor(rune::Cursor::Pointer)
+                        .on_press(|s: &mut State| s.apply_downloads_path()),
+                )
+                .child(
+                    text("Existing downloads stay in the old folder.")
+                        .font(type_::caption())
+                        .color(t.text_secondary),
+                ),
+        )
+        .child(
+            row()
+                .key("setting-downloads-budget-row")
+                .w_full()
+                .gap(10.0)
+                .items_center()
+                .focus_group()
+                .child(
+                    text("Storage budget")
+                        .font(type_::label())
+                        .color(t.text_secondary)
+                        .w(110.0),
+                )
+                .child(stepper_button("−", "setting-downloads-budget-down", &t, move |s| {
+                    s.set_downloads_budget(budget - 5.0)
+                }))
+                .child(
+                    text(super::downloads::format_gb(budget))
+                        .key("setting-downloads-budget-value")
+                        .font(type_::body())
+                        .color(t.text),
+                )
+                .child(stepper_button("+", "setting-downloads-budget-up", &t, move |s| {
+                    s.set_downloads_budget(budget + 5.0)
+                }))
+                .child(el().grow(1.0))
+                .child(
+                    text(format!(
+                        "{} used{}",
+                        crate::downloads::size(s.downloads_used()),
+                        s.downloads
+                            .free
+                            .map(|free| format!(
+                                " · {} free",
+                                crate::downloads::size(free)
+                            ))
+                            .unwrap_or_default()
+                    ))
+                    .key("setting-downloads-usage")
+                    .font(type_::caption())
+                    .color(t.text_secondary),
+                ),
+        )
+        .children(s.downloads.error.as_ref().map(|error| {
+            text(format!("This folder cannot be used: {error}"))
+                .key("setting-downloads-error")
+                .font(type_::caption())
+                .color(theme::status::danger())
+        }))
+        .child(
+            text(format!("In use: {}", s.downloads.root))
+                .key("setting-downloads-root")
+                .font(type_::mono_caption())
+                .color(t.text_secondary.alpha(0.8)),
+        );
+
     content = content
+        .child(
+            text("Downloads")
+                .key("settings-section-downloads")
+                .font(type_::section())
+                .color(t.text_secondary)
+                .mt(8.0),
+        )
+        .child(downloads)
         .child(
             text("Storage")
                 .key("settings-section-storage")

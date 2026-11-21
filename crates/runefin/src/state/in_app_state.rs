@@ -714,6 +714,12 @@ impl State {
         self.play_in_app_media(item, Some(path), None, false, false);
     }
 
+    /// A downloaded item: the copy on this device through the same pipeline, reported like any
+    /// other play while the server is reachable, and played anyway when it is not.
+    pub(super) fn play_in_app_download(&mut self, item: Item, path: std::path::PathBuf) {
+        self.play_in_app_media(item, Some(path), None, false, true);
+    }
+
     /// A server-hosted trailer: the normal stream path, but no reporting.
     pub(super) fn play_in_app_trailer(&mut self, item: Item) {
         self.play_in_app_media(item, None, None, false, false);
@@ -722,7 +728,7 @@ impl State {
     fn play_in_app_media(
         &mut self,
         item: Item,
-        local: Option<std::path::PathBuf>,
+        local_file: Option<std::path::PathBuf>,
         start_override: Option<i64>,
         paused: bool,
         report: bool,
@@ -733,10 +739,14 @@ impl State {
         if self.in_app.is_some() {
             self.finish_in_app();
         }
-        let Some(client) = self.client() else {
+        // A file on this device needs no server: it plays from disk and every report simply
+        // finds no client and stays quiet, which is what makes a download work offline.
+        let client = self.client();
+        if local_file.is_none() && client.is_none() {
             self.detail_notice = Some("Your session expired. Sign in again.".into());
             return;
-        };
+        }
+        let client = client.filter(|_| local_file.is_none());
         // A source chosen for one item must never be sent for another.
         let chosen = self
             .in_app_source
@@ -751,9 +761,13 @@ impl State {
             .copied()
             .unwrap_or(self.playback_quality);
         self.playback_quality = quality;
-        let url = match &local {
+        let url = match &local_file {
             Some(path) => format!("file://{}", path.display()),
             None => {
+                let Some(client) = &client else {
+                    self.detail_notice = Some("Your session expired. Sign in again.".into());
+                    return;
+                };
                 let Some(url) = client.direct_stream_url_with_source(&item.id, source.as_deref())
                 else {
                     self.detail_notice = Some("This item has no playable stream.".into());
@@ -783,7 +797,7 @@ impl State {
         // conflict is only a few seconds in normal use; do not resurrect a stale one, and never
         // override an explicit Start over.
         let reported = server_start;
-        let local = start_override
+        let checkpoint = start_override
             .is_none()
             .then(|| {
                 (!item.user_data.as_ref().is_some_and(|user| user.played))
@@ -791,7 +805,7 @@ impl State {
                     .flatten()
             })
             .flatten()
-            .filter(|local| *local > reported + 5_000);
+            .filter(|at| *at > reported + 5_000);
         // Start where the server says, then let the conflict card offer the local position.
         // Choosing there is one seek, and the film already has a picture meanwhile.
         // Resume a little earlier than the server's second. This is deliberately not applied to
@@ -807,12 +821,12 @@ impl State {
             session_id: session_id.clone(),
             start_ms,
             rewound,
-            conflict: local.map(|local| (local, reported)),
+            conflict: checkpoint.map(|at| (at, reported)),
             paused,
             live: false,
             live_stream_id: None,
             report,
-            local: local.is_some(),
+            local: local_file.is_some(),
         });
         self.launching = true;
         self.in_app_launching = true;
@@ -820,7 +834,7 @@ impl State {
         let surface = rune::NativeSurface::new();
         let waker = self.waker.clone();
         self.in_app_segments.clear();
-        if local.is_none() {
+        if let Some(client) = client.as_ref().filter(|_| local_file.is_none()) {
             let segment_client = client.clone();
             let segment_item = item.id.clone();
             self.in_app_segments_load
@@ -850,10 +864,12 @@ impl State {
         self.in_app_stats = false;
         self.in_app_next = None;
         self.in_app_prev = None;
-        self.in_app_next_dismissed = local.is_some();
+        self.in_app_next_dismissed = local_file.is_some();
         self.in_app_neighbours_load.cancel();
-        if local.is_none() {
-            self.request_in_app_streams(&client, &item.id);
+        if local_file.is_none()
+            && let Some(client) = &client
+        {
+            self.request_in_app_streams(client, &item.id);
             self.request_chapter_images(&item);
             // The neighbours are only useful near the end, so one request loads them alongside
             // playback instead of delaying the first frame. It is scoped to the whole series,
@@ -871,24 +887,27 @@ impl State {
                     });
             }
         }
-        let playback_request = client.user_id().map(|user_id| PlaybackInfoRequest {
-            user_id: user_id.to_string(),
-            start_time_ticks: start_ms.saturating_mul(jellyfin_api::TICKS_PER_MS),
-            max_streaming_bitrate: quality.max_bitrate(),
-            media_source_id: source.clone(),
-            audio_stream_index: None,
-            subtitle_stream_index: None,
-            max_audio_channels: requested_audio_channels(
-                self.audio_passthrough,
-                self.downmix_stereo,
-            ),
-            enable_direct_play: true,
-            enable_direct_stream: true,
-            enable_transcoding: true,
-            allow_video_stream_copy: true,
-            allow_audio_stream_copy: true,
-            device_profile: Client::device_profile(),
-        });
+        let playback_request = client
+            .as_ref()
+            .and_then(|client| client.user_id())
+            .map(|user_id| PlaybackInfoRequest {
+                user_id: user_id.to_string(),
+                start_time_ticks: start_ms.saturating_mul(jellyfin_api::TICKS_PER_MS),
+                max_streaming_bitrate: quality.max_bitrate(),
+                media_source_id: source.clone(),
+                audio_stream_index: None,
+                subtitle_stream_index: None,
+                max_audio_channels: requested_audio_channels(
+                    self.audio_passthrough,
+                    self.downmix_stereo,
+                ),
+                enable_direct_play: true,
+                enable_direct_stream: true,
+                enable_transcoding: true,
+                allow_video_stream_copy: true,
+                allow_audio_stream_copy: true,
+                device_profile: Client::device_profile(),
+            });
         let fallback = url.clone();
         let item_id = item.id.clone();
         let cap = quality.max_bitrate();
@@ -911,16 +930,21 @@ impl State {
                 audio,
             ),
             |(client, item_id, source, request, cap, fallback, surface, waker, start_ms, audio)| {
-                let negotiated = request
-                    .as_ref()
-                    .and_then(|request| client.playback_info(&item_id, request).ok());
-                let (url, method, play_session_id, notice) = choose_playback(
-                    &client,
-                    negotiated.as_ref(),
-                    source.as_deref(),
-                    cap,
-                    &fallback,
-                );
+                let negotiated = match (client.as_ref(), request.as_ref()) {
+                    (Some(client), Some(request)) => client.playback_info(&item_id, request).ok(),
+                    _ => None,
+                };
+                // A file on this device is the thing to play: no server has to choose a source.
+                let (url, method, play_session_id, notice) = match client.as_ref() {
+                    Some(client) => choose_playback(
+                        client,
+                        negotiated.as_ref(),
+                        source.as_deref(),
+                        cap,
+                        &fallback,
+                    ),
+                    None => (fallback.clone(), "DirectPlay", None, None),
+                };
                 let resume_at = resume_target(method, &url, start_ms);
                 match Player::start_at_with_audio(
                     &url,
@@ -959,6 +983,12 @@ impl State {
                                 message: format!("{method}: {first}"),
                             });
                         };
+                        let Some(client) = client.as_ref() else {
+                            return Err(Failure {
+                                stage: Stage::Player,
+                                message: format!("{method}: {first}"),
+                            });
+                        };
                         let Some(response) = client.playback_info(&item_id, &retry).ok() else {
                             return Err(Failure {
                                 stage: Stage::Player,
@@ -968,7 +998,7 @@ impl State {
                             });
                         };
                         let (url, method, play_session_id, _) = choose_playback(
-                            &client,
+                            client,
                             Some(&response),
                             source.as_deref(),
                             None,
@@ -1844,7 +1874,12 @@ impl State {
             Err(failure) => {
                 if let Some(pending) = self.pending_in_app.take() {
                     if pending.local {
-                        self.detail_notice = Some(format!("Trailer failed: {}", failure.message));
+                        let what = if pending.report {
+                            "Could not play the downloaded file"
+                        } else {
+                            "Trailer failed"
+                        };
+                        self.detail_notice = Some(format!("{what}: {}", failure.message));
                     } else {
                         eprintln!("in-app: {}", failure.message);
                         self.last_in_app_error = Some(failure.message.clone());

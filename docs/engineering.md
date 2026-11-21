@@ -63,7 +63,7 @@ sets them.
 | Phase 1b | done — watchlist, likes, search hints, filter sheet (year, rating, language, subtitles), multi-select/bulk, Release/Runtime/Plays sorts, 4K/HDR/CC/5.1/Atmos/VERS/NEW badges, AD/SDH tags, reduced motion, settings search/reset/export, 5xx/transport retry, 400-entry poster cache cap; the mini player was already the persistent now-playing bar |
 | Phase 2 (P4) | implemented and live-checked — PlaybackInfo with a device profile, direct-play-first selection, quality menu/restart, method + PlaySessionId reporting, Why? text. Live: direct play stays offered, a 2 Mbps cap returns a 951-byte HLS playlist, and the app decoded 72 frames in 8 s (1.35 s startup, debug) and seeked to 67.9 s (140 frames). HLS/tsdemux/souphttpsrc plugins present |
 | Phase 2b (small items) | done — collection add/sort and 12.4 creation fix, playlist drag, live reminders and notify-send opt-in, text size 85–130 %, remappable player shortcuts, Live TV crash-safe restore; H2 discovery rail still deprioritised. Covers blocked (server 500 on image upload); frame screenshot blocked (no DMA-BUF readback) |
-| Downloads | planned (Q9) — Settings storage path, queue, offline playback |
+| Downloads | **done** (Q9, first slice) — Download action on detail, Downloads page (queue, pause/resume/retry/remove, Keep), Settings folder + budget, resumable `.part` downloads with an atomic manifest, playback from the file with no server. Not yet: automatic keep-what-you-watch, next-3-episodes, offline browsing (Q4), report flush |
 | Seerr companion | **done** — `seerr-api` crate (22 tests), Settings probe, Discover/search, film and season requests, Active/All request progress, Open in Jellyfin and Request missing seasons. Live Jellyseerr 3.5.1; Radarr/Sonarr sync enabled; the live duplicate probe returns 409. |
 | Images | pass 2 done — search requests, mounted-row library fetches, 256-handle cap, retry, and every card in a home rail queued up front |
 | UI/UX | pass 3 done — ambient home backdrop path, item logos, next-up and cast, shortcut sheet, layered player OSD, mini player, readable-text shadows over artwork, pointer cursors, 10 %/16 % hover/press washes, wheel scrolling in the library; see `docs/research/04-ui-ux-finishing-pass.md` and `docs/research/05-moonfin-linux-desktop.md` |
@@ -292,8 +292,9 @@ The local MKV test and the live server test both pass; the live run stored **59,
 30 s with P010 selected. P010 imports R16/R16G16 and tone-maps PQ/HLG to SDR; quality calibration
 against a real HDR remux is the remaining M5c work, not a missing path.
 
-The next feature projects are **P4** (PlaybackInfo + direct-play-first transcoding) and **Q9**
-(downloads/offline with a Settings path); music is still out of scope.
+The next feature project is **P4** (PlaybackInfo + direct-play-first transcoding); Q9's first
+slice (downloads with a Settings folder, queue and off-server playback) is in, and music is still
+out of scope.
 
 ## Benchmarking a launch, a screen and a request (2026-11-12)
 
@@ -540,7 +541,9 @@ Known limits, with the reason:
   `\fscx`/`\fscy` keeps its area because Rune scales uniformly, and 3D `\frz` axes are ignored;
 - fullscreen/MPRIS: shipped (F11/OSD and a zbus service); MPRIS changes are polled rather than
   pushed as `PropertiesChanged`;
-- downloads/offline: planned (Q9) with a Settings storage path, not implemented yet;
+- downloads/offline: the queue, the Settings folder and off-server playback ship; automatic
+  "keep what you watch", offline browsing of Home/Library/Detail and flushing queued reports are
+  not built yet, and posters need the warm image cache when the server is away;
 - music, photos, SyncPlay: not this product (no libraries, or a WebSocket dependency the design
   excludes);
 - casting playback needs a second device to observe; the server answers 204 to the command.

@@ -21,6 +21,16 @@ pub struct Client {
     agent: ureq::Agent,
 }
 
+/// A media stream opened for a download: the body to copy, and the size the server reported.
+pub struct Stream {
+    pub reader: Box<dyn std::io::Read + Send>,
+    /// The whole file's size, from a full `Content-Length` or a `Content-Range` total.
+    pub total: Option<u64>,
+    /// The server honoured `Range` and this body starts at the requested offset. When false the
+    /// caller must rewrite the file from zero.
+    pub resumed: bool,
+}
+
 #[derive(Debug)]
 pub enum Error {
     /// The server answered, with a status that is not 2xx.
@@ -943,6 +953,47 @@ impl Client {
         res.body_mut()
             .read_to_vec()
             .map_err(|e| Error::Transport(e.to_string()))
+    }
+
+    /// Open a stream URL to copy it to disk. `from` asks the server to resume at that byte via
+    /// `Range`; the answer says whether it did (`resumed`) and how large the file is, which is
+    /// what a download progress bar needs before the first byte arrives.
+    pub fn open_stream(&self, url: &str, from: u64) -> Result<Stream> {
+        let mut req = self
+            .agent
+            .get(url)
+            .header("User-Agent", self.user_agent())
+            .header("Accept", "*/*");
+        if from > 0 {
+            req = req.header("Range", &format!("bytes={from}-"));
+        }
+        let res = req.call().map_err(map_err)?;
+        let status = res.status().as_u16();
+        let resumed = status == 206;
+        let mut total = None;
+        if let Some(value) = res
+            .headers()
+            .get("content-range")
+            .and_then(|value| value.to_str().ok())
+        {
+            // `bytes 100-999/1000`: the total is the part after the slash, `*` when unknown.
+            total = value
+                .rsplit('/')
+                .next()
+                .and_then(|total| total.trim().parse::<u64>().ok());
+        } else if status == 200 {
+            total = res
+                .headers()
+                .get("content-length")
+                .and_then(|value| value.to_str().ok())
+                .and_then(|value| value.parse::<u64>().ok());
+        }
+        let body = res.into_body();
+        Ok(Stream {
+            reader: Box::new(body.into_reader()),
+            total,
+            resumed,
+        })
     }
 
     /// A stream URL mpv can open directly (`DirectPlay`). `None` when there is no token.

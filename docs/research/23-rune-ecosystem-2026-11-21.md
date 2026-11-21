@@ -147,3 +147,21 @@ card now walks to the last rail, which mounts as the page scrolls, and the shell
 The other half of Q10 (image traffic) is untouched: posters are requested by the rails in the
 window, so a server with thirty libraries no longer builds thirty rails but still fetches art for
 the next two ahead. The image-cache byte budget is still the open item.
+
+**Q9 landed 2026-11-21, first slice.** Downloads are in: the action on a film's or episode's
+detail page, a Downloads page under Tools, a Settings folder and budget, resumable `.part` files
+with an atomic manifest, Keep against eviction, and playback through the in-app player from
+`file://` with no server at all. The contract is `design.md` §3 (Downloads).
+
+This is deliberately **not** Wholeseek's stream-to-cache yet. Their player fetches the stream
+itself, so it can write what it plays; ours hands the URL to GStreamer, and teeing a demuxed
+pipeline gives back elementary streams, not the container the server stored. Recording while
+playing would need a local proxy in front of the file — a new moving part on the playback path,
+and not one to add for a feature's first slice. What landed is the storage, the queue and the
+Keep flag that model needs; automatic download-on-play (unkept, promoted by Keep) is the next
+step, and it needs no proxy: two connections to a LAN server are cheap, and the copy is ready
+before the credits.
+
+Still open from the Phase 3 plan: automatic download-on-play with Keep promotion, "download the
+next 3 unwatched episodes", offline browsing of Home/Library/Detail (Q4), flushing playback
+reports queued while the server was away, and posters for rows whose image cache is cold.
