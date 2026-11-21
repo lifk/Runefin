@@ -12,8 +12,21 @@ say() { printf '%s\n' "$*"; }
 die() { printf 'error: %s\n' "$*" >&2; exit 1; }
 
 repo_url=${RUNEFIN_REPO_URL:-https://github.com/lifk/Runefin.git}
+public_url=${FLATPAK_REPO_URL:-https://lifk.github.io/Runefin/}
+key_file=packaging/flatpak/runefin-releases.gpg
 [ -d dist/flatpak-repo ] || die "dist/flatpak-repo is missing; run packaging/flatpak/build.sh first"
-[ -s dist/Runefin.flatpakrepo ] || die "dist/Runefin.flatpakrepo is missing"
+[ -s "$key_file" ] || die "missing $key_file"
+
+# The file a client opens once: `flatpak remote-add --if-not-exists --user runefin <file>`.
+# Generated here, not by the caller, so a local publish and CI publish the same document.
+{
+    echo '[Flatpak Repo]'
+    echo 'Title=Runefin'
+    echo "Url=$public_url"
+    echo 'Homepage=https://github.com/lifk/Runefin'
+    echo 'Comment=Jellyfin client for the desktop and the big screen'
+    echo "GPGKey=$(base64 -w0 "$key_file")"
+} > dist/Runefin.flatpakrepo
 
 pages=$(mktemp -d)
 trap 'rm -rf "$pages"' EXIT

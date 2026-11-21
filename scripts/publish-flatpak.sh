@@ -38,16 +38,6 @@ FLATPAK_GPG_KEY_FILE="$PWD/$key_file" \
 FLATPAK_REPO_URL="$repo_url" \
     ./packaging/flatpak/build.sh
 
-# The file a client opens once: `flatpak remote-add --if-not-exists --user runefin <file>`.
-{
-    echo '[Flatpak Repo]'
-    echo 'Title=Runefin'
-    echo "Url=$repo_url"
-    echo 'Homepage=https://github.com/lifk/Runefin'
-    echo 'Comment=Jellyfin client for the desktop and the big screen'
-    echo "GPGKey=$(base64 -w0 "$key_file")"
-} > dist/Runefin.flatpakrepo
-
-# Publishing itself lives in one place: the release workflow pushes the same directory, so a
-# local publish and a CI publish cannot drift apart.
-./scripts/publish-flatpak-repo.sh
+# Publishing itself lives in one place — the .flatpakrepo, the gh-pages branch — and CI calls
+# the same script, so a local publish cannot drift from a release.
+FLATPAK_REPO_URL="$repo_url" ./scripts/publish-flatpak-repo.sh

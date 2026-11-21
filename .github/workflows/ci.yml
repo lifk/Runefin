@@ -206,6 +206,7 @@ jobs:
         if: steps.gate.outputs.skip != 'true' && steps.meta.outputs.skip != 'true'
         env:
           RUNEFIN_REPO_URL: https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git
+          FLATPAK_REPO_URL: https://lifk.github.io/Runefin/
         run: ./scripts/publish-flatpak-repo.sh
 
       - name: Attach the bundle and publish the release
