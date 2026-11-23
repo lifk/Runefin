@@ -15,7 +15,7 @@ OS.
 - [ ] 7. Audio routing: device row, sink-loss reselect, passthrough requirements in diagnostics
 - [ ] 8. Suspend/resume: `PrepareForSleep`, pause/report, pipeline teardown, pad/audio re-enumeration, re-seek
 - [ ] 9. Diagnostics + update notice + “repair Steam entry”
-- [ ] 10. Desktop media profile script: default Desktop Mode, autostart Big Screen, CEC/power helper, `--restore`
+- [ ] 10. Three-mode integration: Desktop stays stock Plasma, Gaming stays Steam, Media is a separate session; `runefin-mode` switches and recovers, and the in-app keyboard makes Media keyboard-free. See `docs/plans/2026-11-23-three-modes.md`
 - [ ] 11. Distribution: lower `--require-version`, vendor sources, Flathub submission
 - [ ] 12. Hardware verification on Steam Machine/Deck: Gaming Mode, overlay/OSK, suspend, HDMI, CEC, 4K
 - [ ] 13. Experimental only: HDR in Desktop Mode, custom gamescope session doc, Steam store evaluation
@@ -27,11 +27,14 @@ The full feasibility matrix, code references, sources and the “what Valve must
 
 Principles:
 
-- No `/usr`, `/etc`, `devkit-steam`, Steam UI injection, or per-item shortcuts.
+- No `/usr`, `/etc`, `devkit-steam`, Steam UI injection, or per-item shortcuts in the single-app
+  profile. The 2026-11-23 three-mode plan deliberately adds one `/etc/sddm.conf.d` drop-in because a
+  real third mode cannot be selected without it; that exception is scoped to
+  `docs/plans/2026-11-23-three-modes.md`.
 - The app owns the 10-foot UI, input, OSK hint, audio and suspend contract; Steam owns the shell.
 - One stable identity; a wrapper is the launch path so a Steam environment regression cannot
   brick the tile.
-- Desktop Mode is a supported optional media profile, not the default; a custom session is
-  documented as unsupported.
+- Desktop Mode stays a stock Plasma desktop. Media is a separate session, not an app layered over
+  Desktop; see the 2026-11-23 plan.
 - Never promise HDR, 24p, TrueHD or overlay behavior that the platform does not expose; diagnose
   and fall back honestly.
