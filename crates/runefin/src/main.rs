@@ -51,7 +51,7 @@ use rune::{AppSpec, Cx, El, Key, KeyEvent, TextEdit, Tx};
 
 use detail::DetailState;
 use library::LibraryState;
-use state::{Route, State, Step};
+use state::{Route, State, Step, TextTarget};
 
 fn view(s: &State, cx: &mut Cx<State>) -> El {
     let bench = crate::bench::view_started();
@@ -307,6 +307,17 @@ fn poll(s: &mut State, _clock: f64, tx: &mut Tx) -> bool {
         tx.focus(key, true);
         changed = true;
     }
+    // The keyboard opens on the field's focus edge, then takes focus itself. The focus
+    // request is queued after the screen's own request so the sheet wins the frame.
+    let focused = tx.focused().map(str::to_owned);
+    if s.keyboard_observe(focused.as_deref(), s.big_screen) {
+        changed = true;
+    }
+    if let Some(key) = s.keyboard.take_focus() {
+        s.note_focus(key.clone());
+        tx.focus(key, true);
+        changed = true;
+    }
     // The end card is a picture of the next episode: a screen reader hears it open once. The
     // card's own title is on screen, so this is the spoken form of the same news.
     let end_card = s.osd_visible && s.next_up_eligible();
@@ -366,6 +377,11 @@ fn trace_slow_poll(took: std::time::Duration) {
 /// so the root element carries this hook too; `on_key` calls it for the unfocused case. A screen
 /// with no zones, a focused panel or a text field's Left/Right is left to Rune.
 fn tv_key(s: &mut State, key: &KeyEvent, tx: &mut Tx) -> bool {
+    // The sheet owns the D-pad while it is open; its keys are a focus group, and page
+    // zones must not step underneath it.
+    if s.keyboard.open {
+        return false;
+    }
     let Some(action) = tv_input::action(key) else {
         return false;
     };
@@ -494,6 +510,21 @@ fn on_key(s: &mut State, key: &KeyEvent, tx: &mut Tx) -> bool {
         if let Some(name) = crate::shortcuts::key_name(key) {
             s.capture_shortcut(&name);
         }
+        return true;
+    }
+    // The sheet has focus; its keys handle D-pad and activation. Escape and the Menu
+    // button close it, and no page shortcut should fire underneath it.
+    if s.keyboard.open {
+        match key.key {
+            Key::Escape | Key::ContextMenu => {
+                s.keyboard_hide();
+                return true;
+            }
+            _ => return false,
+        }
+    }
+    // Start/Menu on a focused text field asks for the keyboard in On-demand mode too.
+    if key.key == Key::ContextMenu && s.keyboard.manual_open(tx.focused()) {
         return true;
     }
     // The TV's own keys, shared with the root element's key hook. On a focused control Rune
@@ -1327,6 +1358,12 @@ fn main() {
                 s.user = TextEdit::new("");
                 s.password = TextEdit::new("").secure();
                 s.step = Step::Idle;
+            }),
+            ("keyboard", |s| {
+                s.config = crate::config::Config::fresh();
+                s.server = TextEdit::new("https://jellyfin.example");
+                s.step = Step::Idle;
+                s.keyboard.open_for("server", TextTarget::ConnectServer);
             }),
             ("connect-quick", |s| {
                 s.config = crate::config::Config::fresh();
@@ -5555,6 +5592,9 @@ mod tests {
                 s.osd_visible = true;
                 s.in_app_gear_open = true;
             }),
+            ("keyboard", |s: &mut State| {
+                s.keyboard.open_for("server", TextTarget::ConnectServer);
+            }),
         ];
         let mut failures = Vec::new();
         for (name, setup) in screens {
@@ -8711,6 +8751,40 @@ mod tests {
     }
 
     #[test]
+    fn the_keyboard_opens_on_the_connect_field_and_types_with_the_pad() {
+        let env = Env {
+            system_dark: true,
+            scale: 1.5,
+        };
+        let mut state = State::from_config(config::Config::fresh());
+        state.big_screen = true;
+        let mut rt = Runtime::new(state, view, (1280.0, 720.0), env);
+        rt.poll = Some(poll);
+        rt.on_key = Some(on_key);
+        rt.frame(0.0);
+        for _ in 0..3 {
+            rt.frame(1.0 / 60.0);
+        }
+        assert!(rt.state.keyboard.open, "the connect field opened the sheet");
+        assert_eq!(rt.focused_key().as_deref(), Some("osk-a"));
+        rt.key(KeyEvent {
+            key: Key::Enter,
+            mods: Default::default(),
+        });
+        rt.frame(1.0 / 60.0);
+        assert_eq!(
+            rt.state.server.text, "a",
+            "a CEC OK activates the focused key"
+        );
+        rt.key(KeyEvent {
+            key: Key::Escape,
+            mods: Default::default(),
+        });
+        rt.frame(1.0 / 60.0);
+        assert!(!rt.state.keyboard.open, "Escape hides the sheet");
+    }
+
+    #[test]
     fn pressing_connect_with_an_empty_server_explains_what_is_missing() {
         let env = Env {
             system_dark: true,
@@ -8794,6 +8868,9 @@ mod tv_reach_tests {
         let mut state = State::from_config(config::Config::fresh());
         crate::demo::signed_in(&mut state);
         state.big_screen = true;
+        // The reach walk tests the page underneath the sheet. The keyboard's own case
+        // opens it explicitly; auto-open would cover the controls this walk exists to count.
+        state.keyboard.mode = crate::config::KeyboardMode::OnDemand;
         state
     }
 
@@ -9250,6 +9327,13 @@ mod tv_reach_tests {
         state.search.query.focused = true;
         state.search.results = demo::search_results();
         check("search", state);
+    }
+
+    #[test]
+    fn every_on_screen_keyboard_control_is_reachable() {
+        let mut state = base();
+        state.keyboard.open_for("server", TextTarget::ConnectServer);
+        check_in("keyboard", state, "osk");
     }
 
     #[test]

@@ -113,6 +113,9 @@ pub struct Config {
     /// it on a display the compositor drives in HDR.
     #[serde(default)]
     pub hdr: Option<HdrMode>,
+    /// When the in-app on-screen keyboard opens for a text field. Absent means Auto.
+    #[serde(default)]
+    pub keyboard: Option<KeyboardMode>,
     /// The last version chosen per item id, so a restart keeps the edition.
     #[serde(default)]
     pub version_choices: Option<std::collections::HashMap<String, String>>,
@@ -475,6 +478,37 @@ impl SkipMode {
             SkipMode::Ask => SkipMode::Always,
             SkipMode::Always => SkipMode::Never,
             SkipMode::Never => SkipMode::Ask,
+        }
+    }
+}
+
+/// When the in-app on-screen keyboard opens for a text field.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum KeyboardMode {
+    /// Open when a text field takes focus in the big-screen layout.
+    #[default]
+    Auto,
+    /// Open only when the reader asks for it from the field's keyboard action.
+    OnDemand,
+    /// Never open it; a physical keyboard is assumed.
+    Off,
+}
+
+impl KeyboardMode {
+    pub fn label(self) -> &'static str {
+        match self {
+            KeyboardMode::Auto => "Auto",
+            KeyboardMode::OnDemand => "On demand",
+            KeyboardMode::Off => "Off",
+        }
+    }
+
+    pub fn next(self) -> KeyboardMode {
+        match self {
+            KeyboardMode::Auto => KeyboardMode::OnDemand,
+            KeyboardMode::OnDemand => KeyboardMode::Off,
+            KeyboardMode::Off => KeyboardMode::Auto,
         }
     }
 }

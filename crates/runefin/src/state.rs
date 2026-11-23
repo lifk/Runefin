@@ -55,6 +55,7 @@ mod downloads_state;
 mod idle;
 mod image_state;
 mod in_app_state;
+mod keyboard;
 pub use in_app_state::is_playable;
 #[cfg(test)]
 pub use live_state::live_zap_index;
@@ -71,6 +72,7 @@ pub use card_menu_state::CardMenu;
 pub use downloads_state::DownloadsState;
 pub use in_app_state::InAppSession;
 use in_app_state::{PendingInApp, PlaybackStreams, SubtitleCues};
+pub use keyboard::{Keyboard, KeyboardPage, TextTarget};
 pub use live_state::LiveState;
 pub use person_state::PersonPage;
 use person_state::{PersonBundle, PersonLoad};
@@ -814,6 +816,8 @@ pub struct State {
     /// The card that opened the item menu, so closing it returns focus there.
     card_menu_focus: Option<String>,
     pub high_contrast: bool,
+    /// The in-app on-screen keyboard; `mode` is the saved preference.
+    pub keyboard: Keyboard,
     /// Reader text size applied to every type token.
     pub text_scale: f32,
     pub mpris_shuffle: bool,
@@ -1202,6 +1206,7 @@ impl State {
             focus_layers: FocusLayers::default(),
             card_menu_focus: None,
             high_contrast: false,
+            keyboard: Keyboard::new(config.keyboard.unwrap_or_default()),
             text_scale: 1.0,
             mpris_shuffle: false,
 
@@ -1972,6 +1977,7 @@ impl State {
         self.config.hover_preview = Some(self.hover_preview_enabled);
         self.config.light_theme = Some(self.light_theme);
         self.config.high_contrast = Some(self.high_contrast);
+        self.config.keyboard = Some(self.keyboard.mode);
         self.config.text_scale = Some(self.text_scale);
         self.config.live_favorites = Some(self.live.favorites.iter().cloned().collect());
         self.config.live_reminders = Some(self.live_reminders.clone());
@@ -2166,6 +2172,9 @@ impl State {
         if self.route != self.last_route {
             self.current_images.clear();
             self.last_route = self.route.clone();
+            if self.keyboard.open {
+                self.keyboard_reset();
+            }
         }
         let mut booted = false;
         if self.fetch_home && !self.home_started && self.is_signed_in() {
@@ -5311,6 +5320,7 @@ mod tests {
             focus_layers: FocusLayers::default(),
             card_menu_focus: None,
             high_contrast: false,
+            keyboard: Keyboard::default(),
             text_scale: 1.0,
             mpris_shuffle: false,
 

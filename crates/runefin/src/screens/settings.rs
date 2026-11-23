@@ -369,6 +369,12 @@ pub(super) fn settings_screen(s: &State) -> El {
             State::toggle_ui_mode as fn(&mut State),
         ),
         (
+            "setting-keyboard",
+            "On-screen keyboard",
+            s.keyboard.mode.label().to_string(),
+            State::cycle_keyboard_mode as fn(&mut State),
+        ),
+        (
             "setting-autoplay",
             "Autoplay next episode",
             if s.autoplay_next { "On" } else { "Off" }.to_string(),
@@ -541,6 +547,7 @@ pub(super) fn settings_screen(s: &State) -> El {
         let appearance_row = matches!(
             key,
             "setting-ui-mode"
+                | "setting-keyboard"
                 | "setting-high-contrast"
                 | "setting-light-theme"
                 | "setting-text-scale"

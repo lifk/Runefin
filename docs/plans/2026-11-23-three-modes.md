@@ -53,7 +53,7 @@ Flatpak and absent when Steam is not running.
 
 ## 2. Steps
 
-- [ ] 1. **Keyboard first.** Target registry, `TextEdit` insertion, change hooks, bottom sheet, tests,
+- [x] 1. **Keyboard first.** Target registry, `TextEdit` insertion, change hooks, bottom sheet, tests,
   snapshot. Prove the connect form, search, password and go-to fields with a D-pad only.
 - [ ] 2. **Mode skeleton.** `runefin-mode` (marker, switch, recovery), the dispatcher, the one SDDM
   drop-in, and a Desktop/Gaming/Media switch matrix with a placeholder Media client. No app changes.

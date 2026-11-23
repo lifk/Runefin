@@ -53,15 +53,20 @@ web wrapper and does not embed a second render stack.
   picture. A mode change takes effect at restart and the Settings row says so.
 - **Remote reach** is tested: every screen (Home, library, detail, search, Live TV, Settings,
   Seerr explore/browse/requests, Seerr detail, person, remote), overlay (card menu, pre-play,
-  pickers, interrupt cards, shortcut sheet, subtitle search, shelf) and player layer is walked
-  with the D-pad and every visible control must be reachable from the first focus. On a big screen the zones cover the
-  whole page — a detail's collections,
+  pickers, interrupt cards, shortcut sheet, subtitle search, on-screen keyboard, shelf) and player
+  layer is walked with the D-pad and every visible control must be reachable from the first focus.
+  On a big screen the zones cover the whole page — a detail's collections,
   cast, extras and *More like this* below the episode list; the player's gear sheet and each
   panel. Back from a player panel returns to the gear row that opened it. Settings index chips
   put the selector in the section they jump to, and vertical moves glide the page.
 - **Controller navigation** in both modes: D-pad/left stick moves, A activates, B goes back,
   LB/RB change focus group, Start opens the focused card's menu or the player's gear. The pad is
   read natively through `gilrs`; `RUNEFIN_GAMEPAD=0` disables it.
+- **In-app on-screen keyboard** for a remote or pad: focusing a text field opens a bottom sheet
+  with QWERTY, shift, digits/symbols, space, backspace, Enter, Next and Hide, plus a masked Show
+  toggle for passwords. It edits the field directly, so the Steam overlay keyboard is not needed.
+  Settings → Interface → On-screen keyboard chooses Auto (big screen), On demand (Menu/Start on a
+  field) or Off. The sheet is a D-pad focus group and every key is named for screen readers.
 - Keyboard shortcut sheet (`?`): search, playback, subtitles, live channels, volume, menus,
   fullscreen and navigation. Player actions can be remapped in Settings → Keyboard; a duplicate
   binding is refused.
@@ -537,9 +542,9 @@ holds the address, the masked admin key and an optional user id; **Test** proves
 | `Menu` / `⇧F10` | Poster item menu |
 
 Controller (standard gamepad): D-pad/left stick = arrows; A = Space; B/Select = Esc;
-LB/RB = Shift+Tab/Tab; Start = Menu. Text entry uses Steam's on-screen keyboard where Steam
-provides it for a non-Steam Flatpak, or the desktop keyboard; Quick Connect avoids typing
-entirely. HDMI-CEC TV remotes arrive as keyboard input on SteamOS 3.8.1+ (`cecd`) and OK, Back
+LB/RB = Shift+Tab/Tab; Start = Menu. Text entry uses Runefin's in-app keyboard on a big screen;
+the Steam overlay keyboard and the desktop keyboard remain fallbacks. Quick Connect still avoids
+typing entirely. HDMI-CEC TV remotes arrive as keyboard input on SteamOS 3.8.1+ (`cecd`) and OK, Back
 and the D-pad keep its defaults. `packaging/flatpak/cecd.toml` maps only the Menu buttons;
 transport keys are not mapped yet, so a remote's Play/Stop/FF/Rewind do nothing.
 
@@ -548,7 +553,7 @@ transport keys are not mapped yet, so a remote's Play/Stop/FF/Rewind do nothing.
 ```sh
 cargo test -p jellyfin-api        # 49 API tests, no network
 cargo test -p seerr-api           # 26 Seerr API tests, no network
-cargo test -p runefin             # 437 app tests (26 ignored), headless
+cargo test -p runefin             # 477 app tests (27 ignored), headless
 scripts/check.sh                  # fmt, clippy, all three suites, release build
 scripts/snapshots.sh              # the committed views, in place
 JELLYFIN_URL=... JELLYFIN_USER_ID=... JELLYFIN_TOKEN=... \

@@ -17,6 +17,7 @@ use crate::state::{Route, State, Step};
 mod detail;
 mod downloads;
 mod in_app;
+mod keyboard;
 mod library;
 mod live;
 mod now_playing;
@@ -192,6 +193,11 @@ pub fn view(s: &State, _cx: &mut Cx<State>) -> El {
                 ),
         ),
         None => base,
+    };
+    let base = if s.keyboard.open {
+        base.child(keyboard::keyboard(s))
+    } else {
+        base
     };
     // A TV has no pointer; hide it where no control asks for one, and keep the hand over
     // buttons for the occasional mouse.

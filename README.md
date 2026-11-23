@@ -137,6 +137,11 @@ A gamepad works in either mode: D-pad/left stick moves, **A** selects, **B** goe
 change section, and **Start** opens a card menu or the player gear. `RUNEFIN_GAMEPAD=0` turns the
 listener off.
 
+On a big screen, a text field opens Runefin's in-app keyboard: QWERTY, shift, digits and symbols,
+space, backspace, Enter and Hide, all reachable with the D-pad. Passwords are masked with an explicit
+**Show** toggle. Settings → Interface → **On-screen keyboard** chooses Auto, On demand (Menu/Start on
+a field) or Off, so the Steam overlay keyboard is not required.
+
 On SteamOS an HDMI-CEC remote arrives as keyboard input, and Runefin's big-screen mode takes
 Return as OK. Only the Menu buttons need a cecd mapping:
 [`packaging/flatpak/setup-cecd.sh`](packaging/flatpak/setup-cecd.sh) merges it into

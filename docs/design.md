@@ -484,6 +484,14 @@ with `--big-screen`; the physical pad reaches the native listener without a Stea
 Steam+X on a non-Steam Flatpak is best-effort (the overlay injection is sandbox-dependent);
 Quick Connect is the couch sign-in path and does not require it.
 
+**Text entry.** A focused text field opens the in-app keyboard on a big screen: a bottom sheet with
+QWERTY, shift, digits/symbols, space, backspace, Enter, Next and Hide, plus a masked Show toggle for
+secure fields. It edits the field's `TextEdit` directly and keeps every key a named, focusable
+button, so the D-pad, a CEC remote and a screen reader all work without the Steam overlay keyboard.
+Settings → Interface → On-screen keyboard is Auto (big screen), On demand (Menu/Start on a field) or
+Off. The sheet is a modal focus group: Escape/Back hides it and returns focus to the field, and the
+page underneath does not move.
+
 **Images.** Geometry first: reserve the box from the aspect ratio, paint a blurred 27×17
 placeholder, crossfade over 200 ms. Rune's `ImageCache` decodes on its own worker and dedupes by
 content, but `ImageCache::url` is web-only — on Linux we fetch bytes ourselves (below). The image

@@ -81,6 +81,7 @@ core() {
     render in-app-osd in-app-osd 1280 800
     render_big home home
     render_big library library
+    render_focus keyboard keyboard
     render_focus home focus-card
     render_focus home focus-sidebar "$focus_script"
     rm -f "$focus_script"
@@ -227,6 +228,7 @@ render_big library library
 render_big detail detail
 render_big search search
 render_big settings settings
+render_big keyboard keyboard
 render_big live-tv live-tv
 render_big idle connect-idle
 render_big in-app-osd in-app-osd
