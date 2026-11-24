@@ -43,9 +43,28 @@
       <caption>The in-app keyboard on a Big Screen connect form</caption>
       <image type="source">https://raw.githubusercontent.com/lifk/Runefin/main/docs/snapshots/keyboard-big.png</image>
     </screenshot>
+    <screenshot>
+      <caption>SteamOS modes in Settings while the Media session runs</caption>
+      <image type="source">https://raw.githubusercontent.com/lifk/Runefin/main/docs/snapshots/media-settings.png</image>
+    </screenshot>
   </screenshots>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.3.2" date="2026-11-24">
+      <description>
+        <p>
+          Three real SteamOS sessions behind one installer. Desktop stays stock Plasma, Gaming
+          stays stock Steam, and Media is a KWin session with Runefin full screen and no Plasma
+          behind it. The host installer adds one user-owned dispatcher, one supervisor, a
+          runefin-mode command and one additive SDDM drop-in; there is no pin unit and no root
+          process after install. The Steam tile switches Gaming to Media, desktop entries switch
+          Desktop, and Settings -> SteamOS modes switches out of Media. The Media supervisor waits
+          for a first-frame marker, restarts a crash, and falls back to Desktop after three
+          failures. Everything from 0.3.1 carries over, including the in-app keyboard, downloads,
+          virtualized Home rails and scRGB HDR with its SDR fallback.
+        </p>
+      </description>
+    </release>
     <release version="0.3.1" date="2026-11-24">
       <description>
         <p>
