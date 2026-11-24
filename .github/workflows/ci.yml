@@ -28,17 +28,12 @@ jobs:
           DEBIAN_FRONTEND: noninteractive
           NEEDRESTART_MODE: a
         run: |
-          # The runner image's unattended upgrades can hold the apt lock, and needrestart
-          # can wait for a prompt on a headless job. Neither belongs in a test lane.
-          sudo systemctl stop unattended-upgrades || true
-          sudo systemctl disable --now apt-daily.service apt-daily-upgrade.service \
-            apt-daily.timer apt-daily-upgrade.timer || true
-          sudo sed -i 's/^#\?\$nrconf{restart} = .*/$nrconf{restart} = "a";/' \
-            /etc/needrestart/needrestart.conf || true
-          sudo NEEDRESTART_MODE=a DEBIAN_FRONTEND=noninteractive timeout 300 apt-get update
-          sudo NEEDRESTART_MODE=a DEBIAN_FRONTEND=noninteractive timeout 900 apt-get install -y \
+          # needrestart can wait for a prompt on a headless job; sudo -E keeps the two
+          # noninteractive variables through the package install. The timeouts turn a
+          # stalled mirror into a fast failure instead of a blocked release.
+          sudo -E apt-get update
+          sudo -E timeout -k 10 900 apt-get install -y --no-install-recommends \
             -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold \
-            --no-install-recommends \
             libxkbcommon-dev libwayland-dev libudev-dev \
             libvulkan1 mesa-vulkan-drivers vulkan-tools \
             libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
