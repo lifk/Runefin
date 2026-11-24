@@ -39,9 +39,27 @@
       <caption>A library at 1080p with the TV toolbar</caption>
       <image type="source">https://raw.githubusercontent.com/lifk/Runefin/main/docs/snapshots/library-big.png</image>
     </screenshot>
+    <screenshot>
+      <caption>The in-app keyboard on a Big Screen connect form</caption>
+      <image type="source">https://raw.githubusercontent.com/lifk/Runefin/main/docs/snapshots/keyboard-big.png</image>
+    </screenshot>
   </screenshots>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.3.1" date="2026-11-24">
+      <description>
+        <p>
+          An in-app on-screen keyboard for Big Screen. A focused text field opens a bottom sheet
+          with QWERTY, shift, digits and symbols, space, backspace, Enter, Next and Hide, all
+          reachable with the D-pad or a CEC remote; a password stays masked until the temporary
+          Show toggle is used. It edits the field directly, so the Steam overlay keyboard is not
+          needed for the connect form, search or settings. Settings -> Interface -> On-screen
+          keyboard chooses Auto in Big Screen, On demand (Menu/Start on a field) or Off. Everything
+          from 0.3.0 carries over: downloads and offline playback, virtualized Home rails, scRGB
+          HDR output with its SDR fallback, and runefin:// links.
+        </p>
+      </description>
+    </release>
     <release version="0.3.0" date="2026-11-21">
       <description>
         <p>
