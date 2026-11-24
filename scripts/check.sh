@@ -5,6 +5,7 @@ cd "$(dirname "$0")/.."
 
 python3 -c "compile(open('scripts/steam-install.py').read(), 'scripts/steam-install.py', 'exec')"
 python3 -c "compile(open('packaging/decky/runefin/main.py').read(), 'packaging/decky/runefin/main.py', 'exec')"
+for script in packaging/modes/*.sh packaging/modes/runefin-mode; do bash -n "$script"; done
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test -p jellyfin-api

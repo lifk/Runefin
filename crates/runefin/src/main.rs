@@ -28,6 +28,7 @@ mod imdb;
 mod intro_detect;
 mod library;
 mod loudness;
+mod media;
 mod mpris;
 mod net;
 mod pad;
@@ -83,8 +84,13 @@ fn view(s: &State, cx: &mut Cx<State>) -> El {
 /// Once, before the first frame: hand the worker the waker it rings when an answer lands.
 /// The saved or per-launch interface mode. `--big-screen` and `RUNEFIN_UI=big` override the
 /// config for one run; the config is what Settings writes.
+fn media_requested() -> bool {
+    std::env::args().any(|arg| arg == "--media")
+        || std::env::var("RUNEFIN_MEDIA").is_ok_and(|v| v == "1")
+}
+
 fn big_screen_requested() -> bool {
-    if std::env::args().any(|arg| arg == "--big-screen") {
+    if media_requested() || std::env::args().any(|arg| arg == "--big-screen") {
         return true;
     }
     if std::env::var("RUNEFIN_UI").is_ok_and(|v| v.eq_ignore_ascii_case("big")) {
@@ -123,6 +129,9 @@ fn init() -> State {
         let windowed = std::env::args().any(|arg| arg == "--windowed");
         state.fullscreen = !windowed;
         state.pending_fullscreen = (!windowed).then_some(true);
+    }
+    if media_requested() {
+        state.media = true;
     }
     state
 }
@@ -248,6 +257,15 @@ fn open_url(s: &mut State, url: &str, _tx: &mut Tx) {
 fn poll(s: &mut State, _clock: f64, tx: &mut Tx) -> bool {
     let started = std::time::Instant::now();
     let mut changed = s.poll();
+    if s.media && !s.media_ready {
+        s.media_ready = true;
+        crate::media::report_ready();
+        changed = true;
+    }
+    if let Some(code) = s.pending_exit.take() {
+        s.shutdown();
+        std::process::exit(code);
+    }
     // A Settings switch asks the window to reconfigure its surface; the status the surface
     // reports afterwards is what the row shows, so an unsupported display stays honest.
     if let Some(hdr) = s.hdr_pending.take() {
@@ -2059,6 +2077,11 @@ fn main() {
             }),
             ("settings", |s| {
                 demo::signed_in(s);
+                s.route = Route::Settings;
+            }),
+            ("media-settings", |s| {
+                demo::signed_in(s);
+                s.media = true;
                 s.route = Route::Settings;
             }),
             ("settings-seerr", |s| {
@@ -8785,6 +8808,15 @@ mod tests {
     }
 
     #[test]
+    fn a_media_mode_control_asks_the_host_for_its_exit_code() {
+        let mut state = State::from_config(config::Config::fresh());
+        state.request_exit(42);
+        assert_eq!(state.pending_exit, Some(42));
+        state.request_exit(43);
+        assert_eq!(state.pending_exit, Some(43));
+    }
+
+    #[test]
     fn pressing_connect_with_an_empty_server_explains_what_is_missing() {
         let env = Env {
             system_dark: true,
@@ -9300,6 +9332,14 @@ mod tv_reach_tests {
         state.detail = Some(detail);
         state.detail_extras = demo::extras();
         check("movie detail", state);
+    }
+
+    #[test]
+    fn every_media_mode_control_is_reachable() {
+        let mut state = base();
+        state.media = true;
+        state.route = Route::Settings;
+        check("media settings", state);
     }
 
     #[test]

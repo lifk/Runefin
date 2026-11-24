@@ -484,6 +484,14 @@ with `--big-screen`; the physical pad reaches the native listener without a Stea
 Steam+X on a non-Steam Flatpak is best-effort (the overlay injection is sandbox-dependent);
 Quick Connect is the couch sign-in path and does not require it.
 
+**Three modes.** `--media` starts Runefin in the Media mode of the host dispatcher; `Settings →
+SteamOS modes` offers Desktop (43), Gaming (42) and Restart (0), which the supervisor maps to the
+mode marker. Desktop stays stock Plasma and Gaming stays stock Steam; only Media runs KWin without
+Plasma. The host side is `packaging/modes`: one user-owned dispatcher, one supervisor and one
+additive SDDM drop-in installed by `scripts/steam-install.py --three-modes`. The app writes a
+first-frame ready marker in its Flatpak cache; the supervisor restarts a crash and falls back to
+Desktop after three failures. No root process runs after install.
+
 **Text entry.** A focused text field opens the in-app keyboard on a big screen: a bottom sheet with
 QWERTY, shift, digits/symbols, space, backspace, Enter, Next and Hide, plus a masked Show toggle for
 secure fields. It edits the field's `TextEdit` directly and keeps every key a named, focusable

@@ -818,6 +818,13 @@ pub struct State {
     pub high_contrast: bool,
     /// The in-app on-screen keyboard; `mode` is the saved preference.
     pub keyboard: Keyboard,
+    /// Started as the Media mode of the three-mode SteamOS session. Shows the mode controls
+    /// and writes the first-frame ready marker for the host supervisor.
+    pub media: bool,
+    pub media_ready: bool,
+    /// A mode switch that must end this process with a specific code (42 Game, 43 Desktop,
+    /// 0 restart). `main`'s poll shuts down and exits after the frame.
+    pub pending_exit: Option<i32>,
     /// Reader text size applied to every type token.
     pub text_scale: f32,
     pub mpris_shuffle: bool,
@@ -1207,6 +1214,9 @@ impl State {
             card_menu_focus: None,
             high_contrast: false,
             keyboard: Keyboard::new(config.keyboard.unwrap_or_default()),
+            media: false,
+            media_ready: false,
+            pending_exit: None,
             text_scale: 1.0,
             mpris_shuffle: false,
 
@@ -1898,6 +1908,13 @@ impl State {
         self.stop_playback();
     }
 
+    /// Ask the host supervisor to change modes. The process must end with the code that
+    /// `packaging/modes/runefin-mode` maps to the marker; `main`'s poll performs the shutdown
+    /// and exit after this frame.
+    pub fn request_exit(&mut self, code: i32) {
+        self.pending_exit = Some(code);
+    }
+
     /// The window title for the current route, when it changed. A task switcher and a media
     /// widget read this, so "Runefin" everywhere was a missed label on every screen.
     pub fn sync_window_title(&mut self) -> Option<String> {
@@ -2017,7 +2034,9 @@ impl State {
         self.history = crate::history::load(50);
         self.load_downloads();
         crate::bench::mark("bench.setup.disk");
-        self.start_tray(&waker);
+        if !self.media {
+            self.start_tray(&waker);
+        }
         crate::bench::mark("bench.setup.tray");
         self.history_ms = self.history.iter().map(|entry| entry.played_ms).sum();
         self.waker = Some(waker.clone());
@@ -5321,6 +5340,9 @@ mod tests {
             card_menu_focus: None,
             high_contrast: false,
             keyboard: Keyboard::default(),
+            media: false,
+            media_ready: false,
+            pending_exit: None,
             text_scale: 1.0,
             mpris_shuffle: false,
 

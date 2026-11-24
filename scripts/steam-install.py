@@ -13,6 +13,7 @@ This is a host-side installer. A Flatpak has no post-install hook and cannot wri
 
 Usage:
   python3 scripts/steam-install.py [--dry-run] [--no-install] [--no-steam]
+  python3 scripts/steam-install.py --three-modes [--default-mode media]
   python3 scripts/steam-install.py --uninstall
 
 It never runs as root, never edits /usr or /etc, and never touches another shortcut.
@@ -21,6 +22,7 @@ It never runs as root, never edits /usr or /etc, and never touches another short
 from __future__ import annotations
 
 import argparse
+import getpass
 import json
 import os
 import re
@@ -47,6 +49,14 @@ RECORD = RUNEFIN_DIR / "steam.json"
 DECKY_PLUGIN = Path.home() / "homebrew" / "plugins" / "Runefin"
 DECKY_BASE = "https://raw.githubusercontent.com/lifk/Runefin/main/packaging/decky/runefin"
 DECKY_FILES = ("plugin.json", "main.py", "package.json", "dist/index.js")
+MODES_BASE = "https://raw.githubusercontent.com/lifk/Runefin/main/packaging/modes"
+MODES_FILES = ("session.sh", "supervisor.sh", "runefin-mode")
+MODES_DIR = DATA_HOME / "runefin" / "modes"
+MODE_COMMAND = Path.home() / ".local" / "bin" / "runefin-mode"
+SDDM_DROPIN = Path("/etc/sddm.conf.d/zzz-runefin-modes.conf")
+STATE_DIR = Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local/state") / "runefin"
+MODE_FILE = STATE_DIR / "mode"
+APPLICATIONS = DATA_HOME / "applications"
 
 
 def say(message: str) -> None:
@@ -247,6 +257,12 @@ unset LD_LIBRARY_PATH LD_PRELOAD
 mkdir -p "$(dirname '{log}')"
 {{
   printf '%s Runefin launch\\n' "$(date -Is)"
+  mode_cmd="$HOME/.local/bin/runefin-mode"
+  if [ -f /etc/sddm.conf.d/zzz-runefin-modes.conf ] \
+     && [ -x "$mode_cmd" ] \
+     && [ -f "$HOME/.local/share/runefin/modes/session.sh" ]; then
+    exec "$mode_cmd" media
+  fi
   exec {flatpak} run --branch=stable --arch=x86_64 {APP_ID} --big-screen "$@"
 }} >>'{log}' 2>&1
 """
@@ -435,6 +451,139 @@ def write_record(appid: str | None, artworks: list[Path], decky: Path | None, dr
     RECORD.write_text(json.dumps(payload, indent=2) + "\n")
 
 
+def modes_file(name: str, dry: bool) -> Path | None:
+    local = Path(__file__).resolve().parent.parent / "packaging" / "modes" / name
+    if local.is_file():
+        return local
+    url = f"{MODES_BASE}/{name}"
+    if dry:
+        say(f"would download {url}")
+        return None
+    target = Path(tempfile.mkdtemp(prefix="runefin-modes-")) / name
+    try:
+        urllib.request.urlretrieve(url, target)
+    except OSError as error:
+        say(f"Could not download {url}: {error}")
+        return None
+    return target
+
+
+def desktop_text(name: str, comment: str, command: str) -> str:
+    return f"""[Desktop Entry]
+Name={name}
+Comment={comment}
+Exec={command}
+Type=Application
+Categories=AudioVideo;Video;Player;TV;
+StartupNotify=true
+"""
+
+
+def install_modes(default_mode: str, dry: bool) -> bool:
+    user = getpass.getuser()
+    home = Path.home()
+    session_dir = MODES_DIR
+    sources: dict[str, Path] = {}
+    for name in MODES_FILES:
+        source = modes_file(name, dry)
+        if source is None and not dry:
+            return False
+        if source is not None:
+            sources[name] = source
+    if dry:
+        for name in MODES_FILES:
+            say(f"would install {session_dir / name}")
+        say(f"would install {MODE_COMMAND}")
+        say(f"would write {APPLICATIONS / 'runefin-media.desktop'}")
+        say(f"would write {APPLICATIONS / 'runefin-game.desktop'}")
+        say(f"would write {MODE_FILE} = {default_mode}")
+        say(f"would install {SDDM_DROPIN}")
+        return True
+    try:
+        session_dir.mkdir(parents=True, exist_ok=True)
+        for name, source in sources.items():
+            target = session_dir / name
+            shutil.copyfile(source, target)
+            target.chmod(0o755)
+        MODE_COMMAND.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(sources["runefin-mode"], MODE_COMMAND)
+        MODE_COMMAND.chmod(0o755)
+        APPLICATIONS.mkdir(parents=True, exist_ok=True)
+        (APPLICATIONS / "runefin-media.desktop").write_text(
+            desktop_text("Runefin Media", "Runefin in the three-mode Media session", f"{MODE_COMMAND} media")
+        )
+        (APPLICATIONS / "runefin-game.desktop").write_text(
+            desktop_text("Runefin Game", "Switch to Steam Game Mode", f"{MODE_COMMAND} game")
+        )
+        STATE_DIR.mkdir(parents=True, exist_ok=True)
+        MODE_FILE.write_text(f"{default_mode}\n")
+        session_desktop = f"""[Desktop Entry]
+Name=Runefin Modes
+Comment=Desktop, Gaming or Media
+Exec="{session_dir / 'session.sh'}"
+Type=Application
+DesktopNames=KDE
+"""
+        (session_dir / "runefin-modes.desktop").write_text(session_desktop)
+        sddm = f"""[Autologin]
+User={user}
+Relogin=true
+Session=runefin-modes.desktop
+
+[Wayland]
+SessionDir=/usr/local/share/wayland-sessions,/usr/share/wayland-sessions,{session_dir}
+"""
+        (session_dir / "sddm.conf").write_text(sddm)
+    except OSError as error:
+        say(f"Could not write the Runefin mode files: {error}")
+        return False
+
+    if shutil.which("pkexec") is None:
+        say("pkexec is missing. Copy this file to the SDDM drop-in as root:")
+        say(f"  {session_dir / 'sddm.conf'} -> {SDDM_DROPIN}")
+        return True
+    result = subprocess.run(
+        ["pkexec", "install", "-Dm644", str(session_dir / "sddm.conf"), str(SDDM_DROPIN)],
+        timeout=120,
+    )
+    if result.returncode != 0:
+        say("The SDDM drop-in was not installed. Run `runefin-mode repair` later, or copy it as root.")
+        return False
+    say(f"installed {SDDM_DROPIN}")
+    say(f"three modes ready; default mode is {default_mode}. Reboot or run `runefin-mode {default_mode}`.")
+    return True
+
+
+def uninstall_modes(dry: bool) -> None:
+    if MODE_COMMAND.is_file():
+        if dry:
+            say(f"would run {MODE_COMMAND} restore")
+        else:
+            subprocess.run([str(MODE_COMMAND), "restore"], timeout=120)
+    elif SDDM_DROPIN.is_file() and shutil.which("pkexec"):
+        if dry:
+            say(f"would remove {SDDM_DROPIN}")
+        else:
+            subprocess.run(["pkexec", "rm", "-f", str(SDDM_DROPIN)], timeout=120)
+    for path in (
+        MODES_DIR / "session.sh",
+        MODES_DIR / "supervisor.sh",
+        MODES_DIR / "sddm.conf",
+        MODES_DIR / "runefin-modes.desktop",
+        MODE_COMMAND,
+        APPLICATIONS / "runefin-media.desktop",
+        APPLICATIONS / "runefin-game.desktop",
+    ):
+        if path.is_file():
+            if dry:
+                say(f"would remove {path}")
+            else:
+                path.unlink()
+    if MODES_DIR.is_dir() and not any(MODES_DIR.iterdir()):
+        if not dry:
+            MODES_DIR.rmdir()
+
+
 def uninstall(dry: bool) -> int:
     removed = []
     record = {}
@@ -473,6 +622,7 @@ def uninstall(dry: bool) -> int:
             say(f"would remove {RECORD}")
         else:
             RECORD.unlink()
+    uninstall_modes(dry)
     say("Remove the Runefin entry itself in Steam: Library → right-click Runefin → Manage → Remove non-Steam game.")
     say(f"removed {len(removed)} installed file(s).")
     return 0
@@ -487,6 +637,17 @@ def main() -> int:
     parser.add_argument("--decky", action="store_true", help="also install the optional Decky QAM plugin when Decky is present")
     parser.add_argument("--art-dir", type=Path, help="use this artwork directory")
     parser.add_argument("--ref", default=DEFAULT_REF, help="Flatpak .flatpakref to install")
+    parser.add_argument(
+        "--three-modes",
+        action="store_true",
+        help="install the Desktop/Gaming/Media session dispatcher (one SDDM drop-in)",
+    )
+    parser.add_argument(
+        "--default-mode",
+        choices=("desktop", "game", "media"),
+        default="desktop",
+        help="mode the machine starts in after --three-modes (default: desktop)",
+    )
     args = parser.parse_args()
 
     if os.geteuid() == 0:
@@ -497,6 +658,8 @@ def main() -> int:
 
     if not install_flatpak(args.ref, args.dry_run, args.no_install):
         return 1
+    if args.three_modes and not install_modes(args.default_mode, args.dry_run):
+        say("The three-mode files were not installed; the app/tile install can still continue.")
     write_files(args.dry_run)
     decky = install_decky_plugin(args.dry_run) if args.decky else None
 

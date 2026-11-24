@@ -77,6 +77,7 @@ core() {
     render search search 1280 800
     render live-tv live-tv 1280 800
     render settings settings 1280 800
+    render media-settings media-settings 1280 800
     render downloads downloads 1280 800
     render in-app-osd in-app-osd 1280 800
     render_big home home
@@ -158,6 +159,7 @@ render search-hints search-hints 1280 800
 render search-empty search-empty 1280 800
 render settings settings 1280 800
 render settings settings-keyboard 1280 2600
+render media-settings media-settings 1280 800
 render downloads downloads 1280 800
 render settings-seerr settings-seerr 1280 3600
 render remote remote 1280 800

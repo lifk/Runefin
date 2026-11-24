@@ -436,6 +436,12 @@ separate window. `scripts/check.sh` builds it; the player's contract is
   entries, exposes `/dev/input` for the native pad, and uses the Freedesktop 26.08 GStreamer/
   VA-API stack. On a Steam Machine the config lives at
   `~/.var/app/io.github.lifk.Runefin/config/runefin/config.toml`.
+- **Three SteamOS modes**: `steam-install.py --three-modes` adds one user-level dispatcher and
+  one SDDM drop-in. **Desktop** is stock Plasma with no Runefin; **Gaming** is stock Steam; **Media**
+  is KWin with Runefin fullscreen and no Plasma. From Media, Settings → **SteamOS modes** switches
+  to Desktop or Gaming; the desktop entries and the Steam tile switch back. `runefin-mode status`,
+  `repair` and `restore` are the support commands. The Media supervisor restarts after a crash and
+  falls back to Desktop after three failures, so a bad session is never a black screen.
 
 ## 13. Configuration and storage
 
@@ -553,7 +559,7 @@ transport keys are not mapped yet, so a remote's Play/Stop/FF/Rewind do nothing.
 ```sh
 cargo test -p jellyfin-api        # 49 API tests, no network
 cargo test -p seerr-api           # 26 Seerr API tests, no network
-cargo test -p runefin             # 477 app tests (27 ignored), headless
+cargo test -p runefin             # 479 app tests (27 ignored), headless
 scripts/check.sh                  # fmt, clippy, all three suites, release build
 scripts/snapshots.sh              # the committed views, in place
 JELLYFIN_URL=... JELLYFIN_USER_ID=... JELLYFIN_TOKEN=... \

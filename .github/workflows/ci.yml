@@ -79,7 +79,7 @@ jobs:
 
       - name: Shell scripts parse
         run: |
-          for f in scripts/*.sh packaging/flatpak/*.sh; do
+          for f in scripts/*.sh packaging/flatpak/*.sh packaging/modes/*.sh packaging/modes/runefin-mode; do
             bash -n "$f" || exit 1
           done
 

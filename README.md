@@ -142,6 +142,16 @@ space, backspace, Enter and Hide, all reachable with the D-pad. Passwords are ma
 **Show** toggle. Settings → Interface → **On-screen keyboard** chooses Auto, On demand (Menu/Start on
 a field) or Off, so the Steam overlay keyboard is not required.
 
+For a three-mode Steam Machine (Desktop / Gaming / Media), the host installer can add the mode
+dispatcher and the one SDDM drop-in as well:
+
+```sh
+python3 scripts/steam-install.py --three-modes --default-mode media
+```
+
+Desktop remains stock Plasma, Gaming remains Steam, and Media is KWin with Runefin full screen.
+`runefin-mode status` reports the mode; `runefin-mode restore` removes the drop-in.
+
 On SteamOS an HDMI-CEC remote arrives as keyboard input, and Runefin's big-screen mode takes
 Return as OK. Only the Menu buttons need a cecd mapping:
 [`packaging/flatpak/setup-cecd.sh`](packaging/flatpak/setup-cecd.sh) merges it into

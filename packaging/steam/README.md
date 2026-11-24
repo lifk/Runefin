@@ -16,6 +16,18 @@ running Steam client to add that launcher, reads the assigned appid back from
 `userdata/<id>/config/shortcuts.vdf`, and copies generated portrait/header/hero/logo/icon art into
 `config/grid`.
 
+For the three SteamOS modes, add one flag:
+
+```sh
+python3 scripts/steam-install.py --three-modes --default-mode media
+```
+
+That writes the user-owned dispatcher under `~/.local/share/runefin/modes`, installs
+`runefin-mode` in `~/.local/bin`, and adds one additive SDDM drop-in through one `pkexec`. The
+Steam tile then switches Gaming to Media (rather than launching an app inside gamescope); the
+Media Settings page switches to Desktop/Gaming. `--default-mode desktop` (the default) keeps the
+machine booting into stock Plasma. Reboot or run `runefin-mode <mode>` after installing.
+
 `--decky` also copies the optional Decky QAM companion into `~/homebrew/plugins/Runefin` when
 Decky is already installed. It never installs or enables Decky, and the plugin is unsupported:
 it adds an Open/transport/Quit panel and a "Media" collection, not HDR. `--uninstall` removes it
@@ -26,6 +38,9 @@ The wrapper is the durable launch path, not a detail:
 
 ```sh
 unset LD_LIBRARY_PATH LD_PRELOAD
+if [ -f /etc/sddm.conf.d/zzz-runefin-modes.conf ] && [ -x "$HOME/.local/bin/runefin-mode" ]; then
+  exec "$HOME/.local/bin/runefin-mode" media
+fi
 exec /usr/bin/flatpak run --branch=stable --arch=x86_64 io.github.lifk.Runefin --big-screen "$@"
 ```
 

@@ -1,0 +1,125 @@
+#!/bin/sh
+# Switch the machine between the three Runefin modes and recover the session.
+# Installed under ~/.local/bin by `scripts/steam-install.py --three-modes`.
+set -eu
+
+state="${XDG_STATE_HOME:-$HOME/.local/state}/runefin"
+mode_file="$state/mode"
+modes_dir="$HOME/.local/share/runefin/modes"
+dropin="/etc/sddm.conf.d/zzz-runefin-modes.conf"
+log="$state/mode.log"
+
+say() { printf '%s\n' "$*"; }
+warn() { printf 'warning: %s\n' "$*" >&2; }
+log_line() { mkdir -p "$state" 2>/dev/null || true; printf '%s %s\n' "$(date -Is 2>/dev/null || date)" "$*" >>"$log" 2>/dev/null || true; }
+
+usage() {
+    cat <<'EOF'
+usage: runefin-mode <command>
+
+  media | desktop | game   switch mode and restart the session
+  status                   show the current mode and installation state
+  sync                     record a stock Plasma/Game session (user service)
+  repair                   re-write the SDDM drop-in after a SteamOS update
+  restore                  remove the drop-in and return to stock autologin
+EOF
+}
+
+write_mode() {
+    mkdir -p "$state"
+    tmp="$mode_file.tmp"
+    printf '%s\n' "$1" >"$tmp"
+    mv "$tmp" "$mode_file"
+}
+
+current_session() {
+    # An interactive TTY has its own session id; switching modes must end the graphical
+    # session, so prefer a Wayland/X11 session for this user.
+    if [ -n "${XDG_SESSION_ID:-}" ]; then
+        type="$(loginctl show-session "$XDG_SESSION_ID" -p Type --value 2>/dev/null || true)"
+        case "$type" in
+            wayland|x11) printf '%s\n' "$XDG_SESSION_ID"; return 0 ;;
+        esac
+    fi
+    loginctl list-sessions --no-legend 2>/dev/null \
+        | awk -v user="$(id -un)" '$3 == user { print $1 }' \
+        | while read -r sid; do
+            type="$(loginctl show-session "$sid" -p Type --value 2>/dev/null || true)"
+            active="$(loginctl show-session "$sid" -p Active --value 2>/dev/null || true)"
+            case "$type:$active" in
+                wayland:yes|x11:yes) printf '%s\n' "$sid"; exit 0 ;;
+            esac
+        done
+}
+
+case "${1:-}" in
+    media|desktop|game)
+        if [ "$1" = media ] && [ ! -f "$dropin" ]; then
+            warn "the three-mode SDDM drop-in is missing; run: sudo install -Dm644 $modes_dir/sddm.conf $dropin"
+            exit 1
+        fi
+        if [ "$1" = media ]; then
+            mkdir -p "$state"
+            printf '0\n' >"$state/media-fails" 2>/dev/null || true
+        fi
+        write_mode "$1"
+        log_line "mode=$1"
+        sid="$(current_session)"
+        if [ -z "$sid" ]; then
+            say "Mode set to $1; it takes effect at the next login."
+            exit 0
+        fi
+        if loginctl terminate-session "$sid" 2>/dev/null; then
+            say "Switching to $1."
+        else
+            say "Could not end session $sid; the mode is set for the next login."
+        fi
+        ;;
+    sync)
+        sid="$(current_session)"
+        [ -n "$sid" ] || exit 0
+        desktop="$(loginctl show-session "$sid" -p Desktop --value 2>/dev/null || true)"
+        case "$desktop" in
+            runefin-modes|'') exit 0 ;;
+            gamescope|*gamescope*) write_mode game ;;
+            *) write_mode desktop ;;
+        esac
+        ;;
+    status)
+        say "mode: $(cat "$mode_file" 2>/dev/null || echo desktop)"
+        say "user: $(id -un)"
+        say "session: $(current_session)"
+        say "drop-in: $([ -f "$dropin" ] && echo present || echo missing)"
+        say "session files: $([ -x "$modes_dir/session.sh" ] && echo present || echo missing)"
+        if command -v flatpak >/dev/null 2>&1; then
+            say "app: $(flatpak info io.github.lifk.Runefin 2>/dev/null | sed -n 's/^ *Version: *//p' | head -1)"
+        fi
+        ;;
+    repair)
+        if [ ! -f "$modes_dir/sddm.conf" ]; then
+            warn "no $modes_dir/sddm.conf; reinstall with steam-install.py --three-modes"
+            exit 1
+        fi
+        if ! command -v pkexec >/dev/null 2>&1; then
+            warn "pkexec is missing; copy $modes_dir/sddm.conf to $dropin as root"
+            exit 1
+        fi
+        pkexec install -Dm644 "$modes_dir/sddm.conf" "$dropin"
+        say "repaired $dropin"
+        ;;
+    restore)
+        if [ -f "$dropin" ]; then
+            pkexec rm -f "$dropin"
+            say "removed $dropin; stock SDDM config applies."
+        else
+            say "no Runefin SDDM drop-in to remove."
+        fi
+        ;;
+    ''|-h|--help|help)
+        usage
+        ;;
+    *)
+        usage >&2
+        exit 2
+        ;;
+esac

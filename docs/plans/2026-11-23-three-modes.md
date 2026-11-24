@@ -55,9 +55,9 @@ Flatpak and absent when Steam is not running.
 
 - [x] 1. **Keyboard first.** Target registry, `TextEdit` insertion, change hooks, bottom sheet, tests,
   snapshot. Prove the connect form, search, password and go-to fields with a D-pad only.
-- [ ] 2. **Mode skeleton.** `runefin-mode` (marker, switch, recovery), the dispatcher, the one SDDM
+- [x] 2. **Mode skeleton.** `runefin-mode` (marker, switch, recovery), the dispatcher, the one SDDM
   drop-in, and a Desktop/Gaming/Media switch matrix with a placeholder Media client. No app changes.
-- [ ] 3. **Media app.** `--media`, the supervisor, first-frame ready file, exit 42/43 with a graceful
+- [x] 3. **Media app.** `--media`, the supervisor, first-frame ready file, exit 42/43 with a graceful
   flush, Modes page, and the fallback to Desktop after three failures.
 - [ ] 4. **Mode sync and repair.** `runefin-mode sync` service for Steam's own switches, `status`,
   `repair`, `restore`, `RECOVERY.txt`, and a TTY recovery path.

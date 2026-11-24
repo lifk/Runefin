@@ -92,6 +92,56 @@ fn cycle_audio_language(s: &mut State) {
     s.cycle_audio_language();
 }
 
+/// The three SteamOS mode controls. Only the Media session sees them: the other two modes
+/// own their own shell, so a mode button there would be a second way to do what Steam or
+/// Plasma already does.
+fn modes_section(s: &State, t: &tok::Theme) -> El {
+    if !s.media {
+        return el();
+    }
+    let action = |key: &str, label: &str, code: i32| {
+        el().key(key)
+            .role("button")
+            .h(36.0)
+            .px(14.0)
+            .radius(8.0)
+            .center()
+            .fill(t.card)
+            .hover(t.hover)
+            .motion(crate::theme::motion::CONTROL)
+            .focusable(true)
+            .focus_visual(2.0)
+            .press_scale(0.97)
+            .cursor(rune::Cursor::Pointer)
+            .child(text(label).font(type_::label()).color(t.text))
+            .on_press(move |s: &mut State| s.request_exit(code))
+    };
+    col()
+        .w_full()
+        .gap(10.0)
+        .mt(8.0)
+        .child(
+            text("SteamOS modes")
+                .key("settings-section-modes")
+                .font(type_::section())
+                .color(t.text_secondary),
+        )
+        .child(
+            row()
+                .key("settings-mode-actions")
+                .w_full()
+                .gap(10.0)
+                .child(action("mode-switch-desktop", "Switch to desktop", 43))
+                .child(action("mode-switch-game", "Switch to game", 42))
+                .child(action("mode-restart", "Restart app", 0)),
+        )
+        .child(
+            text("Desktop is the stock Plasma session; Game is Steam. This Media session has no desktop behind it.")
+                .font(type_::caption())
+                .color(t.text_secondary),
+        )
+}
+
 pub(super) fn settings_screen(s: &State) -> El {
     let t = theme::colors();
     let mut content = col()
@@ -107,6 +157,7 @@ pub(super) fn settings_screen(s: &State) -> El {
             stick_bottom: false,
         })
         .child(text("Settings").font(type_::page()).color(t.text))
+        .children(s.media.then(|| modes_section(s, &t)))
         .child(
             el().key("settings-search-box")
                 .h(40.0)
@@ -1777,8 +1828,20 @@ pub(super) fn settings_screen(s: &State) -> El {
                 .focusable(true)
                 .focus_visual(2.0)
                 .press_scale(0.97)
-                .label("Quit Runefin")
-                .child(text("Quit Runefin").font(type_::label()).color(t.text))
+                .label(if s.media {
+                    "Restart app"
+                } else {
+                    "Quit Runefin"
+                })
+                .child(
+                    text(if s.media {
+                        "Restart app"
+                    } else {
+                        "Quit Runefin"
+                    })
+                    .font(type_::label())
+                    .color(t.text),
+                )
                 .cursor(rune::Cursor::Pointer)
                 .on_press_tx(|_s: &mut State, tx: &mut rune::Tx| tx.quit()),
         );

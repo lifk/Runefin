@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=Runefin Modes
+Comment=Desktop, Gaming or Media
+Exec=/home/<user>/.local/share/runefin/modes/session.sh
+Type=Application
+DesktopNames=KDE
