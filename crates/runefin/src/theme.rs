@@ -438,6 +438,29 @@ pub fn colors() -> Theme {
 }
 
 /// Elevation and material for surfaces that float over artwork.
+/// Card widths for menus, pickers and sheets. Each one names what the width is for instead of
+/// leaving a bare number at the call site, so the app's few intentional sizes stay in one place.
+pub mod dialog {
+    /// A context menu anchored to a card.
+    pub const MENU: f32 = 300.0;
+    /// A list picker with one column of rows.
+    pub const PICKER: f32 = 360.0;
+    /// A picker with a title and a wider row.
+    pub const PICKER_WIDE: f32 = 380.0;
+    /// A small form: a name, a source, a subtitle result.
+    pub const FORM: f32 = 400.0;
+    /// A confirmation or a sheet with a few choices.
+    pub const SHEET: f32 = 420.0;
+    /// A confirmation with a longer body.
+    pub const CONFIRM: f32 = 430.0;
+    /// The pre-play source and track sheet.
+    pub const PREPLAY: f32 = 460.0;
+    /// The shortcut sheet.
+    pub const SHORTCUTS: f32 = 560.0;
+    /// The shortcut sheet on the big screen.
+    pub const SHORTCUTS_BIG: f32 = 680.0;
+}
+
 pub mod elevation {
     use rune::{Color, El, Shadow};
 

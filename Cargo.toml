@@ -28,6 +28,32 @@ debug = 0
 [profile.dev.package."*"]
 debug = false
 
+# Fastest edit-compile-run loop: same as `dev` but with parallel codegen and a quicker relink.
+# Use it for local iteration (`cargo build --profile dev-fast`, `cargo run --profile dev-fast`).
+[profile.dev-fast]
+inherits = "dev"
+debug = 0
+codegen-units = 64
+
+# Optimized without fat LTO: quick perf checks and local release builds that do not need the
+# shipped profile's 10 GB peak. Packaging still uses `release` in CI.
+[profile.release-quick]
+inherits = "release"
+lto = false
+codegen-units = 16
+
+# Near-release speed at a fraction of fat LTO's build time and memory.
+[profile.release-thin]
+inherits = "release"
+lto = "thin"
+codegen-units = 16
+
+# Profiler symbols without fat LTO.
+[profile.perf]
+inherits = "release-quick"
+incremental = false
+debug = 1
+
 # Rune is pinned to one rev: it is pre-1.0 and its `dev` branch moves ~100 commits a day.
 # Bump deliberately, one commit, and rerun `scripts/snapshots.sh` before and after.
 # https://github.com/anomalyco/rune/commit/f5def6d4f9259580cbbd6472498e4de6b4d754b6

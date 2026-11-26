@@ -3,6 +3,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+scripts/guardrails.sh
 python3 -c "compile(open('scripts/steam-install.py').read(), 'scripts/steam-install.py', 'exec')"
 python3 -c "compile(open('packaging/decky/runefin/main.py').read(), 'packaging/decky/runefin/main.py', 'exec')"
 for script in packaging/modes/*.sh packaging/modes/runefin-mode; do bash -n "$script"; done

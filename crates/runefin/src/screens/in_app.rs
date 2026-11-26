@@ -175,7 +175,7 @@ fn resume_conflict_card(s: &State) -> Option<El> {
             .fill(Color::BLACK.alpha(0.62))
             .child(
                 col()
-                    .w(430.0)
+                    .w(crate::theme::dialog::CONFIRM)
                     .padding(22.0)
                     .gap(12.0)
                     .radius(14.0)
@@ -243,7 +243,7 @@ fn still_watching_card(s: &State) -> Option<El> {
             .fill(Color::BLACK.alpha(0.72))
             .child(
                 col()
-                    .w(420.0)
+                    .w(crate::theme::dialog::SHEET)
                     .padding(24.0)
                     .gap(14.0)
                     .radius(14.0)
@@ -1745,7 +1745,7 @@ fn subtitle_search_panel(s: &State, t: &tok::Theme) -> El {
         .unwrap_or(search.language.as_str());
     let mut panel = col()
         .key("in-app-subtitle-search")
-        .w(400.0)
+        .w(crate::theme::dialog::FORM)
         .padding(16.0)
         .gap(6.0)
         .radius(14.0)

@@ -316,3 +316,26 @@ Read-only review of `anomalyco/opencode-rune` at `987d475` (shallow clone, MIT).
 was changed. API availability was checked against our pin for `rune::Tracked`,
 `rune::region` and `rune::tracked_reads`; the rest of their Rune surface is newer than our pin
 and must be checked before use.
+
+---
+
+## 13. Landed 2026-11-26
+
+The first pass took the cheap, behaviour-preserving items:
+
+- **Build profiles.** `dev-fast`, `release-quick`, `release-thin` and `perf` in the workspace
+  `Cargo.toml`; `release` still ships from CI.
+- **Guardrails.** `scripts/guardrails.sh` runs first in `scripts/check.sh`: one Rune rev for the
+  app and the AccessKit patch, no `use crate::*`, and a file-size ratchet in
+  `scripts/file-size-exceptions.txt` (warn at 800, cap at 1,500, listed ceilings only go down).
+- **One Back/Escape ladder.** `crates/runefin/src/overlay.rs` owns the order; `State::top_overlay`
+  and `close_overlay` in `state/overlay_state.rs` dispatch it, and `on_key` has one check instead
+  of the per-dialog `if … && key.key == Key::Escape` chain. Preplay and the detail page's
+  new-playlist sheet now close on Back like every other modal.
+- **Dialog width tokens.** `theme::dialog` names the widths the menus, pickers and sheets use, so
+  the next dialog starts from a token instead of a bare number.
+
+Still deferred, in the review's order: the four-phase `poll` split, `State` clusters and
+`Tracked` cells, the toast stack, the write-behind storage journal, the server-health machine,
+the narrow-layout machine, paced tips, and screen host traits. They are larger changes and
+should land one at a time with their own snapshots and tests.

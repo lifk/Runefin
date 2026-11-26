@@ -1,0 +1,15 @@
+# Files over the 1500-line cap, with the ceiling they may not grow past.
+# Lower a ceiling when a file shrinks; scripts/guardrails.sh --update raises one.
+crates/jellyfin-api/src/client.rs 1845
+crates/runefin/src/demo.rs 2116
+crates/runefin/src/main.rs 9412
+crates/runefin/src/screens/detail.rs 2559
+crates/runefin/src/screens/in_app.rs 3440
+crates/runefin/src/screens/library.rs 1721
+crates/runefin/src/screens.rs 3304
+crates/runefin/src/screens/seerr.rs 1598
+crates/runefin/src/screens/settings.rs 1865
+crates/runefin/src/state/in_app_state.rs 4039
+crates/runefin/src/state.rs 5853
+crates/runefin/src/state/seerr_state.rs 1710
+crates/runefin/src/tv_focus.rs 1720

@@ -31,6 +31,7 @@ mod loudness;
 mod media;
 mod mpris;
 mod net;
+mod overlay;
 mod pad;
 mod playback_trace;
 mod player;
@@ -554,16 +555,21 @@ fn on_key(s: &mut State, key: &KeyEvent, tx: &mut Tx) -> bool {
         s.toggle_fullscreen();
         return true;
     }
-    if s.card_menu.is_some() && key.key == Key::Escape {
-        s.close_card_menu();
-        return true;
-    }
-    if s.collection_picker_open && key.key == Key::Escape {
-        s.close_collection_picker();
-        return true;
-    }
-    if s.playlist_picker_open && key.key == Key::Escape {
-        s.close_playlist_picker();
+    // Back closes the topmost overlay before any page or player key sees it. The player keeps
+    // its OSD up while a panel closes, as it did when each panel checked Escape itself.
+    if key.key == Key::Escape
+        && let Some(overlay) = s.top_overlay()
+    {
+        if matches!(
+            overlay,
+            crate::overlay::Overlay::SubtitleSearch
+                | crate::overlay::Overlay::PlayerPanel
+                | crate::overlay::Overlay::PlayerGear
+                | crate::overlay::Overlay::PlayerStats
+        ) {
+            s.show_in_app_osd();
+        }
+        s.close_overlay(overlay);
         return true;
     }
     if key.key == Key::ContextMenu && s.in_app.is_some() {
@@ -661,38 +667,6 @@ fn on_key(s: &mut State, key: &KeyEvent, tx: &mut Tx) -> bool {
                 s.shift_in_app_speed(false);
                 return true;
             }
-            Key::Escape if s.in_app_subtitle_search.open => {
-                s.close_in_app_subtitle_search();
-                return true;
-            }
-            Key::Escape if s.player_panel_open() => {
-                s.close_player_panel();
-                return true;
-            }
-            Key::Escape if s.cast_picker_open => {
-                s.close_cast_picker();
-                return true;
-            }
-            Key::Escape if s.playlist_create_open => {
-                s.close_playlist_create();
-                return true;
-            }
-            Key::Escape if s.playlist_picker_open => {
-                s.close_playlist_picker();
-                return true;
-            }
-            Key::Escape if s.collection_picker_open => {
-                s.close_collection_picker();
-                return true;
-            }
-            Key::Escape if s.player_gear_visible() => {
-                s.close_player_gear();
-                return true;
-            }
-            Key::Escape if s.in_app_stats => {
-                s.close_in_app_stats();
-                return true;
-            }
             _ if s.shortcut_matches(crate::shortcuts::Action::Fit, key) => {
                 s.toggle_in_app_fit();
                 return true;
@@ -726,14 +700,6 @@ fn on_key(s: &mut State, key: &KeyEvent, tx: &mut Tx) -> bool {
     }
     if matches!(key.key, Key::Function(1)) || matches!(&key.key, Key::Text(text) if text == "?") {
         s.toggle_shortcuts();
-        return true;
-    }
-    if key.key == Key::Escape && s.shortcuts_open {
-        s.close_shortcuts();
-        return true;
-    }
-    if key.key == Key::Escape && s.shelf.is_some() && s.route == Route::Home {
-        s.close_shelf();
         return true;
     }
     // On the couch, Back out of Home's content lands on the rail rather than nowhere.
@@ -6060,6 +6026,31 @@ mod tests {
         });
         rt.frame(1.0 / 60.0);
         assert!(!rt.state.shortcuts_open);
+    }
+
+    #[test]
+    fn escape_closes_the_top_overlay_before_the_page() {
+        let env = Env {
+            system_dark: true,
+            scale: 2.0,
+        };
+        let mut state = home_state();
+        state.card_menu = Some(crate::state::CardMenu {
+            item: demo::next_episode(),
+            x: 420.0,
+            y: 300.0,
+        });
+        let mut rt = Runtime::new(state, view, (1280.0, 800.0), env);
+        rt.on_key = Some(on_key);
+        rt.frame(0.0);
+        assert!(rt.find("card-menu").is_some());
+        rt.key(KeyEvent {
+            key: Key::Escape,
+            mods: Default::default(),
+        });
+        rt.frame(1.0 / 60.0);
+        assert!(rt.state.card_menu.is_none(), "Back closes the menu");
+        assert_eq!(rt.state.route, Route::Home, "the page behind it stays");
     }
 
     #[test]

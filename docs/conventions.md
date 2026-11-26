@@ -28,6 +28,21 @@ exist because Rune's author enforces the same ones upstream.
    `crates/runefin/Cargo.toml`, run `scripts/check.sh`, render `scripts/snapshots.sh`, include
    the PNG diffs. Never bump inside a feature change.
 
+## Build and shape
+
+- **`scripts/guardrails.sh` runs first in `scripts/check.sh`.** It checks that the `rune` rev and
+  the `accesskit_atspi_common` patch name the same commit, that `crates/runefin/src` has no
+  `use crate::*`, and that no file grows past its line ceiling. Files over 1,500 lines are listed
+  in `scripts/file-size-exceptions.txt`; lower a ceiling when a file shrinks, and use
+  `scripts/guardrails.sh --update` only when a file legitimately grew.
+- **Local profiles:** `dev-fast` for the edit-compile-run loop, `release-quick` and
+  `release-thin` for optimized local builds. The shipped artifact still uses `release` in CI;
+  do not package a local profile.
+- **Back/Escape closes the topmost overlay.** `crates/runefin/src/overlay.rs` owns the order;
+  a new dialog, picker, sheet or player panel adds a variant there, a close arm in
+  `state/overlay_state.rs`, and a case in `tv_reach_tests` when it takes focus. Do not add another
+  `if s.something_open && key.key == Key::Escape` to `on_key`.
+
 ## Releases
 
 - **A push to `main` that bumps the version publishes.** The `release` job in CI runs after the

@@ -61,6 +61,7 @@ pub use in_app_state::is_playable;
 pub use live_state::live_zap_index;
 mod live_state;
 mod mpris_state;
+mod overlay_state;
 mod person_state;
 mod playback_state;
 mod quick_state;
