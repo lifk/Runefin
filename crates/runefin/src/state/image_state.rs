@@ -49,7 +49,7 @@ impl State {
             &item.id,
             tag,
             ImageKind::Backdrop,
-            HOME_BACKDROP_WIDTH,
+            self.image_width(HOME_BACKDROP_WIDTH),
         )?;
         Some((request.0, request.1, None, ImagePriority::Low))
     }
@@ -61,9 +61,21 @@ impl State {
         let mut requests = Vec::new();
         for item in self.home_data.resume.iter() {
             let request = if let Some(tag) = item.image_tag(ImageKind::Backdrop) {
-                self.image_request(&client, &item.id, tag, ImageKind::Backdrop, 640)
+                self.image_request(
+                    &client,
+                    &item.id,
+                    tag,
+                    ImageKind::Backdrop,
+                    self.image_width(640),
+                )
             } else if let Some((id, tag)) = crate::home::poster(item) {
-                self.image_request(&client, id, tag, ImageKind::Primary, POSTER_WIDTH)
+                self.image_request(
+                    &client,
+                    id,
+                    tag,
+                    ImageKind::Primary,
+                    self.image_width(POSTER_WIDTH),
+                )
             } else {
                 None
             };
@@ -76,6 +88,7 @@ impl State {
 
     /// Only rows the virtual grid/list has mounted. Offscreen cards wait for the scroll.
     pub(crate) fn request_library_images_in(&mut self, rows: std::ops::Range<usize>) {
+        self.library_image_rows = rows.clone();
         let requests = match &self.library {
             Some(library) => {
                 let (start, end) = match library.view {
@@ -121,13 +134,23 @@ impl State {
             let Some((id, tag)) = crate::home::poster(item) else {
                 continue;
             };
-            if let Some(request) =
-                self.image_request(&client, id, tag, ImageKind::Primary, POSTER_WIDTH)
-            {
+            if let Some(request) = self.image_request(
+                &client,
+                id,
+                tag,
+                ImageKind::Primary,
+                self.image_width(POSTER_WIDTH),
+            ) {
                 // A few items on the live server answer the Primary image with a 0-byte 200;
                 // their Backdrop is valid, so a card can still show art instead of a letter.
                 let fallback = item.image_tag(ImageKind::Backdrop).map(|tag| {
-                    client.image_url(&item.id, ImageKind::Backdrop, POSTER_WIDTH, Some(tag), None)
+                    client.image_url(
+                        &item.id,
+                        ImageKind::Backdrop,
+                        self.image_width(POSTER_WIDTH),
+                        Some(tag),
+                        None,
+                    )
                 });
                 requests.push((request.0, request.1, fallback, priority));
             }
@@ -144,9 +167,13 @@ impl State {
         let Some(tag) = item.image_tag(ImageKind::Primary) else {
             return;
         };
-        if let Some((key, url)) =
-            self.image_request(&client, &item.id, tag, ImageKind::Primary, 480)
-        {
+        if let Some((key, url)) = self.image_request(
+            &client,
+            &item.id,
+            tag,
+            ImageKind::Primary,
+            self.image_width(480),
+        ) {
             self.send_images(vec![(key, url, None, ImagePriority::High)]);
         }
     }
@@ -171,7 +198,9 @@ impl State {
             if self.requested_images.contains(&key) {
                 continue;
             }
-            let Some(url) = client.chapter_image_url(&item.id, at as u32, tag, 160) else {
+            let Some(url) =
+                client.chapter_image_url(&item.id, at as u32, tag, self.image_width(160))
+            else {
                 continue;
             };
             requests.push((key, url, None, ImagePriority::Low));
@@ -186,7 +215,7 @@ impl State {
             &item.id,
             "Primary",
             Some(item.image_tag(ImageKind::Primary)?),
-            480,
+            self.image_width(480),
         ))
     }
 
@@ -328,5 +357,71 @@ impl State {
                 }
             }
         }
+    }
+
+    /// The width to ask for art the layout draws at `base` logical points. At 1× this keeps the
+    /// old pixel budget; a 4K big-screen sample (3×) asks for a 1080 px poster, because the
+    /// same card now covers 900 physical pixels instead of 300.
+    pub(crate) fn image_width(&self, base: u32) -> u32 {
+        ((base as f32 * self.image_scale).round() as u32).clamp(base, 3840)
+    }
+
+    /// Adopt the native window's physical/logical factor. The width is part of every image
+    /// cache key, so a new factor makes the old bytes undrawable: drop them and ask the
+    /// current screen again. Runs from the window-geometry sample, never from a handler.
+    pub(crate) fn set_image_scale(&mut self, scale: f32) -> bool {
+        let scale = scale.clamp(1.0, 4.0);
+        if (scale - self.image_scale).abs() < 0.02 {
+            return false;
+        }
+        self.image_scale = scale;
+        if self.images.is_empty() && self.requested_images.is_empty() {
+            return true;
+        }
+        self.images.clear();
+        self.placeholders.clear();
+        self.image_fades.clear();
+        self.image_order.clear();
+        self.requested_images.clear();
+        self.current_images.clear();
+        self.request_current_images();
+        true
+    }
+
+    /// Refetch the visible screen after the scale changed. Every loader is a no-op when its
+    /// screen has no data, so this cannot start work for a route that is not showing.
+    fn request_current_images(&mut self) {
+        match self.route.clone() {
+            Route::Home => self.request_images(),
+            Route::Library { .. } => {
+                let rows = self.library_image_rows.clone();
+                if !rows.is_empty() {
+                    self.request_library_images_in(rows);
+                }
+            }
+            Route::Detail { .. } => self.request_detail_images(),
+            Route::Person { .. } | Route::SeerrPerson { .. } => self.request_person_images(),
+            Route::Search { .. } => self.request_search_images(),
+            Route::Downloads => self.request_download_images(),
+            Route::Seerr | Route::SeerrDetail { .. } => self.request_seerr_images(),
+            _ => {}
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn image_widths_follow_the_window_scale() {
+        let mut s = State::from_config(crate::config::Config::fresh());
+        assert_eq!(s.image_width(360), 360, "1× keeps the desk budget");
+        s.set_image_scale(1.5);
+        assert_eq!(s.image_width(360), 540, "1080p big screen draws 1.5×");
+        s.set_image_scale(3.0);
+        assert_eq!(s.image_width(360), 1080, "4K big screen draws 3×");
+        assert_eq!(s.image_width(1280), 3840);
+        assert_eq!(s.image_width(1600), 3840, "a 4K backdrop never asks for 5K");
     }
 }

@@ -201,8 +201,13 @@ impl State {
                 .map(|tag| (person.id.clone(), tag.clone()))
         });
         if let Some((id, tag)) = portrait
-            && let Some((key, url)) =
-                self.image_request(&client, &id, &tag, jellyfin_api::ImageKind::Primary, 240)
+            && let Some((key, url)) = self.image_request(
+                &client,
+                &id,
+                &tag,
+                jellyfin_api::ImageKind::Primary,
+                self.image_width(240),
+            )
         {
             self.send_images(vec![(key, url, None, crate::net::ImagePriority::High)]);
         }
@@ -319,7 +324,7 @@ impl State {
                 &page.id,
                 "Primary",
                 Some(tag),
-                240,
+                self.image_width(240),
             ));
         }
         let tmdb = page.tmdb_id?;
@@ -335,7 +340,7 @@ impl State {
     }
 
     /// The TMDB profile and the poster of every Seerr credit on the page.
-    fn request_person_images(&mut self) {
+    pub(super) fn request_person_images(&mut self) {
         if self.image_cache.is_none() {
             return;
         }

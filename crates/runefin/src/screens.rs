@@ -839,7 +839,12 @@ fn field(
         .label(label.to_string())
         .placeholder(placeholder, t.text_secondary.alpha(0.55))
         .on_edit(access)
-        .on_submit(|s: &mut State, _tx| {
+        .on_submit(move |s: &mut State, _tx| {
+            // In the TV layout the field's OK asks for the keyboard; On-demand and a physical
+            // keyboard (Off) keep the form's own submit.
+            if s.keyboard_enter_open(key) {
+                return;
+            }
             s.connect();
         })
         .role("textbox")
@@ -1407,13 +1412,18 @@ fn nav_item(
             t.text_secondary
         }));
     }
-    // A selected pill is already accent-filled; a 10% wash disappears into it, so focus lifts
-    // it a little further. This is still a fill, not a ring.
-    let item = theme::tv_focus(item);
-    if selected && theme::is_big_screen() {
-        item.focus_fill(Color::WHITE.alpha(0.20))
+    // The sidebar's focus cue is a wash, not the near-white ring: at 4K the 2 pt ring is six
+    // physical pixels of hard white around a 36 pt row, which reads as a line drawn around the
+    // item. A selected pill is already accent-filled, so its focus lifts a little further.
+    if theme::is_big_screen() {
+        item.focus_fill(if selected {
+            Color::WHITE.alpha(0.20)
+        } else {
+            Color::WHITE.alpha(0.14)
+        })
+        .no_focus_ring()
     } else {
-        item
+        theme::tv_focus(item)
     }
 }
 

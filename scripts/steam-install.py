@@ -50,9 +50,10 @@ DECKY_PLUGIN = Path.home() / "homebrew" / "plugins" / "Runefin"
 DECKY_BASE = "https://raw.githubusercontent.com/lifk/Runefin/main/packaging/decky/runefin"
 DECKY_FILES = ("plugin.json", "main.py", "package.json", "dist/index.js")
 MODES_BASE = "https://raw.githubusercontent.com/lifk/Runefin/main/packaging/modes"
-MODES_FILES = ("session.sh", "supervisor.sh", "runefin-mode")
+MODES_FILES = ("session.sh", "supervisor.sh", "gamescope-session.sh", "runefin-mode")
 MODES_DIR = DATA_HOME / "runefin" / "modes"
 MODE_COMMAND = Path.home() / ".local" / "bin" / "runefin-mode"
+GAMESCOPE_DROPIN = Path.home() / ".config/systemd/user/gamescope-session.service.d/50-runefin-display.conf"
 SDDM_DROPIN = Path("/etc/sddm.conf.d/zzz-runefin-modes.conf")
 STATE_DIR = Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local/state") / "runefin"
 MODE_FILE = STATE_DIR / "mode"
@@ -498,6 +499,7 @@ def install_modes(default_mode: str, dry: bool) -> bool:
         say(f"would write {APPLICATIONS / 'runefin-game.desktop'}")
         say(f"would write {MODE_FILE} = {default_mode}")
         say(f"would install {SDDM_DROPIN}")
+        say(f"would write {GAMESCOPE_DROPIN}")
         return True
     try:
         session_dir.mkdir(parents=True, exist_ok=True)
@@ -525,6 +527,19 @@ Type=Application
 DesktopNames=KDE
 """
         (session_dir / "runefin-modes.desktop").write_text(session_desktop)
+        # Valve's Game Mode script owns the gamescope canvas and hardcodes the Deck's 1280x800
+        # 16:10 panel. Overriding its ExecStart lets the wrapper use the connected TV's mode,
+        # which removes the bars around 16:9 content and stops the whole UI being upscaled.
+        GAMESCOPE_DROPIN.parent.mkdir(parents=True, exist_ok=True)
+        GAMESCOPE_DROPIN.write_text(
+            f"[Service]\nExecStart=\nExecStart={session_dir / 'gamescope-session.sh'}\n"
+        )
+        subprocess.run(
+            ["systemctl", "--user", "daemon-reload"],
+            timeout=30,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
         sddm = f"""[Autologin]
 User={user}
 Relogin=true
@@ -568,8 +583,10 @@ def uninstall_modes(dry: bool) -> None:
     for path in (
         MODES_DIR / "session.sh",
         MODES_DIR / "supervisor.sh",
+        MODES_DIR / "gamescope-session.sh",
         MODES_DIR / "sddm.conf",
         MODES_DIR / "runefin-modes.desktop",
+        GAMESCOPE_DROPIN,
         MODE_COMMAND,
         APPLICATIONS / "runefin-media.desktop",
         APPLICATIONS / "runefin-game.desktop",
@@ -579,6 +596,13 @@ def uninstall_modes(dry: bool) -> None:
                 say(f"would remove {path}")
             else:
                 path.unlink()
+    if not dry:
+        subprocess.run(
+            ["systemctl", "--user", "daemon-reload"],
+            timeout=30,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
     if MODES_DIR.is_dir() and not any(MODES_DIR.iterdir()):
         if not dry:
             MODES_DIR.rmdir()

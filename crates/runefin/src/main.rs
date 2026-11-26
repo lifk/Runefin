@@ -82,6 +82,59 @@ fn view(s: &State, cx: &mut Cx<State>) -> El {
         })
 }
 
+/// The window's physical size decides how many pixels one design point covers. Big screen
+/// pins the design height at 720; the desk layout uses the compositor's scale. Fetched art is
+/// asked for at that factor, so a 4K TV does not stretch a 360 px poster over 900 pixels.
+fn note_window_geometry(s: &mut State, geometry: rune::WindowGeometry, _tx: &mut rune::Tx) -> bool {
+    let (width, height) = geometry.physical_size;
+    if width < 1 || height < 1 {
+        return false;
+    }
+    let scale = if s.big_screen {
+        height as f32 / 720.0
+    } else if s.window_size.1 >= 1.0 {
+        height as f32 / s.window_size.1
+    } else {
+        geometry.scale_factor as f32
+    };
+    let changed = s.set_image_scale(scale);
+    if s.big_screen && s.fullscreen {
+        // Rune takes a fullscreen request from `poll` even when no native window is shown
+        // yet; the first poll can run that early and the request is silently dropped. The
+        // geometry sample only exists once there is a window, so it is the reliable place to
+        // ask. Repeating it is harmless and repairs a launch that opened windowed.
+        _tx.set_full_screen(true);
+        // Gamescope keeps the game surface at the window size it opened with, so a saved desk
+        // window (1365x768) would be upscaled over the whole TV. Ask for the output's own size
+        // in points; a `--windowed` big-screen run leaves `fullscreen` false and keeps its
+        // window. `displays()` is a query, allowed here because a window is open.
+        let displays = rune::displays();
+        if let Some(display) = displays
+            .iter()
+            .find(|d| d.primary)
+            .or_else(|| displays.first())
+        {
+            // The monitor's own scale can be a cap (`--max-scale 2`) that is not the factor
+            // this window's points are multiplied by. Convert with the window's factor so a
+            // 4K panel stays 4K whether the compositor scales the buffer or not.
+            let window_scale = if geometry.scale_factor > 0.0 {
+                geometry.scale_factor as f32
+            } else {
+                1.0
+            };
+            let want = (
+                display.size.0 as f32 / window_scale,
+                display.size.1 as f32 / window_scale,
+            );
+            let have = (width as f32 / window_scale, height as f32 / window_scale);
+            if (have.0 - want.0).abs() > 2.0 || (have.1 - want.1).abs() > 2.0 {
+                _tx.resize_window_instant(want);
+            }
+        }
+    }
+    changed
+}
+
 /// Once, before the first frame: hand the worker the waker it rings when an answer lands.
 /// The saved or per-launch interface mode. `--big-screen` and `RUNEFIN_UI=big` override the
 /// config for one run; the config is what Settings writes.
@@ -542,8 +595,16 @@ fn on_key(s: &mut State, key: &KeyEvent, tx: &mut Tx) -> bool {
             _ => return false,
         }
     }
-    // Start/Menu on a focused text field asks for the keyboard in On-demand mode too.
+    // Start/Menu opens the keyboard on a focused text field; Enter does in the TV layout
+    // (Auto) and stays the field's own submit in On-demand. Focus alone never opens it, so a
+    // D-pad pass across a search box cannot trap the reader in the sheet.
     if key.key == Key::ContextMenu && s.keyboard.manual_open(tx.focused()) {
+        return true;
+    }
+    if key.key == Key::Enter
+        && let Some(focused) = tx.focused().map(str::to_owned)
+        && s.keyboard_enter_open(&focused)
+    {
         return true;
     }
     // The TV's own keys, shared with the root element's key hook. On a focused control Rune
@@ -2315,6 +2376,7 @@ fn main() {
     .tab_visits_controls(true)
     .hdr(startup.hdr().into())
     .on_open_url(open_url)
+    .on_window_geometry(note_window_geometry)
     .on_window(move |window| {
         // A launch from a terminal or another app can create the window without focus. Ask
         // for it once the native window exists, then once more after the host has settled.
@@ -2567,9 +2629,10 @@ mod tests {
         let mut rt = Runtime::new(library_state(60), view, (1440.0, 900.0), env);
         rt.frame(0.0);
         rt.frame(1.0 / 60.0);
-        assert!(
-            rt.state.library.as_ref().expect("library").columns >= 6,
-            "a 1440-wide window has room for six cards"
+        assert_eq!(
+            rt.state.library.as_ref().expect("library").columns,
+            5,
+            "a 1440-wide window fits five whole cards; a sixth would need one more pixel              and used to be clipped"
         );
         let env = Env {
             system_dark: true,
@@ -2667,6 +2730,26 @@ mod tests {
             rt.find("rail-collections-silent-horror-collection")
                 .is_some(),
             "the last rail mounts after scrolling to it"
+        );
+    }
+
+    #[test]
+    fn a_big_screen_resume_card_has_no_pointer_only_remove_button() {
+        let env = Env {
+            system_dark: true,
+            scale: 2.0,
+        };
+        let mut state = home_state();
+        state.big_screen = true;
+        let mut rt = Runtime::new(state, view, (1280.0, 720.0), env);
+        rt.frame(0.0);
+        assert!(
+            rt.find("rail-continue-watching").is_some(),
+            "the Continue Watching rail is on screen"
+        );
+        assert!(
+            rt.find("resume-remove-quiet-floor-s2e4").is_none(),
+            "the remote opens the card menu; a pointer-only × must not appear"
         );
     }
 
@@ -8781,7 +8864,22 @@ mod tests {
         for _ in 0..3 {
             rt.frame(1.0 / 60.0);
         }
-        assert!(rt.state.keyboard.open, "the connect field opened the sheet");
+        assert!(
+            !rt.state.keyboard.open,
+            "focus alone leaves the sheet closed so the D-pad can pass the field"
+        );
+        // Enter on the focused field is the deliberate open; focus itself never opens it.
+        rt.key(KeyEvent {
+            key: Key::Enter,
+            mods: Default::default(),
+        });
+        for _ in 0..2 {
+            rt.frame(1.0 / 60.0);
+        }
+        assert!(
+            rt.state.keyboard.open,
+            "Enter on the connect field opens the sheet"
+        );
         assert_eq!(rt.focused_key().as_deref(), Some("osk-a"));
         rt.key(KeyEvent {
             key: Key::Enter,

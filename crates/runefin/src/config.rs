@@ -113,7 +113,8 @@ pub struct Config {
     /// it on a display the compositor drives in HDR.
     #[serde(default)]
     pub hdr: Option<HdrMode>,
-    /// When the in-app on-screen keyboard opens for a text field. Absent means Auto.
+    /// When the in-app on-screen keyboard opens for a text field. Absent means Auto: the TV
+    /// layout asks from the field (Enter or Menu/Start); focus alone never opens it.
     #[serde(default)]
     pub keyboard: Option<KeyboardMode>,
     /// The last version chosen per item id, so a restart keeps the edition.
@@ -486,10 +487,11 @@ impl SkipMode {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum KeyboardMode {
-    /// Open when a text field takes focus in the big-screen layout.
+    /// Open from the field's own action in the big-screen layout (Enter or Menu/Start). Focus
+    /// alone never opens it, so a D-pad pass across a search box cannot trap the reader.
     #[default]
     Auto,
-    /// Open only when the reader asks for it from the field's keyboard action.
+    /// Open only on Menu/Start; Enter stays the field's own submit.
     OnDemand,
     /// Never open it; a physical keyboard is assumed.
     Off,

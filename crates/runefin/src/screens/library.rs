@@ -295,6 +295,11 @@ fn library_toolbar(s: &State, library: &LibraryState, t: &tok::Theme) -> El {
                             if !s.big_screen {
                                 return false;
                             }
+                            if key.key == rune::Key::Enter
+                                && s.keyboard_enter_open("library-search")
+                            {
+                                return true;
+                            }
                             let action = match key.key {
                                 rune::Key::Up => crate::tv_input::TvAction::Up,
                                 rune::Key::Down => crate::tv_input::TvAction::Down,
@@ -1051,6 +1056,18 @@ fn library_body(s: &State, library: &LibraryState, t: &tok::Theme) -> El {
         .on_scroll_offset(move |at| {
             scroll.store(at.offset[1].to_bits(), Ordering::Relaxed);
         })
+        .on_layout_tx(|s: &mut State, rect: [f32; 4], tx: &mut rune::Tx| {
+            // Measure the viewport, not the body: the sidebar, the page gutter and the letter
+            // rail are already outside it. Measuring the body let the last column slide under
+            // the letter rail and be clipped on a page with no horizontal scroll.
+            let columns =
+                (((rect[2] + CARD_GAP) / (CARD_W + CARD_GAP)).floor() as usize).clamp(2, 12);
+            if let Some(library) = &mut s.library
+                && library.set_columns(columns)
+            {
+                tx.settle();
+            }
+        })
         .child(if library.view == ViewMode::Grid {
             library_grid(s, t)
         } else {
@@ -1066,16 +1083,6 @@ fn library_body(s: &State, library: &LibraryState, t: &tok::Theme) -> El {
         .px(theme::gutter())
         .pb(if s.in_app_minimized { 116.0 } else { 20.0 })
         .gap(12.0)
-        .on_layout_tx(|s: &mut State, rect: [f32; 4], tx: &mut rune::Tx| {
-            // Do not add the gap here: the measured rect includes the body padding, and adding
-            // one more gap let a third card claim a column it could not fit.
-            let columns = ((rect[2] / (CARD_W + CARD_GAP)).floor() as usize).clamp(2, 12);
-            if let Some(library) = &mut s.library
-                && library.set_columns(columns)
-            {
-                tx.settle();
-            }
-        })
         .child(viewport);
     if library.sort == SortMode::Name && library.total_items() >= 100 {
         body = body.child(letter_rail(library, t));

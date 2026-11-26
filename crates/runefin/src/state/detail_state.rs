@@ -714,14 +714,19 @@ impl State {
         let mut requests = Vec::new();
         let priority = crate::net::ImagePriority::High;
         if let Some((id, tag)) = crate::home::poster(&detail.item)
-            && let Some(request) =
-                self.image_request(&client, id, tag, ImageKind::Primary, DETAIL_POSTER_WIDTH)
+            && let Some(request) = self.image_request(
+                &client,
+                id,
+                tag,
+                ImageKind::Primary,
+                self.image_width(DETAIL_POSTER_WIDTH),
+            )
         {
             let fallback = detail.item.image_tag(ImageKind::Backdrop).map(|tag| {
                 client.image_url(
                     &detail.item.id,
                     ImageKind::Backdrop,
-                    DETAIL_POSTER_WIDTH,
+                    self.image_width(DETAIL_POSTER_WIDTH),
                     Some(tag),
                     None,
                 )
@@ -734,14 +739,19 @@ impl State {
                 &detail.item.id,
                 tag,
                 ImageKind::Backdrop,
-                BACKDROP_WIDTH,
+                self.image_width(BACKDROP_WIDTH),
             )
         {
             requests.push((request.0, request.1, None, priority));
         }
         if let Some(tag) = detail.item.image_tag(ImageKind::Logo)
-            && let Some(request) =
-                self.image_request(&client, &detail.item.id, tag, ImageKind::Logo, 520)
+            && let Some(request) = self.image_request(
+                &client,
+                &detail.item.id,
+                tag,
+                ImageKind::Logo,
+                self.image_width(520),
+            )
         {
             requests.push((request.0, request.1, None, priority));
         }
@@ -750,8 +760,13 @@ impl State {
             // cached under a key no card ever looks up.
             for item in detail.similar.iter().take(12) {
                 if let Some(tag) = item.image_tag(ImageKind::Primary)
-                    && let Some(request) =
-                        self.image_request(&client, &item.id, tag, ImageKind::Primary, POSTER_WIDTH)
+                    && let Some(request) = self.image_request(
+                        &client,
+                        &item.id,
+                        tag,
+                        ImageKind::Primary,
+                        self.image_width(POSTER_WIDTH),
+                    )
                 {
                     // This page is what the reader is looking at; the home rails that asked
                     // for their own art are behind it now, so a Low here would wait behind
@@ -766,7 +781,7 @@ impl State {
                         &member.id,
                         tag,
                         ImageKind::Primary,
-                        POSTER_WIDTH,
+                        self.image_width(POSTER_WIDTH),
                     )
                 {
                     requests.push((request.0, request.1, None, crate::net::ImagePriority::High));
@@ -774,23 +789,38 @@ impl State {
             }
             for episode in detail.episodes.iter() {
                 if let Some(tag) = episode.image_tag(ImageKind::Primary)
-                    && let Some(request) =
-                        self.image_request(&client, &episode.id, tag, ImageKind::Primary, 320)
+                    && let Some(request) = self.image_request(
+                        &client,
+                        &episode.id,
+                        tag,
+                        ImageKind::Primary,
+                        self.image_width(320),
+                    )
                 {
                     requests.push((request.0, request.1, None, crate::net::ImagePriority::High));
                 }
             }
             if let Some(next) = &detail.next_up
                 && let Some(tag) = next.image_tag(ImageKind::Primary)
-                && let Some(request) =
-                    self.image_request(&client, &next.id, tag, ImageKind::Primary, 320)
+                && let Some(request) = self.image_request(
+                    &client,
+                    &next.id,
+                    tag,
+                    ImageKind::Primary,
+                    self.image_width(320),
+                )
             {
                 requests.push((request.0, request.1, None, crate::net::ImagePriority::High));
             }
             for person in detail.item.people.iter().take(12) {
                 if let Some(tag) = person.primary_image_tag.as_deref()
-                    && let Some(request) =
-                        self.image_request(&client, &person.id, tag, ImageKind::Primary, 160)
+                    && let Some(request) = self.image_request(
+                        &client,
+                        &person.id,
+                        tag,
+                        ImageKind::Primary,
+                        self.image_width(160),
+                    )
                 {
                     requests.push((request.0, request.1, None, crate::net::ImagePriority::High));
                 }
@@ -807,7 +837,7 @@ impl State {
             id,
             "Primary",
             Some(tag),
-            DETAIL_POSTER_WIDTH,
+            self.image_width(DETAIL_POSTER_WIDTH),
         ))
     }
 
@@ -818,7 +848,7 @@ impl State {
             &item.id,
             "Backdrop",
             Some(tag),
-            BACKDROP_WIDTH,
+            self.image_width(BACKDROP_WIDTH),
         ))
     }
 
@@ -829,7 +859,7 @@ impl State {
             &item.id,
             "Logo",
             Some(tag),
-            520,
+            self.image_width(520),
         ))
     }
 }

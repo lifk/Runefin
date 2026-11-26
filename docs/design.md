@@ -495,19 +495,25 @@ written into the active slot's `/var` overlay upper because the rootfs `/etc` is
 an OS update or an A/B switch run `runefin-mode repair`. From a TTY the console is on **F4–F6**
 (`fbcon=vc:4-6`), not F2.
 
-**Text entry.** A focused text field opens the in-app keyboard on a big screen: a bottom sheet with
-QWERTY, shift, digits/symbols, space, backspace, Enter, Next and Hide, plus a masked Show toggle for
-secure fields. It edits the field's `TextEdit` directly and keeps every key a named, focusable
-button, so the D-pad, a CEC remote and a screen reader all work without the Steam overlay keyboard.
-Settings → Interface → On-screen keyboard is Auto (big screen), On demand (Menu/Start on a field) or
-Off. The sheet is a modal focus group: Escape/Back hides it and returns focus to the field, and the
-page underneath does not move.
+**Text entry.** A text field's own action opens the in-app keyboard on a big screen: Enter on the
+focused field or Menu/Start, never focus alone. Focus passing through a search box beside the cards
+must not take over the screen — the D-pad has to keep moving. The sheet has QWERTY, shift,
+digits/symbols, space, backspace, Enter, Next and Hide, plus a masked Show toggle for secure fields.
+It edits the field's `TextEdit` directly and keeps every key a named, focusable button, so the
+D-pad, a CEC remote and a screen reader all work without the Steam overlay keyboard. Settings →
+Interface → On-screen keyboard is Auto (the TV layout: Enter or Menu/Start), On demand (Menu/Start
+only) or Off. The sheet is a modal focus group: Escape/Back hides it and returns focus to the field,
+and the page underneath does not move.
 
 **Images.** Geometry first: reserve the box from the aspect ratio, paint a blurred 27×17
 placeholder, crossfade over 200 ms. Rune's `ImageCache` decodes on its own worker and dedupes by
 content, but `ImageCache::url` is web-only — on Linux we fetch bytes ourselves (below). The image
 worker bakes the placeholder with the `image` crate Rune already uses (PNG/JPEG), so the app adds
-no second decoder or async runtime.
+no second decoder or async runtime. The request width is in physical pixels: the design budget
+(360 for a poster, 1280 for the Home backdrop) is multiplied by the window's physical-to-logical
+factor, sampled from the native window when it appears and after a resize. On a 4K TV that turns
+the same poster into a 1080 px request; keeping it at 360 would stretch one image over 900
+physical pixels on the card.
 
 ---
 

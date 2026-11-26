@@ -135,9 +135,13 @@ impl State {
             let Some((id, tag)) = crate::home::poster(&entry.item) else {
                 continue;
             };
-            if let Some(request) =
-                self.image_request(&client, id, tag, jellyfin_api::ImageKind::Primary, 120)
-            {
+            if let Some(request) = self.image_request(
+                &client,
+                id,
+                tag,
+                jellyfin_api::ImageKind::Primary,
+                self.image_width(120),
+            ) {
                 requests.push((request.0, request.1, None, crate::net::ImagePriority::High));
             }
         }

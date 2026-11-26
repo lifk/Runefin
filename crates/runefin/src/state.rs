@@ -699,6 +699,12 @@ pub struct State {
     /// once, in `poll`, so handlers never need a `Tx`.
     pub fullscreen: bool,
     pub pending_fullscreen: Option<bool>,
+    /// Physical pixels per logical point at the last window sample. Every fetched image is
+    /// asked for at `base × this`: 360 px of poster is sharp at 1× and visibly soft on a 4K
+    /// TV, where the same card draws over 900 physical pixels.
+    pub image_scale: f32,
+    /// The library rows the grid last mounted, so a scale change can fetch them again.
+    pub(crate) library_image_rows: std::ops::Range<usize>,
     /// The session-bus media service, absent in headless renders and without a bus.
     mpris: Option<crate::mpris::Mpris>,
     /// The root view's screen origin, for the next launch. Compositor-owned position is not
@@ -1143,6 +1149,8 @@ impl State {
             window_size: (0.0, 0.0),
             fullscreen: false,
             pending_fullscreen: None,
+            image_scale: 1.0,
+            library_image_rows: 0..0,
             mpris: None,
             window_position: (0.0, 0.0),
             queue_load: Latest::default(),
@@ -4183,7 +4191,7 @@ impl State {
             &item.id,
             "Backdrop",
             Some(tag),
-            HOME_BACKDROP_WIDTH,
+            self.image_width(HOME_BACKDROP_WIDTH),
         ))
     }
 
@@ -4204,7 +4212,7 @@ impl State {
             &item.id,
             "Backdrop",
             Some(tag),
-            HOME_BACKDROP_WIDTH,
+            self.image_width(HOME_BACKDROP_WIDTH),
         ))
     }
 
@@ -4216,7 +4224,7 @@ impl State {
             &person.id,
             "Primary",
             Some(tag),
-            160,
+            self.image_width(160),
         ))
     }
 
@@ -4228,7 +4236,7 @@ impl State {
             &item.id,
             "Primary",
             Some(tag),
-            320,
+            self.image_width(320),
         ))
     }
 
@@ -4240,7 +4248,7 @@ impl State {
             &item.id,
             &format!("Chapter{at}"),
             Some(tag),
-            160,
+            self.image_width(160),
         ))
     }
 
@@ -4253,7 +4261,7 @@ impl State {
                 &item.id,
                 "Backdrop",
                 Some(tag),
-                640,
+                self.image_width(640),
             )
         });
         backdrop.or_else(|| self.image_key(item))
@@ -4267,7 +4275,7 @@ impl State {
             id,
             "Primary",
             Some(tag),
-            POSTER_WIDTH,
+            self.image_width(POSTER_WIDTH),
         ))
     }
 
@@ -4692,6 +4700,8 @@ mod tests {
             window_size: (0.0, 0.0),
             fullscreen: false,
             pending_fullscreen: None,
+            image_scale: 1.0,
+            library_image_rows: 0..0,
             mpris: None,
             window_position: (0.0, 0.0),
             queue_load: Latest::default(),

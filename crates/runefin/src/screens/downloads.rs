@@ -322,7 +322,7 @@ fn thumb(s: &State, entry: &Entry, t: &tok::Theme) -> El {
             id,
             jellyfin_api::ImageKind::Primary.as_str(),
             Some(tag),
-            120,
+            s.image_width(120),
         );
         if let Some(layers) = super::poster_layers(s, &key, SurfaceFit::Fit) {
             art = art.child(layers);

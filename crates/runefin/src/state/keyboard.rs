@@ -220,15 +220,22 @@ impl Keyboard {
         if self.suppress.as_deref() == Some(key) {
             return false;
         }
-        if self.mode != KeyboardMode::Auto || !big_screen {
-            return false;
-        }
-        if let Some(target) = TextTarget::from_key(key) {
-            self.open_for(key, target);
-            return true;
-        }
+        // Focus alone never opens the sheet. On a TV the search field sits in the same row as
+        // the cards, so arrowing across it must not trap the reader in the keyboard; the sheet
+        // opens from the field's own action (Menu/Start or Enter). `big_screen` keeps the
+        // argument the caller knows; the mode only decides whether Off forbids opening at all.
+        let _ = big_screen;
         self.suppress = None;
         false
+    }
+
+    /// Enter on a focused field: Auto opens the sheet, On-demand keeps Enter for the field
+    /// and asks for Menu/Start instead.
+    pub fn manual_open_enter(&mut self, focused: Option<&str>) -> bool {
+        if self.mode != KeyboardMode::Auto {
+            return false;
+        }
+        self.manual_open(focused)
     }
 
     /// The Menu/Start key, or a field's Keyboard action: open even in On-demand mode.
@@ -437,6 +444,12 @@ impl State {
         self.keyboard_close();
     }
 
+    /// Enter on a focused text field asks for the sheet in the TV layout (Auto). The field's
+    /// own submit is what On-demand and Off keep.
+    pub fn keyboard_enter_open(&mut self, key: &str) -> bool {
+        self.big_screen && self.keyboard.manual_open_enter(Some(key))
+    }
+
     pub fn keyboard_next(&mut self) {
         if self.keyboard.target.and_then(TextTarget::next).is_none() {
             self.keyboard_close();
@@ -554,19 +567,36 @@ mod tests {
     }
 
     #[test]
-    fn auto_open_waits_for_a_text_field_and_stays_closed_after_hide() {
+    fn focus_never_opens_the_keyboard() {
         let mut state = state();
         assert!(!state.keyboard.observe(Some("nav-home"), true));
-        assert!(state.keyboard.observe(Some("server"), true));
-        assert!(state.keyboard.open);
+        assert!(!state.keyboard.observe(Some("server"), true));
+        assert!(
+            !state.keyboard.open,
+            "passing through a field must not trap the D-pad in the sheet"
+        );
+        assert!(state.keyboard.manual_open(Some("server")));
         assert_eq!(state.keyboard.target, Some(TextTarget::ConnectServer));
         state.keyboard.close();
         assert!(!state.keyboard.observe(Some("server"), true));
         assert!(!state.keyboard.open);
-        // Moving to another field is a new edge.
-        assert!(state.keyboard.observe(Some("username"), true));
-        assert!(state.keyboard.open);
+        // Moving to another field is still not an open.
+        assert!(!state.keyboard.observe(Some("username"), true));
+        assert!(!state.keyboard.open);
+        assert!(state.keyboard.manual_open(Some("username")));
         assert_eq!(state.keyboard.target, Some(TextTarget::ConnectUser));
+    }
+
+    #[test]
+    fn enter_opens_only_in_auto() {
+        let mut state = state();
+        state.keyboard.mode = KeyboardMode::OnDemand;
+        assert!(!state.keyboard.manual_open_enter(Some("server")));
+        assert!(!state.keyboard.open);
+        assert!(state.keyboard.manual_open(Some("server")));
+        state.keyboard.reset();
+        state.keyboard.mode = KeyboardMode::Auto;
+        assert!(state.keyboard.manual_open_enter(Some("server")));
     }
 
     #[test]
