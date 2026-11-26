@@ -31,3 +31,9 @@ debug = false
 # Rune is pinned to one rev: it is pre-1.0 and its `dev` branch moves ~100 commits a day.
 # Bump deliberately, one commit, and rerun `scripts/snapshots.sh` before and after.
 # https://github.com/anomalyco/rune/commit/f5def6d4f9259580cbbd6472498e4de6b4d754b6
+
+# Upstream's flat-tree fix: AccessKit items read their own `size_of_set` before falling back to
+# the container's, so levelled items in a flat tree report their own level's setsize to Linux
+# AT-SPI. Rune's workspace patches its vendored copy; a downstream workspace must patch it too.
+[patch.crates-io]
+accesskit_atspi_common = { git = "https://github.com/lifk/rune", rev = "c2e2eb6c7b9d519d0a673eca35f5c40bce5b5e07" }

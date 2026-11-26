@@ -352,7 +352,7 @@ fn poll(s: &mut State, _clock: f64, tx: &mut Tx) -> bool {
         s.next_up_announced = false;
     }
     if let Some(fullscreen) = s.pending_fullscreen.take() {
-        tx.set_fullscreen(fullscreen);
+        tx.set_full_screen(fullscreen);
     }
     if let Some(y) = s.take_pending_scroll() {
         tx.scroll_to_y("library-scroll", y);

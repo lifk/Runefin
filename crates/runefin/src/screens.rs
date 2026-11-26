@@ -1839,9 +1839,10 @@ fn rails(s: &State, t: &tok::Theme) -> El {
         .min_w(0.0)
         .growth(GrowthSpec::default())
         // Home's rows are tall (a rail is over half a viewport), so Rune's default of two
-        // viewports each side mounts nearly every rail. One viewport is the next rail coming,
-        // which is all a reader can see.
-        .virtual_overdraw(1.0)
+        // viewports each side mounts nearly every rail. One viewport of overscan is the next
+        // rail coming, which is all a reader can see; the window shifts halfway through it, so
+        // the reader never meets a rail still being built.
+        .virtual_overscan(1.0, 0.5)
         .virtual_rows(
             count,
             HOME_RAIL_ESTIMATE_H,
