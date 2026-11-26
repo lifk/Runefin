@@ -131,7 +131,13 @@ Both are fixed in `packaging/modes/session.sh` (commit `5a0af4d`) and were patch
 installed copy on the machine. The machine's mode is now `desktop` for the first boot.
 
 The custom session `.desktop` lives in `~/.local/share/runefin/modes` and is listed in the
-drop-in's `SessionDir`; SDDM launched it, so the location works. The top-level
+drop-in's `SessionDir`. SDDM did record it as the last session
+(`/var/lib/sddm/state.conf`, as a full path with a trailing space), but the wrapper's own
+`session.log` was never written. The installer generated `Exec="…/session.sh"` with quotes, and
+the script used `$HOME` without a fallback; either can make the session fail silently. The
+installer now writes an unquoted `Exec` and the script falls back to `/home/deck`. The file still
+lives under the 700-permission home, so moving the `.desktop` to `/etc/runefin-modes` and adding
+that to `SessionDir` is the robust fix for SDDM discovery. The top-level
 `XDG_SESSION_TYPE=wayland` export is what makes the session type unambiguous.
 
 ---
@@ -224,6 +230,21 @@ the post-update checklist.
   Plasma dbus wrapper, `start-gamescope-session` for game with fallbacks, and the desktop
   fallback inside the game branch.
 - The installed copy on the machine was patched the same way; mode set to `desktop`.
+
+**Recovery state (2026-11-26)**
+
+Because the custom session never reached a log, the machine was forced to the stock Plasma
+session to separate session selection from Plasma/KWin:
+
+- `/etc/sddm.conf` in the active var overlay: `DisplayServer=wayland`, autologin `deck`,
+  `Session=plasma.desktop`, `SessionDir=/usr/share/wayland-sessions`.
+- `/var/lib/sddm/state.conf`: `Session=/usr/share/wayland-sessions/plasma.desktop`.
+- The Runefin drop-in was renamed `.disabled` in the overlay.
+- The custom `session.sh` was fixed with the stock wrappers, `XDG_SESSION_TYPE=wayland`, a
+  `$HOME` fallback and the stock Plasma/Game commands; its `.desktop` was rewritten with an
+  unquoted `Exec=/home/deck/...`.
+- The rootfs vendor config was **not** modified; the rw remount did not make `/usr` writable
+  (verity/immutable root), and the attempted write left no file.
 
 **Follow-ups**
 

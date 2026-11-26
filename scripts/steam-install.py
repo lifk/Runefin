@@ -520,7 +520,7 @@ def install_modes(default_mode: str, dry: bool) -> bool:
         session_desktop = f"""[Desktop Entry]
 Name=Runefin Modes
 Comment=Desktop, Gaming or Media
-Exec="{session_dir / 'session.sh'}"
+Exec={session_dir / 'session.sh'}
 Type=Application
 DesktopNames=KDE
 """

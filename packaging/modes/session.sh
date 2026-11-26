@@ -4,7 +4,8 @@
 set -u
 export XDG_SESSION_TYPE=wayland
 
-state="${XDG_STATE_HOME:-$HOME/.local/state}/runefin"
+home="${HOME:-/home/deck}"
+state="${XDG_STATE_HOME:-$home/.local/state}/runefin"
 mode_file="$state/mode"
 log="$state/session.log"
 mkdir -p "$state" 2>/dev/null || true
@@ -43,7 +44,7 @@ case "$mode" in
         if [ -x /usr/lib/plasma-dbus-run-session-if-needed ]; then
             exec /usr/lib/plasma-dbus-run-session-if-needed /usr/bin/startplasma-wayland
         fi
-        exec startplasma-wayland
+        exec /usr/bin/startplasma-wayland
         ;;
     game)
         export XDG_SESSION_DESKTOP=gamescope XDG_CURRENT_DESKTOP=gamescope DESKTOP_SESSION=gamescope
@@ -51,8 +52,8 @@ case "$mode" in
         # XDG_SESSION_TYPE=x11, updates the systemd environment, sets the gamescope
         # portal and starts the user target. Running gamescope-session directly skips
         # all of that and hangs at the splash.
-        if command -v start-gamescope-session >/dev/null 2>&1; then
-            exec start-gamescope-session
+        if [ -x /usr/bin/start-gamescope-session ]; then
+            exec /usr/bin/start-gamescope-session
         elif command -v gamescope-session >/dev/null 2>&1; then
             exec gamescope-session
         elif [ -x /usr/lib/steamos/gamescope-session ]; then
@@ -72,10 +73,14 @@ case "$mode" in
         if ! command -v kwin_wayland >/dev/null 2>&1; then
             log_line "kwin_wayland missing; falling back to desktop"
             printf 'desktop\n' >"$mode_file" 2>/dev/null || true
-            exec startplasma-wayland
+            export XDG_SESSION_DESKTOP=plasma XDG_CURRENT_DESKTOP=KDE DESKTOP_SESSION=plasma
+            if [ -x /usr/lib/plasma-dbus-run-session-if-needed ]; then
+                exec /usr/lib/plasma-dbus-run-session-if-needed /usr/bin/startplasma-wayland
+            fi
+            exec /usr/bin/startplasma-wayland
         fi
         rm -f "$media_ready" 2>/dev/null || true
         date +%s >"$media_pending" 2>/dev/null || true
-        exec kwin_wayland --exit-with-session "$HOME/.local/share/runefin/modes/supervisor.sh"
+        exec kwin_wayland --exit-with-session "$home/.local/share/runefin/modes/supervisor.sh"
         ;;
 esac
