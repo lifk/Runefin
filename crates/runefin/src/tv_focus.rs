@@ -195,9 +195,18 @@ fn zones(s: &State) -> (Vec<Zone>, bool) {
     }
 }
 
+/// Whether `key` is one of the sidebar's nav rows.
+pub fn in_sidebar(s: &State, key: &str) -> bool {
+    let (zones, has_sidebar) = zones(s);
+    has_sidebar
+        && zones
+            .first()
+            .is_some_and(|zone| zone.keys.iter().any(|zone_key| zone_key == key))
+}
+
 fn sidebar(s: &State) -> Zone {
     let mut keys = vec!["nav-home".to_string()];
-    for library in &s.home_data.libraries {
+    for library in s.sidebar_libraries() {
         keys.push(format!("library-{}", library.id));
     }
     keys.push("nav-watchlist".into());
@@ -208,16 +217,14 @@ fn sidebar(s: &State) -> Zone {
         keys.push("nav-seerr".into());
     }
     keys.extend(
-        [
-            "nav-search",
-            "nav-remote",
-            "nav-downloads",
-            "nav-controls",
-            "nav-settings",
-        ]
-        .into_iter()
-        .map(String::from),
+        ["nav-search", "nav-remote", "nav-downloads"]
+            .into_iter()
+            .map(String::from),
     );
+    if s.big_screen {
+        keys.push("nav-controls".into());
+    }
+    keys.push("nav-settings".into());
     Zone {
         keys,
         columns: 1,

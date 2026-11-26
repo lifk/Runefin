@@ -94,37 +94,64 @@ pub fn placeholder(bytes: &[u8]) -> Result<Vec<u8>, String> {
     Ok(small.into_raw())
 }
 
+/// Whether bytes are a real image. `full` decodes the whole thing (a truncated JPEG has a
+/// valid header); a trickplay sprite is only header-checked because decoding a 30 MB sprite to
+/// 27x17 would waste the very worker the sprite needs.
+pub fn valid_image(bytes: &[u8], full: bool) -> bool {
+    if full {
+        return placeholder(bytes).is_ok();
+    }
+    match ::image::ImageReader::new(std::io::Cursor::new(bytes)).with_guessed_format() {
+        Ok(reader) => reader.into_dimensions().is_ok(),
+        Err(_) => false,
+    }
+}
+
 /// Disk first, then the source. The caller runs this on the image worker; nothing here blocks
 /// the UI thread. Jellyfin images use the session client; TMDB posters are public.
+///
+/// A cached or served body is only accepted when it is a decodable image. A 200 with an HTML
+/// error page or a truncated JPEG used to be written to disk and handed to Rune forever: every
+/// later visit read the same bad bytes and the card kept its letter until the cache was
+/// cleared. A bad disk entry is now deleted and fetched again; a bad first URL falls through to
+/// its fallback (Primary -> Backdrop).
 pub fn load_or_fetch(
     source: &ImageSource,
     url: &str,
     fallback: Option<&str>,
     key: &str,
+    full_check: bool,
 ) -> Result<Vec<u8>, String> {
     let path = cache_path(key);
     if let Some(path) = &path
         && let Ok(bytes) = std::fs::read(path)
         && !bytes.is_empty()
     {
-        return Ok(bytes);
+        if valid_image(&bytes, full_check) {
+            return Ok(bytes);
+        }
+        let _ = std::fs::remove_file(path);
     }
     let fetch = |url: &str| -> Result<Vec<u8>, String> {
-        match source {
+        let bytes = match source {
             ImageSource::Jellyfin(client) => client.fetch_bytes(url).map_err(|e| e.user_message()),
             ImageSource::Public => seerr_api::fetch_image(url),
+        }?;
+        if bytes.is_empty() {
+            return Err("the server returned an empty image".into());
         }
+        if !valid_image(&bytes, full_check) {
+            return Err("the server returned something that is not a decodable image".into());
+        }
+        Ok(bytes)
     };
-    let mut bytes = fetch(url);
-    if bytes.as_ref().is_ok_and(|bytes| bytes.is_empty())
-        && let Some(fallback) = fallback
-    {
-        bytes = fetch(fallback);
-    }
-    let bytes = bytes?;
-    if bytes.is_empty() {
-        return Err("the server returned an empty image".into());
-    }
+    let bytes = match fetch(url) {
+        Ok(bytes) => Ok(bytes),
+        Err(first) => match fallback {
+            Some(fallback) => fetch(fallback).map_err(|_| first),
+            None => Err(first),
+        },
+    }?;
     if let Some(path) = path {
         if let Some(dir) = path.parent() {
             let _ = std::fs::create_dir_all(dir);
@@ -209,6 +236,19 @@ mod tests {
             (PLACEHOLDER_WIDTH * PLACEHOLDER_HEIGHT * 4) as usize
         );
         assert_eq!(&rgb[..4], &[20, 40, 80, 255]);
+    }
+
+    #[test]
+    fn an_html_error_or_truncated_jpeg_is_not_an_image() {
+        assert!(!valid_image(b"<html><body>Bad gateway</body></html>", true));
+        let image = ::image::RgbaImage::from_pixel(12, 18, ::image::Rgba([1, 2, 3, 255]));
+        let mut png = std::io::Cursor::new(Vec::new());
+        image
+            .write_to(&mut png, ::image::ImageFormat::Png)
+            .expect("encode png");
+        assert!(valid_image(png.get_ref(), true));
+        let truncated = &png.get_ref()[..png.get_ref().len() / 2];
+        assert!(!valid_image(truncated, true));
     }
 
     #[test]

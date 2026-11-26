@@ -209,12 +209,32 @@ pub fn merge_resume(items: Vec<Item>, now_days: i64) -> Vec<Item> {
 }
 
 /// The poster to show for a card: the series poster for an episode, the item's own otherwise.
-pub fn poster(item: &Item) -> Option<(&str, &str)> {
+/// The image a card should draw: the series poster for an episode, then the item's own
+/// Primary, Thumb or Backdrop. Many films and collections have no Primary at all (a logo and a
+/// 16:9 thumb or backdrop are common), and a Primary-only rule left those cards as a letter
+/// forever. The kind travels with the id and tag so the cache key the view looks up and the
+/// URL the worker fetches name the same image.
+pub fn poster_source(item: &Item) -> Option<(&str, &str, ImageKind)> {
     if let (Some(series), Some(tag)) = (&item.series_id, &item.series_primary_image_tag) {
-        return Some((series, tag));
+        return Some((series, tag, ImageKind::Primary));
     }
-    let tag = item.image_tag(ImageKind::Primary)?;
-    Some((item.id.as_str(), tag))
+    for kind in [ImageKind::Primary, ImageKind::Thumb, ImageKind::Backdrop] {
+        if let Some(tag) = item.image_tag(kind) {
+            return Some((item.id.as_str(), tag, kind));
+        }
+    }
+    None
+}
+
+/// The item's own still: Primary, Thumb, then Backdrop. Unlike [`poster_source`] it never
+/// borrows the series poster, so an episode row shows the episode's own frame.
+pub fn own_image_source(item: &Item) -> Option<(&str, &str, ImageKind)> {
+    for kind in [ImageKind::Primary, ImageKind::Thumb, ImageKind::Backdrop] {
+        if let Some(tag) = item.image_tag(kind) {
+            return Some((item.id.as_str(), tag, kind));
+        }
+    }
+    None
 }
 
 /// True when the server added the item in the last 30 days. The date is the server's own
@@ -496,19 +516,38 @@ mod tests {
     }
 
     #[test]
-    fn episodes_prefer_the_series_poster_and_movies_use_their_own() {
+    fn episodes_prefer_the_series_poster_and_movies_fall_back_to_their_stills() {
         let mut episode = item("e1", Some("show"), None);
         episode.series_primary_image_tag = Some("series-tag".into());
-        assert_eq!(poster(&episode), Some(("show", "series-tag")));
+        assert_eq!(
+            poster_source(&episode),
+            Some(("show", "series-tag", ImageKind::Primary))
+        );
 
         let mut film = Item {
             id: "film".into(),
             image_tags: Some([("Primary".to_string(), "film-tag".to_string())].into()),
             ..Item::default()
         };
-        assert_eq!(poster(&film), Some(("film", "film-tag")));
+        assert_eq!(
+            poster_source(&film),
+            Some(("film", "film-tag", ImageKind::Primary))
+        );
+        // A film with no Primary still has a usable Thumb, then a Backdrop. The card draws it
+        // instead of the letter placeholder; before this a Primary-only rule left it blank.
+        film.image_tags = Some([("Thumb".to_string(), "thumb-tag".to_string())].into());
+        assert_eq!(
+            poster_source(&film),
+            Some(("film", "thumb-tag", ImageKind::Thumb))
+        );
         film.image_tags = None;
-        assert_eq!(poster(&film), None);
+        film.backdrop_image_tags = Some(vec!["back-tag".into()]);
+        assert_eq!(
+            poster_source(&film),
+            Some(("film", "back-tag", ImageKind::Backdrop))
+        );
+        film.backdrop_image_tags = None;
+        assert_eq!(poster_source(&film), None);
     }
 
     #[test]

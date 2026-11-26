@@ -23,6 +23,10 @@ pub(super) fn search_screen(s: &State) -> El {
         .on_edit(|s: &mut State| &mut s.search.query)
         .on_input_change(|s: &mut State, _| s.search_changed())
         .on_input_key(|s: &mut State, key: &rune::KeyEvent, tx: &mut rune::Tx| {
+            if s.big_screen && key.key == rune::Key::Enter && s.keyboard_enter_open("search-input")
+            {
+                return true;
+            }
             if key.key == rune::Key::Escape {
                 // A text field keeps its own keys, so the zone router never sees a press here:
                 // Down is the one key this field has to pass on.

@@ -1123,14 +1123,7 @@ pub(super) fn sidebar(s: &State, t: &tok::Theme) -> El {
                     .mb(2.0),
             );
         }
-        for library in s.home_data.libraries.iter().filter(|library| {
-            // A music, photo, book or audiobook library has no browse or playback surface in
-            // this client. Listing it only leads to a grid that cannot play anything.
-            !matches!(
-                library.collection_type.as_deref(),
-                Some("music" | "photos" | "books" | "audiobooks")
-            )
-        }) {
+        for library in s.sidebar_libraries() {
             let is_live = library.collection_type.as_deref() == Some("livetv");
             let selected = if is_live {
                 matches!(s.route, Route::LiveTv)

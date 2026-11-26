@@ -548,6 +548,9 @@ fn search_box(s: &State, t: &tok::Theme) -> El {
             if !s.big_screen {
                 return false;
             }
+            if key.key == rune::Key::Enter && s.keyboard_enter_open("seerr-search") {
+                return true;
+            }
             let action = match key.key {
                 rune::Key::Up => crate::tv_input::TvAction::Up,
                 rune::Key::Down => crate::tv_input::TvAction::Down,

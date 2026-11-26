@@ -705,6 +705,7 @@ impl State {
     }
 
     pub(super) fn request_detail_images(&mut self) {
+        self.current_images.clear();
         let Some(detail) = &self.detail else {
             return;
         };
@@ -713,24 +714,27 @@ impl State {
         };
         let mut requests = Vec::new();
         let priority = crate::net::ImagePriority::High;
-        if let Some((id, tag)) = crate::home::poster(&detail.item)
+        if let Some((id, tag, kind)) = crate::home::poster_source(&detail.item)
             && let Some(request) = self.image_request(
                 &client,
                 id,
                 tag,
-                ImageKind::Primary,
+                kind,
                 self.image_width(DETAIL_POSTER_WIDTH),
             )
         {
-            let fallback = detail.item.image_tag(ImageKind::Backdrop).map(|tag| {
-                client.image_url(
-                    &detail.item.id,
-                    ImageKind::Backdrop,
-                    self.image_width(DETAIL_POSTER_WIDTH),
-                    Some(tag),
-                    None,
-                )
-            });
+            let fallback = (kind != ImageKind::Backdrop)
+                .then(|| detail.item.image_tag(ImageKind::Backdrop))
+                .flatten()
+                .map(|tag| {
+                    client.image_url(
+                        &detail.item.id,
+                        ImageKind::Backdrop,
+                        self.image_width(DETAIL_POSTER_WIDTH),
+                        Some(tag),
+                        None,
+                    )
+                });
             requests.push((request.0, request.1, fallback, priority));
         }
         if let Some(tag) = detail.item.image_tag(ImageKind::Backdrop)
@@ -759,14 +763,9 @@ impl State {
             // The same width the card draws from (`image_key`), or the fetched bytes would be
             // cached under a key no card ever looks up.
             for item in detail.similar.iter().take(12) {
-                if let Some(tag) = item.image_tag(ImageKind::Primary)
-                    && let Some(request) = self.image_request(
-                        &client,
-                        &item.id,
-                        tag,
-                        ImageKind::Primary,
-                        self.image_width(POSTER_WIDTH),
-                    )
+                if let Some((id, tag, kind)) = crate::home::poster_source(item)
+                    && let Some(request) =
+                        self.image_request(&client, id, tag, kind, self.image_width(POSTER_WIDTH))
                 {
                     // This page is what the reader is looking at; the home rails that asked
                     // for their own art are behind it now, so a Low here would wait behind
@@ -775,42 +774,36 @@ impl State {
                 }
             }
             for member in detail.collection.iter() {
-                if let Some(tag) = member.image_tag(ImageKind::Primary)
-                    && let Some(request) = self.image_request(
-                        &client,
-                        &member.id,
-                        tag,
-                        ImageKind::Primary,
-                        self.image_width(POSTER_WIDTH),
-                    )
+                if let Some((id, tag, kind)) = crate::home::poster_source(member)
+                    && let Some(request) =
+                        self.image_request(&client, id, tag, kind, self.image_width(POSTER_WIDTH))
                 {
                     requests.push((request.0, request.1, None, crate::net::ImagePriority::High));
                 }
             }
             for episode in detail.episodes.iter() {
-                if let Some(tag) = episode.image_tag(ImageKind::Primary)
-                    && let Some(request) = self.image_request(
-                        &client,
-                        &episode.id,
-                        tag,
-                        ImageKind::Primary,
-                        self.image_width(320),
-                    )
+                if let Some((id, tag, kind)) = crate::home::own_image_source(episode)
+                    && let Some(request) =
+                        self.image_request(&client, id, tag, kind, self.image_width(320))
                 {
                     requests.push((request.0, request.1, None, crate::net::ImagePriority::High));
                 }
             }
             if let Some(next) = &detail.next_up
-                && let Some(tag) = next.image_tag(ImageKind::Primary)
-                && let Some(request) = self.image_request(
-                    &client,
-                    &next.id,
-                    tag,
-                    ImageKind::Primary,
-                    self.image_width(320),
-                )
+                && let Some((id, tag, kind)) = crate::home::own_image_source(next)
+                && let Some(request) =
+                    self.image_request(&client, id, tag, kind, self.image_width(320))
             {
                 requests.push((request.0, request.1, None, crate::net::ImagePriority::High));
+            }
+            // Special features use `image_key` in the view; request the same key here.
+            for extra in self.detail_extras.iter() {
+                if let Some((id, tag, kind)) = crate::home::poster_source(extra)
+                    && let Some(request) =
+                        self.image_request(&client, id, tag, kind, self.image_width(POSTER_WIDTH))
+                {
+                    requests.push((request.0, request.1, None, crate::net::ImagePriority::Low));
+                }
             }
             for person in detail.item.people.iter().take(12) {
                 if let Some(tag) = person.primary_image_tag.as_deref()
@@ -831,11 +824,11 @@ impl State {
 
     /// The cache key for a detail poster, and for the backdrop behind it.
     pub fn detail_image_key(&self, item: &Item) -> Option<String> {
-        let (id, tag) = crate::home::poster(item)?;
+        let (id, tag, kind) = crate::home::poster_source(item)?;
         Some(crate::image::key(
             &self.config.server_url,
             id,
-            "Primary",
+            kind.as_str(),
             Some(tag),
             self.image_width(DETAIL_POSTER_WIDTH),
         ))

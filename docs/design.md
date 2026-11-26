@@ -511,9 +511,11 @@ content, but `ImageCache::url` is web-only — on Linux we fetch bytes ourselves
 worker bakes the placeholder with the `image` crate Rune already uses (PNG/JPEG), so the app adds
 no second decoder or async runtime. The request width is in physical pixels: the design budget
 (360 for a poster, 1280 for the Home backdrop) is multiplied by the window's physical-to-logical
-factor, sampled from the native window when it appears and after a resize. On a 4K TV that turns
-the same poster into a 1080 px request; keeping it at 360 would stretch one image over 900
-physical pixels on the card.
+factor, sampled from the native window when it appears and after a resize. The multiplier caps
+at 2x. A 4K screen draws a 176 pt card at 528 physical pixels, so a 720 px poster still covers
+it; requesting 1080 px made each decoded poster 8.9 MB and a 256 MB cache held only 28, which
+evicted a screen's own art. The decoded cache now holds 768 MB and pins the keys the current
+screen draws.
 
 ---
 

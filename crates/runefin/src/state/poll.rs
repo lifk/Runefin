@@ -447,6 +447,9 @@ impl State {
             });
             if keep {
                 self.detail_extras = extras.unwrap_or_default();
+                // The view draws extras through `image_key`; the load-complete pass is where
+                // their posters/stills are requested, so they are not letter placeholders.
+                self.request_detail_images();
             }
             changed = true;
         }

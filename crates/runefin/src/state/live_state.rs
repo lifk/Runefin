@@ -257,12 +257,19 @@ impl State {
                 self.live.next = load.next;
                 self.live.guide = load.guide;
                 self.live.error = None;
-                let requests =
-                    self.image_requests(self.live.channels.iter(), crate::net::ImagePriority::High);
-                self.send_images(requests);
+                self.request_live_images();
             }
             Err(message) => self.live.error = Some(message),
         }
+    }
+
+    /// The channel logos the Live TV page draws. Re-run after a scale change, where the old
+    /// keys were dropped and the page would otherwise keep its letter placeholders.
+    pub(super) fn request_live_images(&mut self) {
+        self.current_images.clear();
+        let requests =
+            self.image_requests(self.live.channels.iter(), crate::net::ImagePriority::High);
+        self.send_images(requests);
     }
 
     /// Clicking a channel starts the tuner in the background; the player is handed the URL once

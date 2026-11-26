@@ -197,6 +197,9 @@ pub(super) fn settings_screen(s: &State) -> El {
                         .single_line()
                         .w_full()
                         .on_edit(|s: &mut State| &mut s.settings_query)
+                        .on_submit(|s: &mut State, _tx| {
+                            s.keyboard_enter_open("settings-search");
+                        })
                         .color(t.text),
                 )),
         )
@@ -1025,6 +1028,9 @@ pub(super) fn settings_screen(s: &State) -> El {
             .secure()
             .w_full()
             .on_edit(|s: &mut State| &mut s.omdb_key)
+            .on_submit(|s: &mut State, _tx| {
+                s.keyboard_enter_open("setting-omdb-key");
+            })
             .color(t.text),
     );
     let metadata = col()
@@ -1144,6 +1150,9 @@ pub(super) fn settings_screen(s: &State) -> El {
                 .single_line()
                 .w_full()
                 .on_edit(|s: &mut State| &mut s.seerr.url)
+                .on_submit(|s: &mut State, _tx| {
+                    s.keyboard_enter_open("setting-seerr-url");
+                })
                 .color(t.text),
         );
         // A secure field draws one bullet per character, and the platform text overlay is not
@@ -1158,6 +1167,9 @@ pub(super) fn settings_screen(s: &State) -> El {
                 .secure()
                 .w_full()
                 .on_edit(|s: &mut State| &mut s.seerr.key)
+                .on_submit(|s: &mut State, _tx| {
+                    s.keyboard_enter_open("setting-seerr-key-input");
+                })
                 .color(t.text)
         } else {
             let label = if s.seerr.key.text.is_empty() {
@@ -1483,7 +1495,10 @@ pub(super) fn settings_screen(s: &State) -> El {
                             .fill(t.bg)
                             .outline(1.0, 0.0, t.card_border)
                             .color(t.text)
-                            .on_edit(|s: &mut State| &mut s.downloads_path),
+                            .on_edit(|s: &mut State| &mut s.downloads_path)
+                            .on_submit(|s: &mut State, _tx| {
+                                s.keyboard_enter_open("setting-downloads-path");
+                            }),
                     )),
                 )
         )

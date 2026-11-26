@@ -1433,6 +1433,7 @@ impl State {
     }
 
     pub(super) fn request_seerr_images(&mut self) {
+        self.current_images.clear();
         if self.image_cache.is_none() {
             return;
         }

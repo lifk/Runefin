@@ -341,6 +341,7 @@ impl State {
 
     /// The TMDB profile and the poster of every Seerr credit on the page.
     pub(super) fn request_person_images(&mut self) {
+        self.current_images.clear();
         if self.image_cache.is_none() {
             return;
         }

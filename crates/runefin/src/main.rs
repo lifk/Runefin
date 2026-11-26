@@ -556,6 +556,15 @@ fn tv_key(s: &mut State, key: &KeyEvent, tx: &mut Tx) -> bool {
                     // Back sits above the detail page's scroll viewport, so centring it would
                     // find nothing to move. Going up to it means going back to the top.
                     tx.scroll_to("detail-scroll", 0.0, 0.0);
+                } else if tv_focus::in_sidebar(s, target) {
+                    // The sidebar has its own scroll viewport. A nav row can be below its fold
+                    // on a full server, so scope the reveal there; the page scroll is a sibling,
+                    // not an ancestor, and the generic request left the focused row invisible.
+                    if matches!(action, tv_input::TvAction::Up | tv_input::TvAction::Down) {
+                        tx.scroll_center_in("sidebar-nav-scroll", target.clone());
+                    } else {
+                        tx.scroll_into_view_in("sidebar-nav-scroll", target.clone());
+                    }
                 } else if matches!(action, tv_input::TvAction::Up | tv_input::TvAction::Down) {
                     // A vertical move centres the new row in the page.
                     tx.scroll_center(target.clone());

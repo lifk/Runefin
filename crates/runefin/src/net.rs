@@ -174,6 +174,7 @@ fn image_worker(
             &request.url,
             request.fallback_url.as_deref(),
             &request.key,
+            request.placeholder,
         );
         LAST_JOB_MS.store(
             started.elapsed().as_millis().min(u128::from(u64::MAX)) as u64,

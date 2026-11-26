@@ -315,7 +315,12 @@ fn goto_panel(s: &State, t: &tok::Theme) -> El {
                         .single_line()
                         .w_full()
                         .on_edit(|s: &mut State| &mut s.in_app_goto)
-                        .on_submit(|s: &mut State, _tx| s.submit_in_app_goto())
+                        .on_submit(|s: &mut State, _tx| {
+                            if s.keyboard_enter_open("in-app-goto-input") {
+                                return;
+                            }
+                            s.submit_in_app_goto();
+                        })
                         .on_input_key(|s: &mut State, key: &rune::KeyEvent, tx: &mut rune::Tx| {
                             // A single-line field has no use for Down; the remote needs it to
                             // reach the Go button.

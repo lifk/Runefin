@@ -124,6 +124,7 @@ impl State {
     /// Posters for the page's rows. Offline this asks for nothing: the rows stay readable and
     /// an item with no art still plays.
     pub(super) fn request_download_images(&mut self) {
+        self.current_images.clear();
         if self.image_cache.is_none() {
             return;
         }
@@ -132,16 +133,11 @@ impl State {
         };
         let mut requests = Vec::new();
         for entry in &self.downloads.entries {
-            let Some((id, tag)) = crate::home::poster(&entry.item) else {
+            let Some((id, tag, kind)) = crate::home::poster_source(&entry.item) else {
                 continue;
             };
-            if let Some(request) = self.image_request(
-                &client,
-                id,
-                tag,
-                jellyfin_api::ImageKind::Primary,
-                self.image_width(120),
-            ) {
+            if let Some(request) = self.image_request(&client, id, tag, kind, self.image_width(120))
+            {
                 requests.push((request.0, request.1, None, crate::net::ImagePriority::High));
             }
         }

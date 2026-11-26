@@ -316,11 +316,11 @@ fn thumb(s: &State, entry: &Entry, t: &tok::Theme) -> El {
                 .font(rune::TextStyle::new(18.0, 650.0))
                 .color(t.text_secondary),
         );
-    if let Some((id, tag)) = crate::home::poster(&entry.item) {
+    if let Some((id, tag, kind)) = crate::home::poster_source(&entry.item) {
         let key = crate::image::key(
             &s.config.server_url,
             id,
-            jellyfin_api::ImageKind::Primary.as_str(),
+            kind.as_str(),
             Some(tag),
             s.image_width(120),
         );

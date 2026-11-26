@@ -382,7 +382,12 @@ pub(super) fn playlist_create_modal(s: &State, item: &Item, t: &tok::Theme) -> E
         .single_line()
         .w_full()
         .on_edit(|s: &mut State| &mut s.playlist_new_name)
-        .on_submit(|s: &mut State, _tx| s.create_playlist_with_detail())
+        .on_submit(|s: &mut State, _tx| {
+            if s.keyboard_enter_open("playlist-name-input") {
+                return;
+            }
+            s.create_playlist_with_detail();
+        })
         .on_input_key(|s: &mut State, key: &rune::KeyEvent, tx: &mut rune::Tx| {
             // The field owns the arrow keys; Down is how a remote reaches Create.
             if s.big_screen && key.key == rune::Key::Down {

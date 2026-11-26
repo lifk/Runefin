@@ -36,8 +36,10 @@ const HOME_BACKDROP_WIDTH: u32 = 1280;
 const IMAGE_CACHE_LIMIT: usize = 256;
 /// A decoded image cache in bytes, not handles: one 6400×3600 trickplay sprite is ~88 MB
 /// before mips, while a poster is a few hundred kilobytes. The count cap alone cannot bound
-/// the former. The mip chain is approximated at a third on top of the base pixels.
-const IMAGE_CACHE_BYTES: usize = 256 * 1024 * 1024;
+/// the former. The mip chain is approximated at a third on top of the base pixels. A 4K Home
+/// has 60-150 images; at the capped 720 px poster (~3.9 MB decoded) 768 MB holds the whole
+/// screen, where the old 256 MB held only 28 of the old 1080 px poster (~8.9 MB).
+const IMAGE_CACHE_BYTES: usize = 768 * 1024 * 1024;
 
 fn decoded_image_bytes(image: &Image) -> usize {
     image.size().map_or(0, |[width, height]| {
@@ -2238,7 +2240,10 @@ impl State {
                     (Err(_), _) => {
                         self.requested_images.remove(&key);
                     }
-                    _ => {}
+                    (Ok(_), None) => {
+                        // The cache is not ready yet; let a later pass fetch it again.
+                        self.requested_images.remove(&key);
+                    }
                 }
             }
             Msg::Download { id, event } => self.apply_download(id, event),
@@ -2438,6 +2443,19 @@ impl State {
 
     /// Open a library from the sidebar. The first page starts immediately; the viewport returns
     /// to the position it had the last time this library was open.
+    /// The libraries the sidebar shows and the D-pad can reach. Music, photo, book and
+    /// audiobook libraries have no browse surface in this client, and a Playlists view is
+    /// virtual: opening it as a library asks for its items and gets a 404. The app's own
+    /// playlist list below the libraries opens each real playlist by id.
+    pub fn sidebar_libraries(&self) -> impl Iterator<Item = &jellyfin_api::LibraryView> {
+        self.home_data.libraries.iter().filter(|library| {
+            !matches!(
+                library.collection_type.as_deref(),
+                Some("music" | "photos" | "books" | "audiobooks" | "playlists")
+            )
+        })
+    }
+
     pub fn open_library(&mut self, id: String, name: String, collection_type: Option<String>) {
         self.capture_library_scroll();
         self.stop_theme_media();
@@ -3274,33 +3292,32 @@ impl State {
         self.current_images.remove(key);
     }
 
-    /// Evict around the current screen until both the handle cap and the byte budget hold.
-    /// Pending images have no size yet; the frame that wakes after their decode trims again.
+    /// Evict offscreen art until both the handle cap and the byte budget hold. Images the
+    /// current screen draws are pinned: if the pins alone exceed the budget we stay over it
+    /// rather than wipe the visible cards into letter placeholders. Pending images have no
+    /// size yet; the frame that wakes after their decode trims again.
     fn trim_image_cache(&mut self) {
         if self.images.is_empty() {
             return;
         }
         let mut total: usize = self.images.values().map(decoded_image_bytes).sum();
-        let mut scanned = 0usize;
-        while self.images.len() > IMAGE_CACHE_LIMIT || total > IMAGE_CACHE_BYTES {
-            let Some(old) = self.image_order.pop_front() else {
+        let order: Vec<String> = self.image_order.iter().cloned().collect();
+        for old in order {
+            if self.images.len() <= IMAGE_CACHE_LIMIT && total <= IMAGE_CACHE_BYTES {
                 break;
-            };
-            if self.current_images.contains(&old) && scanned < self.image_order.len() {
-                self.image_order.push_back(old);
-                scanned += 1;
+            }
+            if self.current_images.contains(&old) {
                 continue;
             }
-            scanned = 0;
             if let Some(image) = self.images.remove(&old) {
                 total = total.saturating_sub(decoded_image_bytes(&image));
                 // A later visible-row pass may ask for it again.
                 self.requested_images.remove(&old);
-                self.current_images.remove(&old);
                 self.placeholders.remove(&old);
                 self.image_fades.remove(&old);
             }
         }
+        self.image_order.retain(|key| self.images.contains_key(key));
     }
 
     /// Fetch the manifest once, then one tile at a time. Returns true when the drawn frame
@@ -4230,11 +4247,11 @@ impl State {
 
     /// The 16:9 still used by an episode row.
     pub fn episode_image_key(&self, item: &Item) -> Option<String> {
-        let tag = item.image_tag(ImageKind::Primary)?;
+        let (id, tag, kind) = crate::home::own_image_source(item)?;
         Some(crate::image::key(
             &self.config.server_url,
-            &item.id,
-            "Primary",
+            id,
+            kind.as_str(),
             Some(tag),
             self.image_width(320),
         ))
@@ -4269,11 +4286,11 @@ impl State {
 
     /// The cache key for an item's poster, as the view looks it up.
     pub fn image_key(&self, item: &Item) -> Option<String> {
-        let (id, tag) = crate::home::poster(item)?;
+        let (id, tag, kind) = crate::home::poster_source(item)?;
         Some(crate::image::key(
             &self.config.server_url,
             id,
-            "Primary",
+            kind.as_str(),
             Some(tag),
             self.image_width(POSTER_WIDTH),
         ))
