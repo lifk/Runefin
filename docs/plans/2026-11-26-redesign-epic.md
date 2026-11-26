@@ -198,6 +198,11 @@ budgets, snapshot refresh, `scripts/check.sh`, `--all` snapshots reviewed.
 - **Keep the 720 design height**; 4K is a 3× scale, not a separate layout.
 - **No Rune fork work in this epic** unless a phase is blocked; the research lists the gaps
   (image filters, text shadow, conic gradients, scroll-linked motion).
+- **A 16:9 fallback is cropped, not final.** An item with no Primary now uses its Thumb or
+  Backdrop, but a 2:3 card crops a 16:9 still and cuts the artwork's own title (28 Days Later
+  is the live example). Phase 4/5 should draw the fallback fit over a blurred copy of itself,
+  or use the backdrop hero on Detail, instead of a hard 2:3 crop. The letter is gone; the crop
+  is the remaining polish.
 
 ## 9. Risks
 
