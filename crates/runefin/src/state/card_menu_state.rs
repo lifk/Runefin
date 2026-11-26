@@ -297,11 +297,11 @@ impl State {
     /// The Undo button on a toast. The server is told the opposite change in the background; the
     /// in-memory rails are restored first so the screen feels immediate.
     pub fn undo_toast(&mut self) {
-        let Some(undo) = self.toast_undo.take() else {
+        let Some(undo) = self.toast.undo.take() else {
             return;
         };
-        self.toast = None;
-        self.toast_until = None;
+        *self.toast.message = None;
+        *self.toast.until = None;
         match undo {
             crate::state::UndoAction::Favorite { item_id, value } => {
                 if let Some(client) = self.client() {

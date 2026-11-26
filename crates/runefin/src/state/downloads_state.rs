@@ -5,7 +5,7 @@
 //! the writes that must happen (the manifest, the rename that finishes a file) run on a worker
 //! so the UI thread never waits for a disk.
 
-use rune::Latest;
+use rune::{Latest, Tracked};
 
 use crate::downloads::{self, Entry, State as EntryState};
 use crate::net::DownloadEvent;
@@ -19,12 +19,12 @@ pub struct DownloadsState {
     pub root: String,
     pub budget_gb: f64,
     /// Why the root is unusable, if it is.
-    pub error: Option<String>,
-    pub entries: Vec<Entry>,
+    pub error: Tracked<Option<String>>,
+    pub entries: Tracked<Vec<Entry>>,
     /// Free space on the root's volume, asked for when the page opens.
-    pub free: Option<u64>,
+    pub free: Tracked<Option<u64>>,
     /// A sentence about the last failure, shown at the top of the page or as a toast.
-    pub notice: Option<String>,
+    pub notice: Tracked<Option<String>>,
     /// The manifest has been read once. A fixture that brings its own entries sets this, so
     /// `setup` does not replace them with the (empty) manifest of a fresh install.
     pub booted: bool,
@@ -49,8 +49,8 @@ impl State {
         match downloads::Store::open(root) {
             Ok((store, entries)) => {
                 self.downloads.store = Some(store);
-                self.downloads.entries = entries;
-                self.downloads.error = None;
+                *self.downloads.entries = entries;
+                *self.downloads.error = None;
                 let queued: Vec<String> = self
                     .downloads
                     .entries
@@ -62,7 +62,7 @@ impl State {
                     self.start_download(&id);
                 }
             }
-            Err(message) => self.downloads.error = Some(message),
+            Err(message) => *self.downloads.error = Some(message),
         }
     }
 
@@ -86,8 +86,8 @@ impl State {
         match result {
             Ok((store, entries)) => {
                 self.downloads.store = Some(store);
-                self.downloads.entries = entries;
-                self.downloads.error = None;
+                *self.downloads.entries = entries;
+                *self.downloads.error = None;
                 self.show_toast(format!("Downloads now live in {}.", self.downloads.root));
                 self.refresh_download_free();
                 let queued: Vec<String> = self
@@ -101,7 +101,7 @@ impl State {
                     self.start_download(&id);
                 }
             }
-            Err(message) => self.downloads.error = Some(message),
+            Err(message) => *self.downloads.error = Some(message),
         }
     }
 
@@ -116,7 +116,7 @@ impl State {
     pub fn open_downloads(&mut self) {
         self.stop_theme_media();
         self.route = crate::state::Route::Downloads;
-        self.downloads.notice = None;
+        *self.downloads.notice = None;
         self.refresh_download_free();
         self.request_download_images();
     }
@@ -203,8 +203,9 @@ impl State {
             self.show_toast(
                 self.downloads
                     .error
-                    .clone()
-                    .unwrap_or_else(|| "Downloads are unavailable.".into()),
+                    .as_deref()
+                    .unwrap_or("Downloads are unavailable.")
+                    .to_string(),
             );
             return;
         }
@@ -372,7 +373,7 @@ impl State {
             entry.state = EntryState::Failed;
             entry.error = Some(message.to_string());
         }
-        self.downloads.notice = Some(message.to_string());
+        *self.downloads.notice = Some(message.to_string());
         self.save_downloads();
     }
 
@@ -496,7 +497,7 @@ impl State {
 
     pub(crate) fn apply_download_saved(&mut self, result: Result<(), String>) {
         if let Err(message) = result {
-            self.downloads.notice = Some(format!("Could not save the download list: {message}"));
+            *self.downloads.notice = Some(format!("Could not save the download list: {message}"));
         }
     }
 }

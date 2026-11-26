@@ -67,7 +67,7 @@ fn downloads_content(s: &State, t: &tok::Theme) -> El {
         .pb(if s.in_app_minimized { 124.0 } else { 28.0 })
         .gap(10.0);
 
-    if let Some(error) = &s.downloads.error {
+    if let Some(error) = s.downloads.error.as_ref() {
         let message = format!(
             "Downloads are unavailable: {error}. Pick another folder in Settings, or free some space."
         );

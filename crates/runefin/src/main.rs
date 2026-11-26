@@ -1434,7 +1434,7 @@ fn main() {
             }),
             ("downloads", |s| {
                 demo::signed_in(s);
-                s.downloads.entries = demo::downloads();
+                *s.downloads.entries = demo::downloads();
                 s.downloads.booted = true;
                 s.downloads.root = crate::downloads::default_root().display().to_string();
                 s.open_downloads();
@@ -2687,7 +2687,7 @@ mod tests {
         let mut state = home_state();
         state.downloads.store = Some(store);
         state.downloads.booted = true;
-        state.downloads.entries = entries;
+        *state.downloads.entries = entries;
         state.downloads.root = root.display().to_string();
         (state, root)
     }
@@ -2746,7 +2746,7 @@ mod tests {
         };
         let mut state = home_state();
         state.downloads.booted = true;
-        state.downloads.entries = demo::downloads();
+        *state.downloads.entries = demo::downloads();
         state.downloads.root = "/tmp/runefin/downloads".into();
         state.route = Route::Downloads;
         let done = state.downloads.entries[1].item.id.clone();
@@ -2929,10 +2929,11 @@ mod tests {
         assert!(
             state
                 .toast
+                .message
                 .as_deref()
                 .is_some_and(|toast| toast.contains("budget")),
             "the page says why: {:?}",
-            state.toast
+            state.toast.message
         );
         let _ = std::fs::remove_dir_all(root);
     }
@@ -3071,7 +3072,7 @@ mod tests {
                 .as_ref()
                 .is_some_and(|user| user.is_favorite)
         );
-        assert!(state.toast_undo.is_some());
+        assert!(state.toast.undo.is_some());
         state.undo_toast();
         assert!(
             !state.home_data.resume[0]
@@ -3132,7 +3133,7 @@ mod tests {
                 .iter()
                 .any(|item| item.id == "quiet-floor-s2e4")
         );
-        assert!(state.toast_undo.is_some());
+        assert!(state.toast.undo.is_some());
         let mut rt = Runtime::new(state, view, (1280.0, 800.0), env);
         rt.frame(0.0);
         assert!(rt.find("toast-undo").is_some(), "the toast offers Undo");
@@ -3148,7 +3149,7 @@ mod tests {
                 .any(|item| item.id == "quiet-floor-s2e4"),
             "the card is back after Undo"
         );
-        assert!(rt.state.toast.is_none());
+        assert!(rt.state.toast.message.is_none());
     }
 
     #[test]
@@ -4470,7 +4471,7 @@ mod tests {
                 .all(|item| item.id != resume.id),
             "the card leaves the rail"
         );
-        assert!(rt.state.toast.is_some(), "the removal is confirmed");
+        assert!(rt.state.toast.message.is_some(), "the removal is confirmed");
     }
 
     #[test]
@@ -7385,7 +7386,7 @@ mod tests {
                 .iter()
                 .any(|item| item.id == first.id)
         );
-        assert!(state.toast_undo.is_some());
+        assert!(state.toast.undo.is_some());
         state.undo_toast();
         assert!(
             state
@@ -7556,15 +7557,16 @@ mod tests {
             "Silent Horror Night".into(),
         ));
         state.apply_playlist_add(Ok(()));
-        assert!(state.toast_undo.is_some());
+        assert!(state.toast.undo.is_some());
         assert!(
             state
                 .toast
+                .message
                 .as_deref()
                 .is_some_and(|text| text.contains("Silent Horror Night"))
         );
         state.undo_toast();
-        assert!(state.toast.is_some());
+        assert!(state.toast.message.is_some());
     }
 
     #[test]
@@ -7603,7 +7605,7 @@ mod tests {
         state.detail_theme_videos = demo::extras();
         state.toggle_theme_video();
         assert!(!state.theme_video_on);
-        assert!(state.toast.is_some());
+        assert!(state.toast.message.is_some());
     }
 
     #[test]
@@ -8003,7 +8005,7 @@ mod tests {
                 .iter()
                 .any(|item| item.id == member)
         );
-        assert!(state.toast.is_some());
+        assert!(state.toast.message.is_some());
     }
 
     #[test]
@@ -8114,7 +8116,7 @@ mod tests {
         let mut state = home_state();
         state.hide_from_home("quiet-floor-s2e4".into());
         assert!(state.is_home_hidden("quiet-floor-s2e4"));
-        assert!(state.toast_undo.is_some());
+        assert!(state.toast.undo.is_some());
         let mut rt = Runtime::new(state, view, (1280.0, 800.0), env);
         rt.frame(0.0);
         assert!(rt.find("rail-continue-watching-quiet-floor").is_none());
@@ -8380,7 +8382,7 @@ mod tests {
         assert!(state.poll());
         let session = state.in_app.as_ref().expect("playing");
         assert_eq!(session.position_ms, 42 * 60_000 + 10_000);
-        assert!(state.toast_undo.is_some(), "the skip offers Undo");
+        assert!(state.toast.undo.is_some(), "the skip offers Undo");
         // A second poll at the end of the segment does not skip again.
         state.poll();
         assert_eq!(
@@ -9344,7 +9346,7 @@ mod tv_reach_tests {
     fn every_downloads_control_is_reachable() {
         let mut state = base();
         state.downloads.booted = true;
-        state.downloads.entries = demo::downloads();
+        *state.downloads.entries = demo::downloads();
         state.downloads.root = "/tmp/runefin/downloads".into();
         state.open_downloads();
         check("downloads", state);

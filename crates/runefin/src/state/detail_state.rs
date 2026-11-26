@@ -972,6 +972,7 @@ mod live_tests {
         while Instant::now() < deadline
             && state
                 .toast
+                .message
                 .as_deref()
                 .is_none_or(|toast| !toast.contains("Added"))
         {
@@ -990,6 +991,7 @@ mod live_tests {
         assert!(
             state
                 .toast
+                .message
                 .as_deref()
                 .is_some_and(|toast| toast.contains("Added")),
             "the toast confirms it"

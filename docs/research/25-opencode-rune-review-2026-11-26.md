@@ -335,7 +335,16 @@ The first pass took the cheap, behaviour-preserving items:
 - **Dialog width tokens.** `theme::dialog` names the widths the menus, pickers and sheets use, so
   the next dialog starts from a token instead of a bare number.
 
-Still deferred, in the review's order: the four-phase `poll` split, `State` clusters and
-`Tracked` cells, the toast stack, the write-behind storage journal, the server-health machine,
-the narrow-layout machine, paced tips, and screen host traits. They are larger changes and
-should land one at a time with their own snapshots and tests.
+Second slice, same day:
+
+- **Four-phase `poll`.** The tick now lives in `crates/runefin/src/state/poll.rs` as Ingest,
+  Derive, React and Persist, in the exact order the old single function ran. `state.rs` dropped
+  from 5,891 to 5,282 lines and its ratchet ceiling came down with it.
+- **First `Tracked` clusters.** `Toast` (`message`, `undo`, `until`) replaces three loose fields,
+  and `DownloadsState` wraps `entries`, `free`, `notice` and `error` in `rune::Tracked`. Reads
+  still look like the value; writes go through the cell. Regions come next, once every read in a
+  screen is tracked or an explicit `region_with` input.
+
+Still deferred, in the review's order: the toast stack, the write-behind storage journal, the
+server-health machine, the narrow-layout machine, paced tips, and screen host traits. They are
+larger changes and should land one at a time with their own snapshots and tests.

@@ -43,6 +43,18 @@ exist because Rune's author enforces the same ones upstream.
   `state/overlay_state.rs`, and a case in `tv_reach_tests` when it takes focus. Do not add another
   `if s.something_open && key.key == Key::Escape` to `on_key`.
 
+## State and the frame
+
+- **`State::poll` is four phases** in `crates/runefin/src/state/poll.rs`: Ingest (inputs and
+  answers), Derive (state and timers), React (follow-ups and machines) and Persist (external
+  observers). Add a per-frame block to the phase whose inputs it needs; keep the phases
+  contiguous so the order the app has always run stays visible.
+- **A new state cluster is a struct on `State`.** Group fields that change together
+  (`Toast`, `DownloadsState`, ...) and wrap the hot ones in `rune::Tracked`. Read them like the
+  value (`self.toast.message.as_ref()`); write through the cell (`*self.toast.message = ...`).
+  A `rune::region` around a screen can then subscribe to exactly the fields it read, but only
+  add the region once every read inside it is `Tracked` or an explicit `region_with` input.
+
 ## Releases
 
 - **A push to `main` that bumps the version publishes.** The `release` job in CI runs after the

@@ -140,7 +140,7 @@ pub fn view(s: &State, _cx: &mut Cx<State>) -> El {
     } else {
         base
     };
-    let base = match &s.toast {
+    let base = match s.toast.message.as_ref() {
         Some(message) => base.child(
             el().key("toast")
                 .absolute(0.0, 0.0)
@@ -169,7 +169,7 @@ pub fn view(s: &State, _cx: &mut Cx<State>) -> El {
                                 .font(type_::label())
                                 .color(theme::colors().text),
                         )
-                        .children(s.toast_undo.as_ref().map(|_| {
+                        .children(s.toast.undo.as_ref().map(|_| {
                             el().key("toast-undo")
                                 .role("button")
                                 .h(28.0)
