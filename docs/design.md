@@ -490,7 +490,10 @@ mode marker. Desktop stays stock Plasma and Gaming stays stock Steam; only Media
 Plasma. The host side is `packaging/modes`: one user-owned dispatcher, one supervisor and one
 additive SDDM drop-in installed by `scripts/steam-install.py --three-modes`. The app writes a
 first-frame ready marker in its Flatpak cache; the supervisor restarts a crash and falls back to
-Desktop after three failures. No root process runs after install.
+Desktop after three failures. No root process runs after install. On SteamOS 3.9 the drop-in is
+written into the active slot's `/var` overlay upper because the rootfs `/etc` is read-only; after
+an OS update or an A/B switch run `runefin-mode repair`. From a TTY the console is on **F4–F6**
+(`fbcon=vc:4-6`), not F2.
 
 **Text entry.** A focused text field opens the in-app keyboard on a big screen: a bottom sheet with
 QWERTY, shift, digits/symbols, space, backspace, Enter, Next and Hide, plus a masked Show toggle for

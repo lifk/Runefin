@@ -45,11 +45,14 @@ Media → SteamOS modes → Desktop.
 
 Media has a first-frame marker in the Flatpak cache. The supervisor restarts a crash, and after
 three failures in the window writes `desktop` and exits, so the machine lands in Plasma rather
-than a black screen. A KWin failure is caught by the next session start. From a TTY:
+than a black screen. A KWin failure is caught by the next session start. From a TTY — on
+SteamOS 3.9 the console is on **F4–F6** (`fbcon=vc:4-6`), not F2:
 
 ```sh
 runefin-mode desktop
 ```
 
 The SDDM drop-in is additive and sorts last; `runefin-mode restore` removes it and SteamOS's own
-autologin applies. There is no per-boot rewrite and no root process at runtime.
+autologin applies. It lives in the active slot's `/var` overlay upper (`/etc` is an overlay on
+SteamOS 3.9), so after an OS update or an A/B switch run `runefin-mode repair` before switching
+to Media. There is no per-boot rewrite and no root process at runtime.
