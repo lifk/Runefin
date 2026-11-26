@@ -2,6 +2,7 @@
 # The one SDDM session body: Desktop, Gaming or Media, chosen by the mode marker.
 # It is installed under ~/.local/share/runefin/modes and runs as the login user.
 set -u
+export XDG_SESSION_TYPE=wayland
 
 state="${XDG_STATE_HOME:-$HOME/.local/state}/runefin"
 mode_file="$state/mode"
@@ -38,19 +39,31 @@ fi
 
 case "$mode" in
     desktop)
-        export XDG_SESSION_DESKTOP=plasma XDG_CURRENT_DESKTOP=KDE
+        export XDG_SESSION_DESKTOP=plasma XDG_CURRENT_DESKTOP=KDE DESKTOP_SESSION=plasma
+        if [ -x /usr/lib/plasma-dbus-run-session-if-needed ]; then
+            exec /usr/lib/plasma-dbus-run-session-if-needed /usr/bin/startplasma-wayland
+        fi
         exec startplasma-wayland
         ;;
     game)
-        export XDG_SESSION_DESKTOP=gamescope XDG_CURRENT_DESKTOP=gamescope
-        if command -v gamescope-session >/dev/null 2>&1; then
+        export XDG_SESSION_DESKTOP=gamescope XDG_CURRENT_DESKTOP=gamescope DESKTOP_SESSION=gamescope
+        # SteamOS 3.9 runs its session through start-gamescope-session: it sets
+        # XDG_SESSION_TYPE=x11, updates the systemd environment, sets the gamescope
+        # portal and starts the user target. Running gamescope-session directly skips
+        # all of that and hangs at the splash.
+        if command -v start-gamescope-session >/dev/null 2>&1; then
+            exec start-gamescope-session
+        elif command -v gamescope-session >/dev/null 2>&1; then
             exec gamescope-session
         elif [ -x /usr/lib/steamos/gamescope-session ]; then
             exec /usr/lib/steamos/gamescope-session
         else
             log_line "gamescope-session missing; falling back to desktop"
             printf 'desktop\n' >"$mode_file" 2>/dev/null || true
-            export XDG_SESSION_DESKTOP=plasma XDG_CURRENT_DESKTOP=KDE
+            export XDG_SESSION_DESKTOP=plasma XDG_CURRENT_DESKTOP=KDE DESKTOP_SESSION=plasma
+            if [ -x /usr/lib/plasma-dbus-run-session-if-needed ]; then
+                exec /usr/lib/plasma-dbus-run-session-if-needed /usr/bin/startplasma-wayland
+            fi
             exec startplasma-wayland
         fi
         ;;
