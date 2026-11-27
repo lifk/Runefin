@@ -93,3 +93,17 @@ Mockup: `/tmp/opencode/raw2-a.png` (the chosen Nocturne direction) and the scree
 
 The final images are the live server at 1280×720 big-screen; the focus pair is
 `focus-card-big.png` and `rail-focus-big.png`.
+
+## Third pass — 0.4.3
+
+- **Home billboard:** the old config saved `home_hero = false` (the old compact default), so the
+  Nocturne Home opened without its billboard. A one-time layout migration turns it on and stores
+  `layout_rev = 1`; an Off chosen after that is kept.
+- **Home backdrop:** the billboard is the first non-hidden Continue Watching item; if there is no
+  resume, the first item of the newest rail. It is deterministic, not random.
+- **Library background:** the page had no backdrop of its own, so the grid sat on flat black. It
+  now has the same top band as Home across the full height, plus a cool radial wash in the upper
+  right; the card art remains the subject.
+- **Library top row:** the 1.05 focus scale and its outer ring had no room at the scroll viewport
+  top. The grid and list now start 10 pt inside the viewport, so the first row's card and ring
+  are complete; the ring remains the screen-level overlay.

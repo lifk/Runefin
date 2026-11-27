@@ -153,6 +153,11 @@ pub struct Config {
     pub shortcuts: Option<KeyBindings>,
     #[serde(default)]
     pub home_hero: Option<bool>,
+    /// The Home layout revision. Absent means a config from before Nocturne; load turns the
+    /// billboard on once, so the old compact default does not hide the new Home. A later
+    /// explicit Off is kept.
+    #[serde(default)]
+    pub layout_rev: Option<u8>,
     /// Opt-in trickplay previews on a poster hover. Off by default; always silent.
     #[serde(default)]
     pub hover_preview: Option<bool>,
@@ -720,15 +725,33 @@ impl Config {
                 if config.device_id.is_empty() {
                     config.device_id = new_device_id();
                 }
+                if config.migrate_layout() {
+                    let _ = config.save();
+                }
                 config
             }
             Err(_) => Config::fresh(),
         }
     }
 
+    /// One-time upgrade to the Nocturne Home: the old config saved the compact header as
+    /// `home_hero = false`. Turn the billboard on for one revision; later toggles are kept.
+    pub(crate) fn migrate_layout(&mut self) -> bool {
+        if self.layout_rev.unwrap_or(0) >= 1 {
+            return false;
+        }
+        self.layout_rev = Some(1);
+        // The old default false is indistinguishable from a deliberate one; the redesign asks
+        // for the billboard once. Turning it off in Settings after this is kept because the
+        // revision is stored.
+        self.home_hero = Some(true);
+        true
+    }
+
     pub fn fresh() -> Config {
         Config {
             device_id: new_device_id(),
+            layout_rev: Some(1),
             ..Config::default()
         }
     }
@@ -801,6 +824,20 @@ fn new_device_id() -> String {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn the_nocturne_migration_turns_the_billboard_on_once() {
+        let mut old: super::Config = toml::from_str("home_hero = false").expect("old config");
+        assert!(old.migrate_layout());
+        assert_eq!(old.home_hero, Some(true));
+        assert!(
+            !old.migrate_layout(),
+            "a second load does not override a later Off"
+        );
+        old.home_hero = Some(false);
+        assert!(!old.migrate_layout());
+        assert_eq!(old.home_hero, Some(false));
+    }
+
     use super::*;
 
     #[test]

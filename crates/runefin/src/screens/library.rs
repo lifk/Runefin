@@ -23,9 +23,37 @@ pub(super) fn library_screen(s: &State, library: &LibraryState) -> El {
         .w_full()
         .h_full()
         .fill(t.bg)
+        .child(library_ambient(&t))
         .child(sidebar(s, &t))
         .child(el().w(1.0).h_full().fill(t.separator))
         .child(library_content(s, library, &t))
+}
+
+/// A quiet texture behind a dense grid: the top band Home uses, plus one cool radial wash in
+/// the upper right. The library page has no backdrop of its own, so flat black was its whole
+/// background.
+fn library_ambient(t: &tok::Theme) -> El {
+    el().key("library-ambient")
+        .absolute(0.0, 0.0)
+        .w_full()
+        .h_full()
+        .no_focus_ring()
+        .child(el().absolute(0.0, 0.0).w_full().h(420.0).linear_gradient(
+            std::f32::consts::PI,
+            [
+                (0.0, t.card.alpha(0.55)),
+                (0.55, t.card.alpha(0.18)),
+                (1.0, Color::TRANSPARENT),
+            ],
+        ))
+        .child(el().absolute(0.0, 0.0).w_full().h_full().radial_gradient(
+            [0.80, 0.0],
+            900.0,
+            [
+                (0.0, crate::theme::accent().alpha(0.055)),
+                (1.0, Color::TRANSPARENT),
+            ],
+        ))
 }
 
 fn library_content(s: &State, library: &LibraryState, t: &tok::Theme) -> El {
@@ -88,7 +116,6 @@ fn library_content(s: &State, library: &LibraryState, t: &tok::Theme) -> El {
         .min_w(0.0)
         .min_h(0.0)
         .h_full()
-        .fill(t.bg)
         .child(header)
         .child(library_toolbar(s, library, t))
         .children(active_filter_chips(library, t))
@@ -1178,6 +1205,9 @@ fn library_grid(s: &State, t: &tok::Theme) -> El {
     col()
         .key("library-grid")
         .w_full()
+        // Room inside the scroll viewport for the 1.05 focus scale and its outer ring; the
+        // first row's card was clipped by the viewport top.
+        .pt(10.0)
         .growth(GrowthSpec::default())
         .virtual_rows_version(library.version())
         // One row of overscan: at the bottom of the window the next row is already mounted,
@@ -1222,6 +1252,7 @@ fn library_list(s: &State, t: &tok::Theme) -> El {
     col()
         .key("library-list")
         .w_full()
+        .pt(10.0)
         .growth(GrowthSpec::default())
         .virtual_rows_version(library.version())
         .virtual_overscan(3.0, 1.5)
