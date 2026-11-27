@@ -623,6 +623,7 @@ pub(super) fn discover_card(item: &seerr_api::DiscoverItem, s: &State, t: &tok::
         .map(|info| info.media_status())
         .unwrap_or(seerr_api::MediaStatus::Unknown);
     let card_key = format!("seerr-card-{}-{}", item.media_type, item.id);
+    let focused = s.focused_key.as_deref() == Some(card_key.as_str());
     col()
         .key(card_key.clone())
         .role("button")
@@ -632,7 +633,7 @@ pub(super) fn discover_card(item: &seerr_api::DiscoverItem, s: &State, t: &tok::
         .hover_group_focus()
         .hover_motion(crate::theme::motion::HOVER, crate::theme::motion::HOVER)
         .focusable(true)
-        .focus_lift_only(4.0)
+        .no_focus_ring()
         .press_scale(0.985)
         .motion(crate::theme::motion::CONTROL)
         .label(item.title().to_string())
@@ -655,7 +656,8 @@ pub(super) fn discover_card(item: &seerr_api::DiscoverItem, s: &State, t: &tok::
             .children(
                 (state != seerr_api::MediaStatus::Unknown)
                     .then(|| el().absolute(8.0, 8.0).child(status_chip(state, t))),
-            ),
+            )
+            .children(focused.then(|| crate::theme::focus_edge(10.0))),
         )
         .child(
             text(item.title().to_string())

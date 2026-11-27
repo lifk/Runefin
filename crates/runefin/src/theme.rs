@@ -220,8 +220,6 @@ pub fn on_accent() -> Color {
 /// distance without turning into a selection box.
 pub trait FocusVisual {
     fn focus_visual(self, radius: f32) -> El;
-    /// A lifted card shows focus by its scale and a light inner edge; desktop keeps its ring.
-    fn focus_lift_only(self, radius: f32) -> El;
     /// A control whose fill is already near-white: an inner dark edge instead of a white one.
     fn focus_on_light(self) -> El;
 }
@@ -231,14 +229,6 @@ impl FocusVisual for El {
         if is_big_screen() {
             // Inside the border box: a full-bleed poster or a rail card is clipped by its
             // scroll viewport, and a ring drawn outside was cut in half by the neighbour.
-            self.focus_ring(focus_width(), -focus_width(), ring())
-        } else {
-            self.focus_ring(focus_width(), radius, ring())
-        }
-    }
-
-    fn focus_lift_only(self, radius: f32) -> El {
-        if is_big_screen() {
             self.focus_ring(focus_width(), -focus_width(), ring())
         } else {
             self.focus_ring(focus_width(), radius, ring())

@@ -1951,7 +1951,8 @@ fn wide_card(item: &Item, rail: &str, s: &State, t: &tok::Theme, show_progress: 
         .hover(t.hover)
         .motion(theme::motion::CONTROL)
         .focusable(true)
-        .focus_visual(2.0)
+        // One edge, drawn over the art (see `focus_edge`), instead of a ring on the card box.
+        .no_focus_ring()
         .press_scale(0.98)
         .cursor(rune::Cursor::Pointer)
         .on_press(move |s: &mut State| s.open_detail(detail_id.clone()))
@@ -3036,7 +3037,9 @@ pub(super) fn card(item: &Item, rail: &str, s: &State, t: &tok::Theme) -> El {
         .hover_group_focus()
         .hover_motion(crate::theme::motion::HOVER, crate::theme::motion::HOVER)
         .focusable(true)
-        .focus_lift_only(4.0)
+        // The poster draws its own edge (`focus_edge`) inside the art: a ring on the whole
+        // cell also framed the title and, at 1.05 scale, no longer hugged the image.
+        .no_focus_ring()
         .press_scale(0.985)
         .motion(crate::theme::motion::CONTROL)
         .label(title.to_string())

@@ -6,8 +6,8 @@ crates/runefin/src/main.rs 9873
 crates/runefin/src/screens/detail.rs 2634
 crates/runefin/src/screens/in_app.rs 3457
 crates/runefin/src/screens/library.rs 1750
-crates/runefin/src/screens.rs 3276
-crates/runefin/src/screens/seerr.rs 1601
+crates/runefin/src/screens.rs 3279
+crates/runefin/src/screens/seerr.rs 1603
 crates/runefin/src/screens/settings.rs 1940
 crates/runefin/src/state/in_app_state.rs 4039
 crates/runefin/src/state.rs 5446
