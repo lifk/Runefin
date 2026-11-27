@@ -37,7 +37,7 @@ rune = { git = "https://github.com/lifk/rune", rev = "c2e2eb6c7b9d519d0a673eca35
 gilrs = "0.11.2"
 # A Steam "Exit game" (and Ctrl+C in a terminal) sends SIGTERM/SIGINT, which would bypass every
 # save and playback-stop path. signal-hook turns both into the app's own quit; see design.md §7.
-signal-hook = "0.3"
+signal-hook = "0.4"
 
 [lints]
 workspace = true
