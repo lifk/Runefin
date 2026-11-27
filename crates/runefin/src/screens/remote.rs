@@ -130,7 +130,7 @@ fn session_row(session: &SessionInfo, t: &tok::Theme) -> El {
         .as_ref()
         .map_or(0, |state| state.position_ticks + 300_000_000);
     let mut controls = row().gap(8.0).focus_group();
-    if session.play_state.is_some() {
+    if session.now_playing_item.is_some() {
         controls = controls
             .child(
                 el().key(format!("remote-pause-{}", session.id))
@@ -139,7 +139,7 @@ fn session_row(session: &SessionInfo, t: &tok::Theme) -> El {
                     .px(10.0)
                     .radius(7.0)
                     .center()
-                    .fill(if paused { tok::accent(0, true) } else { t.bg })
+                    .fill(if paused { crate::theme::accent() } else { t.bg })
                     .surface_sheen()
                     .shadow(1.0, 2.0, t.shadow)
                     .hover(t.hover)
@@ -178,6 +178,48 @@ fn session_row(session: &SessionInfo, t: &tok::Theme) -> El {
                     .child(text("+30s").font(type_::label()).color(t.text))
                     .cursor(rune::Cursor::Pointer)
                     .on_press(move |s: &mut State| s.remote_seek(seek_id.clone(), seek_ticks)),
+            )
+            .child(
+                el().key(format!("remote-stop-{}", session.id))
+                    .role("button")
+                    .h(30.0)
+                    .px(10.0)
+                    .radius(7.0)
+                    .center()
+                    .fill(t.bg)
+                    .surface_sheen()
+                    .shadow(1.0, 2.0, t.shadow)
+                    .hover(t.hover)
+                    .motion(crate::theme::motion::CONTROL)
+                    .focusable(true)
+                    .focus_visual(2.0)
+                    .press_scale(0.97)
+                    .child(text("Stop").font(type_::label()).color(t.text))
+                    .cursor(rune::Cursor::Pointer)
+                    .on_press(move |s: &mut State| s.remote_command(stop_id.clone(), "Stop")),
+            );
+    } else {
+        controls = controls
+            .child(
+                el().key(format!("remote-play-{}", session.id))
+                    .role("button")
+                    .h(30.0)
+                    .px(10.0)
+                    .radius(7.0)
+                    .center()
+                    .fill(t.bg)
+                    .surface_sheen()
+                    .shadow(1.0, 2.0, t.shadow)
+                    .hover(t.hover)
+                    .motion(crate::theme::motion::CONTROL)
+                    .focusable(true)
+                    .focus_visual(2.0)
+                    .press_scale(0.97)
+                    .child(text("Play").font(type_::label()).color(t.text))
+                    .cursor(rune::Cursor::Pointer)
+                    .on_press(move |s: &mut State| {
+                        s.remote_command(toggle_id.clone(), "PlayPause")
+                    }),
             )
             .child(
                 el().key(format!("remote-stop-{}", session.id))

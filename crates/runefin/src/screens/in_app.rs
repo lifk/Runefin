@@ -205,7 +205,7 @@ fn resume_conflict_card(s: &State) -> Option<El> {
                                     &t,
                                     |s| s.resume_from_local(),
                                 )
-                                .fill(tok::accent(0, true)),
+                                .fill(crate::theme::accent()),
                             )
                             .child(
                                 control(
@@ -273,7 +273,7 @@ fn still_watching_card(s: &State) -> Option<El> {
                                 control("Keep watching", "still-watching-continue", &t, |s| {
                                     s.still_watching_continue()
                                 })
-                                .fill(tok::accent(0, true)),
+                                .fill(crate::theme::accent()),
                             )
                             .child(
                                 control("Stop", "still-watching-stop", &t, |s| {
@@ -359,7 +359,7 @@ fn goto_panel(s: &State, t: &tok::Theme) -> El {
                                 .px(14.0)
                                 .radius(8.0)
                                 .center()
-                                .fill(tok::accent(0, true))
+                                .fill(crate::theme::accent())
                                 .hover(t.hover)
                                 .focusable(true)
                                 .focus_visual(2.0)
@@ -440,7 +440,7 @@ fn quality_panel(s: &State, session: &crate::state::InAppSession, t: &tok::Theme
                     text(format!("{method} · {}", s.playback_quality.label()))
                         .key("in-app-quality-method")
                         .font(type_::label())
-                        .color(tok::accent(0, true))
+                        .color(crate::theme::accent())
                         .padding(4.0),
                 )
                 .child(
@@ -479,7 +479,7 @@ fn sleep_panel(s: &State, t: &tok::Theme) -> El {
                 .radius(6.0)
                 .center_y()
                 .fill(if on {
-                    tok::accent(0, true).alpha(0.22)
+                    crate::theme::accent().alpha(0.22)
                 } else {
                     Color::TRANSPARENT
                 })
@@ -973,7 +973,7 @@ fn next_up_banner(s: &State, t: &tok::Theme) -> Option<El> {
                         .child(
                             text(label)
                                 .font(type_::caption())
-                                .color(tok::accent(0, true)),
+                                .color(crate::theme::accent()),
                         )
                         .child(el().grow(1.0))
                         .children((!runtime.is_empty()).then(|| {
@@ -1009,7 +1009,7 @@ fn next_up_banner(s: &State, t: &tok::Theme) -> Option<El> {
                                 .items_center()
                                 .gap(7.0)
                                 .fill(Color::WHITE.alpha(0.08))
-                                .child(el().w(6.0).h(6.0).radius(3.0).fill(tok::accent(0, true)))
+                                .child(el().w(6.0).h(6.0).radius(3.0).fill(crate::theme::accent()))
                                 .child(
                                     text(status.clone())
                                         .font(type_::label())
@@ -1050,7 +1050,7 @@ fn next_up_banner(s: &State, t: &tok::Theme) -> Option<El> {
                 .w(824.0 * (remaining as f32 / 30_000.0).clamp(0.0, 1.0))
                 .h(3.0)
                 .radius(1.5)
-                .fill(tok::accent(0, true)),
+                .fill(crate::theme::accent()),
         );
     Some(
         col()
@@ -1078,10 +1078,10 @@ fn accent_control(
         .px(14.0)
         .radius(9.0)
         .center()
-        .fill(tok::accent(0, true))
+        .fill(crate::theme::accent())
         .gradient(Color::WHITE.alpha(0.18), Color::TRANSPARENT)
         .shadow(1.0, 2.0, Color::BLACK.alpha(0.30))
-        .shadow(4.0, 12.0, tok::accent(0, true).alpha(0.35))
+        .shadow(4.0, 12.0, crate::theme::accent().alpha(0.35))
         .hover(Color::WHITE.alpha(0.18))
         .motion(crate::theme::motion::CONTROL)
         .focusable(true)
@@ -1230,9 +1230,19 @@ fn chapter_panel(s: &State, session: &crate::state::InAppSession, t: &tok::Theme
         .radius(14.0)
         .focus_group()
         .child(text("Chapters").font(type_::section()).color(t.text));
-    for (at, chapter) in chapters.iter().take(8).enumerate() {
+    let list_height = (chapters.len() as f32 * 44.0).min(360.0);
+    let mut list = col()
+        .key("in-app-chapter-list")
+        .w_full()
+        .gap(4.0)
+        .h(list_height)
+        .scroll(rune::ScrollSpec {
+            stick_bottom: false,
+        })
+        .scroll_edge_fade(16.0);
+    for (at, chapter) in chapters.iter().enumerate() {
         let selected = at == current;
-        panel = panel.child(
+        list = list.child(
             row()
                 .key(format!("in-app-chapter-{at}"))
                 .role("button")
@@ -1258,7 +1268,7 @@ fn chapter_panel(s: &State, session: &crate::state::InAppSession, t: &tok::Theme
                     text(if selected { "▶" } else { "" })
                         .w(12.0)
                         .font(type_::caption())
-                        .color(tok::accent(0, true)),
+                        .color(crate::theme::accent()),
                 )
                 .children(s.chapter_image_key(&session.item, at).map(|key| {
                     let thumb = s.images.get(&key);
@@ -1288,13 +1298,7 @@ fn chapter_panel(s: &State, session: &crate::state::InAppSession, t: &tok::Theme
                 ),
         );
     }
-    if chapters.len() > 8 {
-        panel = panel.child(
-            text(format!("and {} more", chapters.len() - 8))
-                .font(type_::caption())
-                .color(t.text_secondary),
-        );
-    }
+    panel = panel.child(list);
     el().key("in-app-chapter-layer")
         .absolute(0.0, 0.0)
         .w_full()
@@ -1393,7 +1397,7 @@ fn queue_panel(s: &State, t: &tok::Theme) -> El {
                     text(if selected { "▶" } else { "" })
                         .w(12.0)
                         .font(type_::caption())
-                        .color(tok::accent(0, true)),
+                        .color(crate::theme::accent()),
                 )
                 .child(
                     text(label)
@@ -1577,7 +1581,7 @@ fn subtitle_tracks_panel(s: &State, t: &tok::Theme) -> El {
                         text("Image · find text".to_string())
                             .key(format!("subtitle-image-{at}"))
                             .font(type_::caption())
-                            .color(tok::accent(0, true)),
+                            .color(crate::theme::accent()),
                     ),
             );
             continue;
@@ -1684,7 +1688,7 @@ fn subtitle_tracks_panel(s: &State, t: &tok::Theme) -> El {
                 .child(
                     text("≋".to_string())
                         .font(type_::label())
-                        .color(tok::accent(0, true)),
+                        .color(crate::theme::accent()),
                 )
                 .child(
                     text("Sync to audio".to_string())
@@ -1727,7 +1731,7 @@ fn subtitle_tracks_panel(s: &State, t: &tok::Theme) -> El {
             .child(
                 text("＋".to_string())
                     .font(type_::label())
-                    .color(tok::accent(0, true)),
+                    .color(crate::theme::accent()),
             )
             .child(
                 text("Search online…".to_string())
@@ -1927,7 +1931,7 @@ fn subtitle_search_panel(s: &State, t: &tok::Theme) -> El {
             item = item.child(
                 text("Downloading…".to_string())
                     .font(type_::caption())
-                    .color(tok::accent(0, true)),
+                    .color(crate::theme::accent()),
             );
         }
         panel = panel.child(item);
@@ -1976,7 +1980,7 @@ fn choice_row(
             text(if selected { "●" } else { "○" })
                 .font(type_::label())
                 .color(if selected {
-                    tok::accent(0, true)
+                    crate::theme::accent()
                 } else {
                     t.text_secondary
                 }),
@@ -2098,7 +2102,7 @@ fn segment_marks(s: &State, session: &crate::state::InAppSession, _t: &tok::Them
         };
         *count += 1;
         let color = match kind.as_str() {
-            "intro" => tok::accent(0, true).alpha(0.85),
+            "intro" => crate::theme::accent().alpha(0.85),
             "outro" => tok::accent(2, true).alpha(0.85),
             "recap" => Color::WHITE.alpha(0.55),
             _ => Color::WHITE.alpha(0.32),
@@ -2651,7 +2655,7 @@ fn volume_slider(s: &State, t: &tok::Theme) -> El {
                     el().w(width * fraction)
                         .h(track)
                         .radius(2.5)
-                        .fill(tok::accent(0, true)),
+                        .fill(crate::theme::accent()),
                 )
                 .child(
                     el().grow(1.0)
@@ -2666,12 +2670,12 @@ fn volume_slider(s: &State, t: &tok::Theme) -> El {
                 .h(knob)
                 .radius(knob / 2.0)
                 .fill(Color::WHITE)
-                .outline(if focused { 2.0 } else { 0.0 }, 0.0, tok::accent(0, true))
+                .outline(if focused { 2.0 } else { 0.0 }, 0.0, crate::theme::accent())
                 .shadow(
                     0.0,
                     if focused { 6.0 } else { 2.0 },
                     if focused {
-                        tok::accent(0, true).alpha(0.55)
+                        crate::theme::accent().alpha(0.55)
                     } else {
                         Color::BLACK.alpha(0.45)
                     },
@@ -2788,7 +2792,7 @@ fn seek_bar(s: &State, session: &crate::state::InAppSession, progress: f32, t: &
                             el().grow(progress.max(0.001))
                                 .h(track)
                                 .radius(track / 2.0)
-                                .fill(tok::accent(0, true)),
+                                .fill(crate::theme::accent()),
                         )
                         .child(
                             el().grow((1.0 - progress).max(0.001))
@@ -2811,12 +2815,12 @@ fn seek_bar(s: &State, session: &crate::state::InAppSession, progress: f32, t: &
                 .h(knob)
                 .radius(knob / 2.0)
                 .fill(Color::WHITE)
-                .outline(if focused { 2.5 } else { 0.0 }, 0.0, tok::accent(0, true))
+                .outline(if focused { 2.5 } else { 0.0 }, 0.0, crate::theme::accent())
                 .shadow(
                     0.0,
                     if focused { 8.0 } else { 3.0 },
                     if focused {
-                        tok::accent(0, true).alpha(0.55)
+                        crate::theme::accent().alpha(0.55)
                     } else {
                         Color::BLACK.alpha(0.55)
                     },
@@ -3005,6 +3009,14 @@ fn bottom_osd(
     let live = session.live;
     col()
         .key("in-app-controls")
+        .transition(
+            rune::Transition::offset(0.0, 8.0)
+                .combined(rune::Transition::opacity())
+                .springs(rune::SpringPair::new(
+                    theme::motion::OSD,
+                    theme::motion::OSD,
+                )),
+        )
         .absolute(0.0, 0.0)
         .w_full()
         .h_full()
@@ -3328,8 +3340,8 @@ fn transport_primary(glyph: &'static Icon, label: &str, t: &tok::Theme) -> El {
         .h(48.0)
         .radius(24.0)
         .center()
-        .fill(tok::accent(0, true))
-        .shadow(0.0, 12.0, tok::accent(0, true).alpha(0.35))
+        .fill(crate::theme::accent())
+        .shadow(0.0, 12.0, crate::theme::accent().alpha(0.35))
         .hover(t.hover)
         .motion(crate::theme::motion::CONTROL)
         .focusable(true)

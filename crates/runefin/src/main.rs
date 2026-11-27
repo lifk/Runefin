@@ -196,6 +196,9 @@ fn init() -> State {
 /// `Latest` loads the UI would start.
 fn apply_live_route(s: &mut State) {
     s.forget_last_place();
+    // The live capture is the design review: show the billboard even if this device still has
+    // the old compact-hero preference saved.
+    s.home_hero = true;
     let route = std::env::var("RUNEFIN_LIVE_ROUTE").unwrap_or_default();
     let env = |name: &str| std::env::var(name).unwrap_or_default();
     match route.as_str() {
@@ -219,6 +222,14 @@ fn apply_live_route(s: &mut State) {
             s.search.query = TextEdit::new(query);
             s.search_changed();
         }
+        "home-rails" => s.open_home_rails(),
+        "hub" => s.open_libraries(),
+        "playlist" => {
+            let id = env("RUNEFIN_LIVE_PLAYLIST_ID");
+            if !id.is_empty() {
+                s.open_playlist(id, env("RUNEFIN_LIVE_PLAYLIST_NAME"));
+            }
+        }
         "settings" => {
             s.open_settings();
             if let Ok(query) = std::env::var("RUNEFIN_LIVE_SETTINGS_QUERY") {
@@ -226,7 +237,14 @@ fn apply_live_route(s: &mut State) {
             }
         }
         "remote" => s.open_remote(),
+        "downloads" => s.open_downloads(),
         "live-tv" => s.open_live_tv(),
+        "live-guide" => {
+            s.open_live_tv();
+            if !s.live.guide_open {
+                s.toggle_live_guide();
+            }
+        }
         "seerr-discover" => {
             s.open_seerr(crate::state::SeerrTab::Discover);
             if std::env::var("RUNEFIN_LIVE_SEERR_BROWSE").is_ok() {
@@ -504,35 +522,6 @@ fn tv_key(s: &mut State, key: &KeyEvent, tx: &mut Tx) -> bool {
     {
         return false;
     }
-    // Settings is a vertical form with dozens of control keys; Up/Down follow the page's tab
-    // order instead of a hand-kept key list. Left/Right stay with the focused control.
-    if s.big_screen && matches!(s.route, Route::Settings) {
-        let on_sidebar = focused.as_deref().is_some_and(|key| {
-            key.starts_with("nav-") || key.starts_with("library-") || key.starts_with("playlist-")
-        });
-        if on_sidebar {
-            // The sidebar is its own focus group: Up/Down rove it, Right enters the form.
-            if matches!(action, tv_input::TvAction::Right) {
-                s.note_focus("setting-ui-mode-value".into());
-                tx.focus("setting-ui-mode-value".to_string(), true);
-                return true;
-            }
-            return false;
-        }
-        // The long form reads top to bottom: Up/Down walk its tab order. Left/Right stay with
-        // the control so a row of buttons (Seerr, storage) roves inside its focus group.
-        if matches!(action, tv_input::TvAction::Up | tv_input::TvAction::Down) {
-            tx.send_key(KeyEvent {
-                key: Key::Tab,
-                mods: rune::Mods {
-                    shift: matches!(action, tv_input::TvAction::Up),
-                    ..rune::Mods::default()
-                },
-            });
-            return true;
-        }
-        return false;
-    }
     // The router steps between zones, clamps at the edges and asks Rune to focus the key it
     // chose. A modal, menu or scrollbar has focus: its directions are Rune's, not the zones'.
     let panel = focused
@@ -557,14 +546,7 @@ fn tv_key(s: &mut State, key: &KeyEvent, tx: &mut Tx) -> bool {
                     // find nothing to move. Going up to it means going back to the top.
                     tx.scroll_to("detail-scroll", 0.0, 0.0);
                 } else if tv_focus::in_sidebar(s, target) {
-                    // The sidebar has its own scroll viewport. A nav row can be below its fold
-                    // on a full server, so scope the reveal there; the page scroll is a sibling,
-                    // not an ancestor, and the generic request left the focused row invisible.
-                    if matches!(action, tv_input::TvAction::Up | tv_input::TvAction::Down) {
-                        tx.scroll_center_in("sidebar-nav-scroll", target.clone());
-                    } else {
-                        tx.scroll_into_view_in("sidebar-nav-scroll", target.clone());
-                    }
+                    // The rail is an overlay with five always-visible rows: no page scroll.
                 } else if matches!(action, tv_input::TvAction::Up | tv_input::TvAction::Down) {
                     // A vertical move centres the new row in the page.
                     tx.scroll_center(target.clone());
@@ -627,6 +609,10 @@ fn on_key(s: &mut State, key: &KeyEvent, tx: &mut Tx) -> bool {
     }
     // Back closes the topmost overlay before any page or player key sees it. The player keeps
     // its OSD up while a panel closes, as it did when each panel checked Escape itself.
+    if key.key == Key::Escape && s.home_rails_open {
+        s.close_home_rails();
+        return true;
+    }
     if key.key == Key::Escape
         && let Some(overlay) = s.top_overlay()
     {
@@ -800,7 +786,10 @@ fn on_key(s: &mut State, key: &KeyEvent, tx: &mut Tx) -> bool {
         s.close_seerr();
         return true;
     }
-    if matches!(&s.route, Route::Remote | Route::LiveTv | Route::Settings) {
+    if matches!(
+        &s.route,
+        Route::Remote | Route::LiveTv | Route::Settings | Route::Libraries
+    ) {
         s.go_home();
         return true;
     }
@@ -816,7 +805,7 @@ fn on_key(s: &mut State, key: &KeyEvent, tx: &mut Tx) -> bool {
         s.back_from_detail();
         true
     } else if matches!(&s.route, Route::Library { .. }) {
-        s.go_home();
+        s.back_from_library();
         true
     } else {
         false
@@ -1453,6 +1442,25 @@ fn main() {
                 s.config.user_name = "example-user".into();
                 s.home_data = demo::home();
                 s.home_loaded = true;
+            }),
+            #[cfg(debug_assertions)]
+            ("hub", |s| {
+                demo::signed_in(s);
+                s.route = Route::Libraries;
+            }),
+            #[cfg(debug_assertions)]
+            ("home-pins", |s| {
+                demo::signed_in(s);
+                s.home_rails_open = true;
+            }),
+            #[cfg(debug_assertions)]
+            ("library-10k", |s| {
+                demo::signed_in(s);
+                let library = demo::library(10_000);
+                s.route = Route::Library {
+                    id: library.id.clone(),
+                };
+                s.library = Some(library);
             }),
             #[cfg(debug_assertions)]
             ("home-shelf", |s| {
@@ -2621,7 +2629,7 @@ mod tests {
         };
         let mut rt = Runtime::new(home_state(), view, (1280.0, 800.0), env);
         rt.frame(0.0);
-        for key in ["nav-home", "library-movies", "nav-settings"] {
+        for key in ["nav-home", "nav-libraries", "nav-settings"] {
             let (x, y) = rt.find(key).unwrap_or_else(|| panic!("{key}"));
             rt.pointer_move(x, y);
             rt.frame(0.01);
@@ -2640,8 +2648,8 @@ mod tests {
         rt.frame(1.0 / 60.0);
         assert_eq!(
             rt.state.library.as_ref().expect("library").columns,
-            5,
-            "a 1440-wide window fits five whole cards; a sixth would need one more pixel              and used to be clipped"
+            6,
+            "a 1440-wide window fits six whole cards with the rail"
         );
         let env = Env {
             system_dark: true,
@@ -2660,8 +2668,8 @@ mod tests {
         rt.frame(1.0 / 60.0);
         assert_eq!(
             rt.state.library.as_ref().expect("library").columns,
-            2,
-            "two cards fit with the sidebar at 800"
+            3,
+            "three cards fit with the rail at 800"
         );
     }
 
@@ -2718,14 +2726,14 @@ mod tests {
         // cards in them are addressable as before.
         for key in [
             "home-screen",
-            "sidebar",
+            "rail",
             "nav-home",
-            "library-live-tv",
+            "home-library-all",
             "rail-continue-watching",
-            "rail-next-up",
+            "rail-libraries",
+            "rail-recent-0",
             "rail-continue-watching-quiet-floor",
             "rail-continue-watching-metropolis",
-            "resume-remove-quiet-floor-s2e4",
         ] {
             assert!(rt.find(key).is_some(), "{key} is on screen and addressable");
         }
@@ -2850,7 +2858,7 @@ mod tests {
         for key in [
             "downloads-screen".to_string(),
             "downloads-summary".to_string(),
-            "nav-downloads".to_string(),
+            "nav-libraries".to_string(),
             format!("download-{done}"),
             format!("download-play-{done}"),
             format!("download-keep-{done}"),
@@ -3098,43 +3106,63 @@ mod tests {
     }
 
     #[test]
-    fn the_home_contract_orders_every_library_rail() {
+    fn twelve_libraries_keep_home_at_six_rails() {
+        let mut state = home_state();
+        let base = state
+            .home_data
+            .libraries
+            .first()
+            .cloned()
+            .expect("the demo server has a library");
+        for index in 0..11 {
+            let mut library = base.clone();
+            library.id = format!("extra-{index}");
+            library.name = format!("Extra {index}");
+            state.home_data.libraries.push(library);
+        }
+        let keys = crate::screens::home_rail_keys(&state);
+        assert!(
+            keys.len() <= 6,
+            "twelve libraries do not create a rail each: {keys:?}"
+        );
+        assert_eq!(
+            keys.iter()
+                .filter(|key| key.starts_with("rail-recent-"))
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn the_home_contract_is_one_combined_recent_rail() {
         let env = Env {
             system_dark: true,
             scale: 2.0,
         };
         let mut state = home_state();
-        // Four libraries means four Recently Added rails, not a capped subset.
-        let template = state
+        let mut rail = state
             .home_data
             .latest
             .first()
             .cloned()
             .expect("the fixture has a recent rail");
-        state.home_data.latest = (0..4)
-            .map(|index| {
-                let mut rail = template.clone();
-                rail.library = format!("Library {index}");
-                rail
-            })
-            .collect();
-        // The contract is the page's order and that no library is capped, which is what the
-        // rail list holds; only the windowed part of it is in the tree at any moment.
+        rail.library = "All libraries".into();
+        rail.library_id.clear();
+        state.home_data.latest = vec![rail];
+        let keys = crate::screens::home_rail_keys(&state);
         assert_eq!(
-            crate::screens::home_rail_keys(&state),
-            [
-                "rail-continue-watching",
-                "rail-next-up",
-                "rail-on-now",
-                "rail-recent-0",
-                "rail-recent-1",
-                "rail-recent-2",
-                "rail-recent-3",
-                "rail-recently-played",
-                "rail-collections",
-            ],
-            "every library gets a Recently Added rail, in order"
+            keys.iter()
+                .filter(|key| key.starts_with("rail-recent-"))
+                .count(),
+            1,
+            "one combined Recently added rail, not one per library: {keys:?}"
         );
+        assert_eq!(
+            keys.first().map(String::as_str),
+            Some("rail-continue-watching")
+        );
+        assert!(keys.iter().any(|key| key == "rail-libraries"));
+        assert!(keys.iter().any(|key| key == "rail-collections"));
         let mut rt = Runtime::new(state, view, (1280.0, 800.0), env);
         rt.frame(0.0);
         let top = |key: &str| {
@@ -3142,9 +3170,10 @@ mod tests {
                 .map(|(rect, _)| rect[1])
                 .unwrap_or_else(|| panic!("{key} has a rect"))
         };
-        assert!(top("rail-continue-watching") < top("rail-next-up"));
+        assert!(top("rail-continue-watching") < top("rail-libraries"));
+        assert!(top("rail-libraries") < top("rail-recent-0"));
         assert!(rt.find("rail-continue-watching-all").is_some());
-        assert!(rt.find("rail-next-up-all").is_some());
+        assert!(rt.find("home-library-all").is_some());
     }
 
     #[test]
@@ -3191,7 +3220,7 @@ mod tests {
     }
 
     #[test]
-    fn the_sidebar_puts_content_before_tools() {
+    fn the_rail_keeps_five_anchors_in_order() {
         let env = Env {
             system_dark: true,
             scale: 2.0,
@@ -3203,11 +3232,23 @@ mod tests {
                 .map(|(rect, _)| rect[1])
                 .unwrap_or_else(|| panic!("{key} has a rect"))
         };
-        assert!(top("nav-home") < top("library-movies"));
-        assert!(top("library-movies") < top("nav-search"));
-        assert!(top("nav-search") < top("nav-settings"));
-        assert!(rt.find("libraries-label").is_some());
-        assert!(rt.find("tools-label").is_some());
+        assert!(top("nav-home") < top("nav-search"));
+        assert!(top("nav-search") < top("nav-libraries"));
+        assert!(top("nav-libraries") < top("nav-live"));
+        assert!(top("nav-live") < top("nav-settings"));
+        for key in [
+            "nav-home",
+            "nav-search",
+            "nav-libraries",
+            "nav-live",
+            "nav-settings",
+        ] {
+            assert!(rt.find(key).is_some(), "{key}");
+        }
+        assert!(
+            rt.find("library-movies").is_none(),
+            "the rail never lists libraries"
+        );
     }
 
     #[test]
@@ -3428,25 +3469,25 @@ mod tests {
     }
 
     #[test]
-    fn the_sidebar_lists_playlists_and_a_playlist_opens_without_sort_controls() {
+    fn the_hub_lists_playlists_and_a_playlist_opens_without_sort_controls() {
         let env = Env {
             system_dark: true,
             scale: 2.0,
         };
         let mut state = home_state();
         state.playlists = demo::playlists();
+        state.route = Route::Libraries;
         let mut rt = Runtime::new(state, view, (1280.0, 800.0), env);
         rt.frame(0.0);
         for key in [
-            "playlists-label",
-            "playlist-playlist-silent",
-            "playlist-playlist-horror",
-            "playlist-playlist-titles",
+            "hub-playlist-playlist-silent",
+            "hub-playlist-playlist-horror",
+            "hub-playlist-playlist-titles",
         ] {
-            assert!(rt.find(key).is_some(), "{key} is in the sidebar");
+            assert!(rt.find(key).is_some(), "{key} is in the hub");
         }
         let (x, y) = rt
-            .find("playlist-playlist-silent")
+            .find("hub-playlist-playlist-silent")
             .expect("the playlist row");
         rt.pointer_down(x, y);
         rt.pointer_up(x, y);
@@ -3467,14 +3508,11 @@ mod tests {
         // toolbar must not offer sorts or filters that would reorder an ordered list.
         rt.state.library = Some(demo::playlist_library());
         rt.frame(0.05);
-        for key in [
-            "library-play-all",
-            "library-shuffle",
-            "view-grid",
-            "view-list",
-        ] {
-            assert!(rt.find(key).is_some(), "{key} is on the playlist page");
-        }
+        assert!(
+            rt.find("library-back").is_some(),
+            "the playlist page opened"
+        );
+        assert!(rt.find("library-toolbar").is_some());
         assert!(rt.find("sort-name").is_none(), "a playlist keeps its order");
         assert!(rt.find("sort-direction").is_none());
         assert!(rt.find("filter-unwatched").is_none());
@@ -5138,7 +5176,26 @@ mod tests {
     }
 
     #[test]
-    fn a_tall_sidebar_keeps_every_library_and_pins_settings() {
+    fn the_hub_filter_narrows_the_library_grid() {
+        let env = Env {
+            system_dark: true,
+            scale: 2.0,
+        };
+        let mut state = home_state();
+        state.route = Route::Libraries;
+        state.hub_filter = rune::TextEdit::new("mov");
+        let mut rt = Runtime::new(state, view, (1280.0, 800.0), env);
+        rt.frame(0.0);
+        assert!(rt.find("hub-library-movies").is_some(), "Movies matches");
+        assert!(
+            rt.find("hub-library-shows").is_none(),
+            "Shows is filtered out"
+        );
+        assert!(rt.find("hub-filter").is_some(), "the field stays");
+    }
+
+    #[test]
+    fn the_hub_keeps_every_library_and_pins_settings() {
         let env = Env {
             system_dark: true,
             scale: 1.5,
@@ -5151,28 +5208,24 @@ mod tests {
             .first()
             .cloned()
             .expect("the demo server has a library");
-        for index in 0..12 {
+        for index in 0..40 {
             let mut library = base.clone();
             library.id = format!("extra-{index}");
             library.name = format!("Extra {index}");
             state.home_data.libraries.push(library);
         }
+        state.route = Route::Libraries;
         let mut rt = Runtime::new(state, view, (1280.0, 720.0), env);
         rt.frame(0.0);
-        for index in 0..12 {
+        for index in 0..40 {
             assert!(
-                rt.find(&format!("library-extra-{index}")).is_some(),
-                "library {index} is in the sidebar, not dropped by a cap"
+                rt.find(&format!("hub-library-extra-{index}")).is_some(),
+                "library {index} is in the hub, not dropped by a cap"
             );
         }
-        assert!(rt.find("sidebar-nav-scroll").is_some());
         assert!(
             rt.find("nav-settings").is_some(),
-            "Settings stays pinned below the scroll"
-        );
-        assert!(
-            rt.find("server-name").is_none(),
-            "the server name is no longer repeated under the wordmark"
+            "Settings stays on the rail"
         );
     }
 
@@ -5203,8 +5256,8 @@ mod tests {
         rt.frame(0.032);
         let below = rt.focused_key().expect("the next lane");
         assert!(
-            below.starts_with("rail-next-up-"),
-            "Down changes lanes instead of wrapping the rail: {below}"
+            below.starts_with("home-library-"),
+            "Down changes lanes to the libraries strip: {below}"
         );
 
         rt.key(KeyEvent {
@@ -5332,7 +5385,8 @@ mod tests {
             mods: Default::default(),
         });
         rt.frame(0.048);
-        assert_eq!(rt.focused_key().as_deref(), Some("detail-imdb-link"));
+        let season = rt.focused_key().expect("the season chips");
+        assert!(season.starts_with("season-"), "{season}");
 
         rt.key(KeyEvent {
             key: Key::Down,
@@ -5346,14 +5400,6 @@ mod tests {
             mods: Default::default(),
         });
         rt.frame(0.080);
-        let season = rt.focused_key().expect("the season chips");
-        assert!(season.starts_with("season-"), "{season}");
-
-        rt.key(KeyEvent {
-            key: Key::Down,
-            mods: Default::default(),
-        });
-        rt.frame(0.096);
         assert_eq!(rt.focused_key().as_deref(), Some("detail-play-season"));
     }
 
@@ -5375,7 +5421,7 @@ mod tests {
             .expect("home asks for its first card");
         rt.state.note_focus(key.clone());
         rt.update(|_, tx| tx.focus(key, true));
-        for step in 1..=4 {
+        for step in 1..=16 {
             rt.frame(step as f64 * 0.016);
         }
         assert!(
@@ -5560,7 +5606,7 @@ mod tests {
         rt.state.note_focus(key.clone());
         rt.update(|_, tx| tx.focus(key, true));
         let mut t = 0.0;
-        for _ in 0..8 {
+        for _ in 0..24 {
             t += 0.016;
             rt.frame(t);
         }
@@ -5867,7 +5913,7 @@ mod tests {
     }
 
     #[test]
-    fn a_settings_jump_chip_moves_the_selector_into_its_section() {
+    fn a_settings_section_moves_the_selector_into_its_pane() {
         // The big-screen entry sets this; the remote's OK arrives as Enter.
         rune::set_return_activates(true);
         let env = Env {
@@ -5880,9 +5926,9 @@ mod tests {
         let mut rt = Runtime::new(state, view, (1280.0, 720.0), env);
         rt.on_key = Some(on_key);
         rt.frame(0.0);
-        rt.update(|_, tx| tx.focus("settings-jump-subtitles", true));
+        rt.update(|_, tx| tx.focus("settings-nav-subtitles", true));
         rt.frame(0.016);
-        assert_eq!(rt.focused_key().as_deref(), Some("settings-jump-subtitles"));
+        assert_eq!(rt.focused_key().as_deref(), Some("settings-nav-subtitles"));
         rt.key(KeyEvent {
             key: Key::Enter,
             mods: Default::default(),
@@ -5892,7 +5938,7 @@ mod tests {
         assert_eq!(
             rt.focused_key().as_deref(),
             Some("setting-subtitle-mode-value"),
-            "the chip puts the selector in the section it jumps to"
+            "the section list puts the selector in the pane it names"
         );
     }
 
@@ -6569,14 +6615,15 @@ mod tests {
         let mut state = home_state();
         state.config.seerr_url.clear();
         state.config.seerr_api_key = None;
+        state.route = Route::Libraries;
         let mut rt = Runtime::new(state, view, (1280.0, 800.0), env);
         rt.frame(0.0);
-        assert!(rt.find("nav-seerr").is_none());
+        assert!(rt.find("hub-seerr").is_none());
 
         rt.state.config.seerr_url = "https://jellyseerr.example".into();
         rt.state.config.seerr_api_key = Some("example-api-key".into());
         rt.frame(0.1);
-        assert!(rt.find("nav-seerr").is_some());
+        assert!(rt.find("hub-seerr").is_some());
     }
 
     #[test]
@@ -7863,17 +7910,252 @@ mod tests {
     }
 
     #[test]
-    fn the_compact_hero_takes_the_first_focus_when_it_is_on() {
+    fn a_hundred_credit_person_reaches_the_last_card() {
+        let env = Env {
+            system_dark: true,
+            scale: 1.5,
+        };
+        let mut state = home_state();
+        let mut person = demo::person();
+        let base = person.items.first().cloned().expect("a credit");
+        person.items = (0..100)
+            .map(|index| {
+                let mut item = base.clone();
+                item.id = format!("credit-{index:03}");
+                item.series_id = None;
+                item
+            })
+            .collect();
+        state.route = Route::Person {
+            id: person.id.clone(),
+        };
+        state.person = Some(person);
+        let mut rt = Runtime::new(state, view, (1280.0, 720.0), env);
+        rt.frame(0.0);
+        assert!(rt.find("person-show-all").is_some());
+        assert!(
+            rt.find("person-credit-099").is_none(),
+            "the first 36 cards are the window"
+        );
+        rt.update(|s, _| s.show_all_person_credits());
+        rt.frame(0.016);
+        assert!(rt.find("person-credit-099").is_some());
+    }
+
+    #[test]
+    fn a_ten_thousand_item_library_still_measures_six_columns() {
+        let env = Env {
+            system_dark: true,
+            scale: 1.5,
+        };
+        let mut state = home_state();
+        let library = demo::library(10_000);
+        let id = library.id.clone();
+        state.route = Route::Library { id };
+        state.library = Some(library);
+        let mut rt = Runtime::new(state, view, (1280.0, 720.0), env);
+        rt.frame(0.0);
+        rt.frame(1.0 / 60.0);
+        assert_eq!(rt.state.library.as_ref().expect("library").columns, 6);
+        assert!(rt.find("library-count").is_some());
+        assert!(rt.find("library-film-000").is_some());
+    }
+
+    #[test]
+    fn a_sixty_channel_guide_mounts_only_its_window() {
+        let env = Env {
+            system_dark: true,
+            scale: 1.5,
+        };
+        let mut state = home_state();
+        state.route = Route::LiveTv;
+        state.live.channels = (0..60)
+            .map(|index| jellyfin_api::Item {
+                id: format!("channel-{index:02}"),
+                name: format!("Channel {index}"),
+                kind: "TvChannel".into(),
+                ..jellyfin_api::Item::default()
+            })
+            .collect();
+        state.live.guide_open = true;
+        let mut rt = Runtime::new(state, view, (1280.0, 720.0), env);
+        rt.frame(0.0);
+        assert!(rt.find("live-guide-row-channel-00").is_some());
+        assert!(
+            rt.find("live-guide-row-channel-59").is_none(),
+            "the far channel waits in the virtual window"
+        );
+        assert!(rt.find("live-preview-watch").is_some());
+    }
+
+    #[test]
+    fn a_twenty_season_series_reaches_the_last_chip() {
+        let env = Env {
+            system_dark: true,
+            scale: 1.5,
+        };
+        let mut state = home_state();
+        let mut detail = demo::detail();
+        detail.seasons = (0..20)
+            .map(|index| jellyfin_api::Item {
+                id: format!("season-{index:02}"),
+                name: format!("Season {}", index + 1),
+                kind: "Season".into(),
+                index_number: Some(index + 1),
+                ..jellyfin_api::Item::default()
+            })
+            .collect();
+        detail.active_season = Some("season-00".into());
+        state.route = Route::Detail {
+            id: detail.item.id.clone(),
+        };
+        state.detail = Some(detail);
+        let mut rt = Runtime::new(state, view, (1280.0, 720.0), env);
+        rt.frame(0.0);
+        assert!(rt.find("season-season-19").is_some());
+        assert!(rt.find("detail-seasons-count").is_some());
+    }
+
+    #[test]
+    fn a_non_empty_playlist_offers_play_all_and_edit() {
+        let env = Env {
+            system_dark: true,
+            scale: 1.5,
+        };
+        let mut state = home_state();
+        let library = demo::playlist_library();
+        state.route = Route::Library {
+            id: library.id.clone(),
+        };
+        state.library = Some(library);
+        let mut rt = Runtime::new(state, view, (1280.0, 800.0), env);
+        rt.frame(0.0);
+        for key in ["library-play-all", "library-shuffle", "playlist-edit"] {
+            assert!(rt.find(key).is_some(), "{key} is on the playlist page");
+        }
+        assert!(rt.find("sort-name").is_none(), "a playlist keeps its order");
+    }
+
+    #[test]
+    fn the_combined_recent_rail_opens_its_shelf() {
+        let env = Env {
+            system_dark: true,
+            scale: 1.5,
+        };
+        let mut state = home_state();
+        state.open_shelf(crate::state::HomeShelf::RecentlyAdded);
+        let mut rt = Runtime::new(state, view, (1280.0, 800.0), env);
+        rt.frame(0.0);
+        assert!(rt.find("shelf-screen").is_some());
+        assert!(rt.find("shelf-title").is_some());
+        assert!(rt.find("shelf-back").is_some());
+    }
+
+    #[test]
+    fn a_library_opened_from_the_hub_returns_to_the_hub() {
+        let mut state = home_state();
+        state.route = Route::Libraries;
+        state.open_library("movies".into(), "Movies".into(), Some("movies".into()));
+        assert_eq!(state.library_back_label(), "Libraries");
+        assert!(matches!(state.route, Route::Library { .. }));
+        state.back_from_library();
+        assert!(matches!(state.route, Route::Libraries));
+    }
+
+    #[test]
+    fn home_pins_replace_the_combined_rail_and_cap_at_four() {
+        let mut state = home_state();
+        for index in 0..4 {
+            state.toggle_home_library(format!("pin-{index}"));
+        }
+        assert_eq!(state.home_pins().len(), 4);
+        state.toggle_home_library("pin-5".into());
+        assert_eq!(state.home_pins().len(), 4, "the fifth pin is refused");
+        assert!(state.toast.message.is_some(), "a refusal explains itself");
+        state.reset_home_libraries();
+        assert!(
+            state.home_pins().is_empty(),
+            "reset returns to the combined rail"
+        );
+    }
+
+    #[test]
+    fn a_long_season_reveals_ten_episodes_at_a_time() {
+        let env = Env {
+            system_dark: true,
+            scale: 1.5,
+        };
+        let mut state = home_state();
+        let mut detail = demo::detail();
+        detail.episodes = (0..300)
+            .map(|index| jellyfin_api::Item {
+                id: format!("episode-{index:03}"),
+                name: format!("Episode {index}"),
+                kind: "Episode".into(),
+                parent_index_number: Some(1),
+                index_number: Some(index + 1),
+                ..jellyfin_api::Item::default()
+            })
+            .collect();
+        detail.episode_page = 0;
+        state.route = Route::Detail {
+            id: detail.item.id.clone(),
+        };
+        state.detail = Some(detail);
+        let mut rt = Runtime::new(state, view, (1280.0, 720.0), env);
+        rt.frame(0.0);
+        assert!(rt.find("detail-episode-episode-009").is_some());
+        assert!(
+            rt.find("detail-episode-episode-010").is_none(),
+            "the eleventh episode waits behind the page control"
+        );
+        for _ in 0..29 {
+            rt.update(|s, _| s.next_episode_page());
+            rt.frame(0.016);
+        }
+        assert!(rt.find("detail-episode-episode-299").is_some());
+        assert!(rt.find("detail-episodes-next").is_none());
+        assert!(
+            rt.find("detail-episode-episode-289").is_none(),
+            "only the current ten are mounted"
+        );
+    }
+
+    #[test]
+    fn the_chapter_sheet_reaches_all_three_hundred() {
+        let env = Env {
+            system_dark: true,
+            scale: 1.5,
+        };
+        let mut state = home_state();
+        let mut session = demo::in_app();
+        session.item.chapters = (0..300)
+            .map(|index| jellyfin_api::ChapterInfo {
+                start_position_ticks: index as i64 * 60_000 * jellyfin_api::TICKS_PER_MS,
+                name: format!("Chapter {index}"),
+                image_tag: None,
+            })
+            .collect();
+        state.in_app = Some(session);
+        state.osd_visible = true;
+        state.in_app_chapters_open = true;
+        let mut rt = Runtime::new(state, view, (1280.0, 720.0), env);
+        rt.frame(0.0);
+        assert!(
+            rt.find("in-app-chapter-299").is_some(),
+            "the 300th chapter is in the sheet, not behind an 'and more' line"
+        );
+    }
+
+    #[test]
+    fn the_billboard_sits_above_the_first_continue_card() {
         let mut state = home_state();
         state.big_screen = true;
         state.home_hero = true;
-        assert_eq!(state.take_focus_key().as_deref(), Some("home-hero-play"));
-        // Off by default: the first Continue Watching card stays the first focus.
-        let mut state = home_state();
-        state.big_screen = true;
         assert_eq!(
             state.take_focus_key().as_deref(),
-            Some("rail-continue-watching-quiet-floor")
+            Some("rail-continue-watching-quiet-floor"),
+            "the first Continue card is the first focus; Up reaches the billboard"
         );
     }
 
@@ -8975,7 +9257,7 @@ mod tests {
             crate::home::load_watching(&client, now_days).expect("watching");
         });
         measure("home::load_rails", &mut || {
-            crate::home::load_rails(&client).expect("rails");
+            crate::home::load_rails(&client, &[]).expect("rails");
         });
         measure("home::load_next_up", &mut || {
             crate::home::load_next_up(&client);
@@ -8989,6 +9271,76 @@ mod tests {
         measure("search::load", &mut || {
             crate::search::load(&client, "the", None).expect("search");
         });
+    }
+}
+
+#[cfg(test)]
+mod direction_audit {
+    use super::*;
+
+    fn base() -> State {
+        let mut state = State::from_config(config::Config::fresh());
+        crate::demo::signed_in(&mut state);
+        state.big_screen = true;
+        state.keyboard.mode = crate::config::KeyboardMode::OnDemand;
+        state
+    }
+
+    fn home_state() -> State {
+        let mut state = State::from_config(config::Config::fresh());
+        crate::demo::signed_in(&mut state);
+        state
+    }
+
+    fn assert_arrows(name: &str, state: State) {
+        let violations = crate::tv_reach::directional_violations(state, (1280.0, 720.0));
+        assert!(
+            violations.is_empty(),
+            "{name}: {} arrow move(s) went against the press:\n  {}",
+            violations.len(),
+            violations.join("\n  ")
+        );
+    }
+
+    #[test]
+    fn arrows_never_move_against_the_press() {
+        assert_arrows("home", home_state());
+        let mut hub = base();
+        hub.route = Route::Libraries;
+        assert_arrows("hub", hub);
+        let mut library = base();
+        let page = demo::library(36);
+        library.route = Route::Library {
+            id: page.id.clone(),
+        };
+        library.library = Some(page);
+        assert_arrows("library", library);
+        let mut settings = base();
+        settings.route = Route::Settings;
+        assert_arrows("settings", settings);
+        let mut live = base();
+        live.route = Route::LiveTv;
+        live.live.guide_open = true;
+        assert_arrows("live-guide", live);
+        let mut detail = base();
+        let page = demo::detail();
+        detail.route = Route::Detail {
+            id: page.item.id.clone(),
+        };
+        detail.detail = Some(page);
+        assert_arrows("detail", detail);
+        let mut person = base();
+        person.route = Route::Person {
+            id: "mara-ellison".into(),
+        };
+        person.person = Some(demo::person());
+        assert_arrows("person", person);
+        let mut downloads = base();
+        downloads.route = Route::Downloads;
+        assert_arrows("downloads", downloads);
+        let mut remote = base();
+        remote.route = Route::Remote;
+        assert_arrows("remote", remote);
     }
 }
 

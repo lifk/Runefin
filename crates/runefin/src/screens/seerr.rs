@@ -166,7 +166,7 @@ fn tab_button(
         .radius(8.0)
         .center()
         .fill(if selected {
-            tok::accent(0, true)
+            crate::theme::accent()
         } else {
             t.card
         })
@@ -216,7 +216,7 @@ fn setup_card(s: &State, t: &tok::Theme) -> El {
                 .px(16.0)
                 .radius(9.0)
                 .center()
-                .fill(tok::accent(0, true))
+                .fill(crate::theme::accent())
                 .hover(t.hover)
                 .motion(crate::theme::motion::CONTROL)
                 .focusable(true)
@@ -576,7 +576,7 @@ fn search_box(s: &State, t: &tok::Theme) -> El {
             if s.seerr.query.focused { 1.5 } else { 1.0 },
             0.0,
             if s.seerr.query.focused {
-                tok::accent(0, true)
+                crate::theme::accent()
             } else {
                 t.card_border
             },
@@ -898,8 +898,8 @@ fn request_row(request: &seerr_api::MediaRequest, s: &State, t: &tok::Theme) -> 
                     el().grow(fraction.max(0.001))
                         .h_full()
                         .radius(3.0)
-                        .fill(tok::accent(0, true))
-                        .shadow(0.0, 4.0, tok::accent(0, true).alpha(0.30))
+                        .fill(crate::theme::accent())
+                        .shadow(0.0, 4.0, crate::theme::accent().alpha(0.30))
                         .child(
                             el().absolute(0.0, 0.0)
                                 .w_full()
@@ -1509,7 +1509,7 @@ fn detail_action(
             .px(16.0)
             .radius(9.0)
             .center()
-            .fill(tok::accent(0, true))
+            .fill(crate::theme::accent())
             .hover(t.hover)
             .motion(crate::theme::motion::CONTROL)
             .focusable(true)

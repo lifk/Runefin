@@ -151,7 +151,7 @@ pub(super) fn now_playing(s: &State) -> El {
                                     el().grow(progress.max(0.001))
                                         .h(4.0)
                                         .radius(2.0)
-                                        .fill(tok::accent(0, true)),
+                                        .fill(crate::theme::accent()),
                                 )
                                 .child(el().grow((1.0 - progress).max(0.001)).h(4.0)),
                         ),
@@ -219,7 +219,11 @@ fn control(
         .px(18.0)
         .radius(10.0)
         .center()
-        .fill(if selected { tok::accent(0, true) } else { t.bg })
+        .fill(if selected {
+            crate::theme::accent()
+        } else {
+            t.bg
+        })
         .hover(t.hover)
         .motion(crate::theme::motion::CONTROL)
         .focusable(true)

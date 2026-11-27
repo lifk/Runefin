@@ -153,7 +153,7 @@ fn preplay_sheet(s: &State, detail: &DetailState, t: &tok::Theme) -> El {
                     .radius(7.0)
                     .center()
                     .fill(if on {
-                        tok::accent(0, true).alpha(0.24)
+                        crate::theme::accent().alpha(0.24)
                     } else {
                         t.bg
                     })
@@ -161,7 +161,7 @@ fn preplay_sheet(s: &State, detail: &DetailState, t: &tok::Theme) -> El {
                         1.0,
                         0.0,
                         if on {
-                            tok::accent(0, true)
+                            crate::theme::accent()
                         } else {
                             t.card_border
                         },
@@ -352,7 +352,7 @@ fn preplay_sheet(s: &State, detail: &DetailState, t: &tok::Theme) -> El {
                     .px(16.0)
                     .radius(8.0)
                     .center()
-                    .fill(tok::accent(0, true))
+                    .fill(crate::theme::accent())
                     .hover(t.hover)
                     .focusable(true)
                     .focus_visual(2.0)
@@ -444,7 +444,7 @@ pub(super) fn playlist_create_modal(s: &State, item: &Item, t: &tok::Theme) -> E
                         .px(16.0)
                         .radius(8.0)
                         .center()
-                        .fill(tok::accent(0, true))
+                        .fill(crate::theme::accent())
                         .hover(t.hover)
                         .motion(crate::theme::motion::CONTROL)
                         .focusable(true)
@@ -552,7 +552,7 @@ pub(super) fn playlist_picker(s: &State, item: &Item, t: &tok::Theme) -> El {
                 .child(
                     text("＋".to_string())
                         .font(type_::label())
-                        .color(tok::accent(0, true)),
+                        .color(crate::theme::accent()),
                 )
                 .child(
                     text(playlist.name.clone())
@@ -583,7 +583,7 @@ pub(super) fn playlist_picker(s: &State, item: &Item, t: &tok::Theme) -> El {
             .child(
                 text("＋".to_string())
                     .font(type_::label())
-                    .color(tok::accent(0, true)),
+                    .color(crate::theme::accent()),
             )
             .child(
                 text("New playlist".to_string())
@@ -695,7 +695,7 @@ pub(super) fn collection_picker(s: &State, item: Option<&Item>, t: &tok::Theme) 
                 .child(
                     text("＋".to_string())
                         .font(type_::label())
-                        .color(tok::accent(0, true)),
+                        .color(crate::theme::accent()),
                 )
                 .child(
                     text(collection.name.clone())
@@ -789,7 +789,7 @@ fn version_row(s: &State, detail: &DetailState, t: &tok::Theme) -> Option<El> {
                 .radius(7.0)
                 .center()
                 .fill(if selected {
-                    tok::accent(0, true).alpha(0.24)
+                    crate::theme::accent().alpha(0.24)
                 } else {
                     t.card
                 })
@@ -797,7 +797,7 @@ fn version_row(s: &State, detail: &DetailState, t: &tok::Theme) -> Option<El> {
                     1.0,
                     0.0,
                     if selected {
-                        tok::accent(0, true)
+                        crate::theme::accent()
                     } else {
                         t.card_border
                     },
@@ -853,6 +853,7 @@ fn hero(s: &State, detail: &DetailState, t: &tok::Theme) -> El {
                 .clone()
                 .unwrap_or_else(|| format!("poster-{}", detail.item.id)),
         )
+        .animated_changes()
         .child(poster);
 
     let title = s
@@ -888,10 +889,10 @@ fn hero(s: &State, detail: &DetailState, t: &tok::Theme) -> El {
         .px(18.0)
         .radius(9.0)
         .center()
-        .fill(tok::accent(0, true))
+        .fill(crate::theme::accent())
         .gradient(Color::WHITE.alpha(0.18), Color::TRANSPARENT)
         .shadow(1.0, 2.0, Color::BLACK.alpha(0.30))
-        .shadow(4.0, 12.0, tok::accent(0, true).alpha(0.35))
+        .shadow(4.0, 12.0, crate::theme::accent().alpha(0.35))
         .hover(t.hover)
         .motion(crate::theme::motion::CONTROL)
         .focusable(true)
@@ -921,7 +922,7 @@ fn hero(s: &State, detail: &DetailState, t: &tok::Theme) -> El {
             1.0,
             0.0,
             if favorite {
-                tok::accent(0, true).alpha(0.70)
+                crate::theme::accent().alpha(0.70)
             } else {
                 t.card_border
             },
@@ -940,7 +941,7 @@ fn hero(s: &State, detail: &DetailState, t: &tok::Theme) -> El {
             text(if favorite { "Favourited" } else { "Favourite" })
                 .font(type_::label())
                 .color(if favorite {
-                    tok::accent(0, true)
+                    crate::theme::accent()
                 } else {
                     t.text
                 }),
@@ -1059,10 +1060,10 @@ fn hero(s: &State, detail: &DetailState, t: &tok::Theme) -> El {
                             .center()
                             // The same accent as the primary it belongs to: it is that
                             // button's options, not a second action with a stray glyph.
-                            .fill(tok::accent(0, true))
+                            .fill(crate::theme::accent())
                             .gradient(Color::WHITE.alpha(0.18), Color::TRANSPARENT)
                             .shadow(1.0, 2.0, Color::BLACK.alpha(0.30))
-                            .shadow(4.0, 12.0, tok::accent(0, true).alpha(0.35))
+                            .shadow(4.0, 12.0, crate::theme::accent().alpha(0.35))
                             .hover(t.hover)
                             .motion(crate::theme::motion::CONTROL)
                             .focusable(true)
@@ -1119,7 +1120,7 @@ fn hero(s: &State, detail: &DetailState, t: &tok::Theme) -> El {
                             .radius(9.0)
                             .center()
                             .fill(if s.theme_audio.is_some() {
-                                tok::accent(0, true).alpha(0.22)
+                                crate::theme::accent().alpha(0.22)
                             } else {
                                 t.card
                             })
@@ -1152,7 +1153,7 @@ fn hero(s: &State, detail: &DetailState, t: &tok::Theme) -> El {
                             .radius(9.0)
                             .center()
                             .fill(if s.theme_video_on {
-                                tok::accent(0, true).alpha(0.22)
+                                crate::theme::accent().alpha(0.22)
                             } else {
                                 t.card
                             })
@@ -1414,9 +1415,13 @@ fn hero(s: &State, detail: &DetailState, t: &tok::Theme) -> El {
                 .color(theme::status::danger()),
         );
     }
-    info = info
-        .child(overview(s, detail, t))
-        .child(row().gap(10.0).child(season_chips(detail, t)));
+    info = info.child(overview(s, detail, t)).child(
+        el().w_full()
+            .min_w(0.0)
+            .scroll_x()
+            .scroll_edge_fade(24.0)
+            .child(season_chips(detail, t)),
+    );
 
     // A narrow window stacks the poster above the text instead of letting the hero's
     // minimum widths push the overview and modals past the right edge.
@@ -1697,7 +1702,7 @@ fn collection(s: &State, detail: &DetailState, t: &tok::Theme) -> Option<El> {
                 .radius(13.0)
                 .center()
                 .fill(if selected {
-                    tok::accent(0, true).alpha(0.22)
+                    crate::theme::accent().alpha(0.22)
                 } else {
                     t.card
                 })
@@ -1705,7 +1710,7 @@ fn collection(s: &State, detail: &DetailState, t: &tok::Theme) -> Option<El> {
                     1.0,
                     0.0,
                     if selected {
-                        tok::accent(0, true)
+                        crate::theme::accent()
                     } else {
                         t.card_border
                     },
@@ -1999,7 +2004,7 @@ fn queue_button(
         .radius(9.0)
         .center()
         .fill(if primary {
-            tok::accent(0, true)
+            crate::theme::accent()
         } else {
             t.card
         })
@@ -2017,7 +2022,7 @@ fn queue_button(
             if primary { 4.0 } else { 2.0 },
             if primary { 12.0 } else { 6.0 },
             if primary {
-                tok::accent(0, true).alpha(0.35)
+                crate::theme::accent().alpha(0.35)
             } else {
                 Color::BLACK.alpha(0.18)
             },
@@ -2055,7 +2060,7 @@ fn season_chips(detail: &DetailState, t: &tok::Theme) -> El {
                 // The active season is the one the episode list belongs to: a raised chip with
                 // an accent hairline, not a second filled primary on the page.
                 .fill(if selected {
-                    tok::accent(0, true).alpha(0.20)
+                    crate::theme::accent().alpha(0.20)
                 } else {
                     Color::TRANSPARENT
                 })
@@ -2063,7 +2068,7 @@ fn season_chips(detail: &DetailState, t: &tok::Theme) -> El {
                     1.0,
                     0.0,
                     if selected {
-                        tok::accent(0, true).alpha(0.70)
+                        crate::theme::accent().alpha(0.70)
                     } else {
                         t.card_border
                     },
@@ -2082,7 +2087,12 @@ fn season_chips(detail: &DetailState, t: &tok::Theme) -> El {
                 .on_press(move |s: &mut State| s.select_season(id.clone())),
         );
     }
-    chips
+    chips.child(
+        text(format!("{} seasons", detail.seasons.len()))
+            .key("detail-seasons-count")
+            .font(type_::caption())
+            .color(t.text_secondary),
+    )
 }
 
 fn series(s: &State, detail: &DetailState, t: &tok::Theme) -> Option<El> {
@@ -2140,14 +2150,74 @@ fn series(s: &State, detail: &DetailState, t: &tok::Theme) -> Option<El> {
                 .color(t.text_secondary),
         );
     } else {
-        section = section.child(
-            col().key("detail-episodes").w_full().gap(8.0).children(
-                detail
-                    .episodes
-                    .iter()
-                    .map(|episode| episode_row(episode, s, t)),
-            ),
+        let pages = detail.episodes.len().div_ceil(10).max(1);
+        let page = detail.episode_page.min(pages - 1);
+        let start = page * 10;
+        let end = (start + 10).min(detail.episodes.len());
+        let mut episodes = col().key("detail-episodes").w_full().gap(8.0).children(
+            detail.episodes[start..end]
+                .iter()
+                .map(|episode| episode_row(episode, s, t)),
         );
+        if pages > 1 {
+            episodes = episodes.child(
+                row()
+                    .key("detail-episodes-pager")
+                    .w_full()
+                    .items_center()
+                    .gap(8.0)
+                    .child(
+                        text(format!(
+                            "{}–{} of {} episodes",
+                            start + 1,
+                            end,
+                            detail.episodes.len()
+                        ))
+                        .font(type_::caption())
+                        .color(t.text_secondary)
+                        .grow(1.0),
+                    )
+                    .children((page > 0).then(|| {
+                        el().key("detail-episodes-prev")
+                            .role("button")
+                            .label("Previous episodes")
+                            .h(32.0)
+                            .px(10.0)
+                            .radius(7.0)
+                            .center()
+                            .fill(t.card)
+                            .outline(1.0, 0.0, t.card_border)
+                            .hover(t.hover)
+                            .motion(crate::theme::motion::CONTROL)
+                            .focusable(true)
+                            .focus_visual(2.0)
+                            .press_scale(0.97)
+                            .cursor(rune::Cursor::Pointer)
+                            .child(text("‹ Previous").font(type_::label()).color(t.text))
+                            .on_press(|s: &mut State| s.previous_episode_page())
+                    }))
+                    .children((page + 1 < pages).then(|| {
+                        el().key("detail-episodes-next")
+                            .role("button")
+                            .label("Next episodes")
+                            .h(32.0)
+                            .px(10.0)
+                            .radius(7.0)
+                            .center()
+                            .fill(t.card)
+                            .outline(1.0, 0.0, t.card_border)
+                            .hover(t.hover)
+                            .motion(crate::theme::motion::CONTROL)
+                            .focusable(true)
+                            .focus_visual(2.0)
+                            .press_scale(0.97)
+                            .cursor(rune::Cursor::Pointer)
+                            .child(text("Next ›").font(type_::label()).color(t.text))
+                            .on_press(|s: &mut State| s.next_episode_page())
+                    })),
+            );
+        }
+        section = section.child(episodes);
     }
     Some(section)
 }
@@ -2414,7 +2484,7 @@ fn episode_row(item: &Item, s: &State, t: &tok::Theme) -> El {
                 .h(20.0)
                 .radius(10.0)
                 .center()
-                .fill(tok::accent(0, true))
+                .fill(crate::theme::accent())
                 .child(text("✓").font(type_::caption()).color(theme::on_accent()))
         }))
         .child(
@@ -2456,7 +2526,7 @@ fn episode_row(item: &Item, s: &State, t: &tok::Theme) -> El {
                 el().w(80.0 * watched)
                     .h(3.0)
                     .radius(1.5)
-                    .fill(tok::accent(0, true)),
+                    .fill(crate::theme::accent()),
             )
         }))
 }

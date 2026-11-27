@@ -11,11 +11,11 @@ use jellyfin_api::{Item, ItemQuery, SortBy};
 pub const PAGE_SIZE: u32 = 100;
 
 /// Five 172 pt posters plus their gaps fit the 1280 pt window with the sidebar open.
-pub const GRID_COLUMNS: usize = 5;
+pub const GRID_COLUMNS: usize = 6;
 
 /// A grid row is a poster plus a title that reserves two lines and one metadata line, with a
 /// little air before the next row: 264 + 6 + 40 + 6 + 20 = 336, plus 8.
-pub const GRID_ROW_H: f32 = 344.0;
+pub const GRID_ROW_H: f32 = 320.0;
 
 /// A list row is one 56 pt thumb plus breathing room.
 pub const LIST_ROW_H: f32 = 76.0;

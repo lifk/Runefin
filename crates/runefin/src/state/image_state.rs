@@ -7,6 +7,10 @@ use crate::net::ImagePriority;
 impl State {
     /// Queue one fetch per card. Rune decodes on its own worker; this only gets the bytes.
     pub(crate) fn request_images(&mut self) {
+        if matches!(self.route, crate::state::Route::Libraries) {
+            self.request_hub_images();
+            return;
+        }
         // This pass is the current screen: replacing the set drops images from the route we
         // left and pins exactly the keys this screen draws.
         self.current_images.clear();
@@ -30,6 +34,43 @@ impl State {
         requests
             .extend(self.image_requests(self.home_data.recently_played.iter(), ImagePriority::Low));
         requests.extend(self.image_requests(self.home_data.collections.iter(), ImagePriority::Low));
+        self.send_images(requests);
+    }
+
+    /// A library has an image but no `Item` to carry its tag, so the hub requests
+    /// `/Items/{library}/Images/Primary` untagged. The key includes the width; a scale change
+    /// asks again through the normal pass.
+    pub(crate) fn library_image_key(&self, library: &jellyfin_api::LibraryView) -> String {
+        crate::image::key(
+            &self.config.server_url,
+            &library.id,
+            "Primary",
+            None,
+            self.image_width(420),
+        )
+    }
+
+    fn request_hub_images(&mut self) {
+        self.current_images.clear();
+        let Some(client) = self.client() else {
+            return;
+        };
+        if self.image_cache.is_none() {
+            return;
+        }
+        let width = self.image_width(420);
+        let mut requests = Vec::new();
+        for library in self.sidebar_libraries() {
+            let key = self.library_image_key(library);
+            let url = client.image_url(
+                &library.id,
+                jellyfin_api::ImageKind::Primary,
+                width,
+                None,
+                None,
+            );
+            requests.push((key, url, None, ImagePriority::High));
+        }
         self.send_images(requests);
     }
 

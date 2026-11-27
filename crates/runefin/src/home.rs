@@ -63,40 +63,59 @@ pub fn load_watching(client: &Client, now_days: i64) -> Result<Vec<Item>, String
 
 /// The library list and one Recently Added rail per video library. One library's query failing
 /// is not worth hiding the rest: that rail is skipped and the others stay.
-pub fn load_rails(client: &Client) -> Result<HomeRails, String> {
+pub fn load_rails(client: &Client, pins: &[String]) -> Result<HomeRails, String> {
     let t = crate::bench::timer();
     let libraries = client.libraries().map_err(|e| e.user_message())?;
     crate::bench::lap("libraries", t);
-    // The server owns the order; every library the reader can browse gets its own rail.
     let video: Vec<&LibraryView> = libraries
         .iter()
         .filter(|library| is_video_library(library))
         .collect();
-    let latest = std::thread::scope(|scope| {
-        let latest_jobs: Vec<_> = video
-            .iter()
-            .map(|library| {
-                scope.spawn(move || {
-                    let t = crate::bench::timer();
-                    let answer = client
-                        .latest(Some(&library.id), 12)
-                        .ok()
-                        .filter(|items| !items.is_empty())
-                        .map(|items| LatestRail {
-                            library: library.name.clone(),
-                            library_id: library.id.clone(),
-                            items,
-                        });
-                    crate::bench::lap("latest", t);
-                    answer
-                })
+    // One global `Latest` is the default. Pinned libraries replace it, never sit beside it.
+    let latest = if pins.is_empty() {
+        client
+            .latest(None, 12)
+            .ok()
+            .filter(|items| !items.is_empty())
+            .map(|items| LatestRail {
+                library: "All libraries".into(),
+                library_id: String::new(),
+                items,
             })
-            .collect();
-        latest_jobs
             .into_iter()
-            .filter_map(|job| job.join().expect("latest worker"))
-            .collect::<Vec<LatestRail>>()
-    });
+            .collect()
+    } else {
+        let selected: Vec<&LibraryView> = pins
+            .iter()
+            .filter_map(|id| video.iter().copied().find(|library| &library.id == id))
+            .take(4)
+            .collect();
+        std::thread::scope(|scope| {
+            let latest_jobs: Vec<_> = selected
+                .iter()
+                .map(|library| {
+                    scope.spawn(move || {
+                        let t = crate::bench::timer();
+                        let answer = client
+                            .latest(Some(&library.id), 12)
+                            .ok()
+                            .filter(|items| !items.is_empty())
+                            .map(|items| LatestRail {
+                                library: library.name.clone(),
+                                library_id: library.id.clone(),
+                                items,
+                            });
+                        crate::bench::lap("latest", t);
+                        answer
+                    })
+                })
+                .collect();
+            latest_jobs
+                .into_iter()
+                .filter_map(|job| job.join().expect("latest worker"))
+                .collect::<Vec<LatestRail>>()
+        })
+    };
     crate::bench::lap("rails", t);
     Ok(HomeRails { libraries, latest })
 }

@@ -59,6 +59,25 @@ fn focus(rt: &mut Runtime<State>, key: &str) {
     frame(rt);
 }
 
+/// Focus `key` and wait until it stays there. A page opening still has a focus request in
+/// flight; pressing before it lands measured the page's own focus, not the arrow.
+fn focus_settled(rt: &mut Runtime<State>, key: &str) -> bool {
+    rt.update(|_, tx| tx.focus(key.to_string(), true));
+    let mut held = 0;
+    for _ in 0..12 {
+        frame(rt);
+        if rt.focused_key().as_deref() == Some(key) {
+            held += 1;
+            if held >= 2 {
+                return true;
+            }
+        } else {
+            held = 0;
+        }
+    }
+    rt.focused_key().as_deref() == Some(key)
+}
+
 fn press(rt: &mut Runtime<State>, key: Key) {
     rt.key(KeyEvent {
         key,
@@ -138,4 +157,100 @@ pub(crate) fn assert_reachable_in(name: &str, state: State, size: (f32, f32), sc
         missing.len(),
         missing.join("\n  ")
     );
+}
+
+/// A focusable's on-screen box, for the direction audit.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Box2 {
+    pub x: f32,
+    pub y: f32,
+    pub w: f32,
+    pub h: f32,
+}
+
+impl Box2 {
+    fn center(&self) -> (f32, f32) {
+        (self.x + self.w / 2.0, self.y + self.h / 2.0)
+    }
+}
+
+fn boxes(rt: &Runtime<State>) -> BTreeMap<String, Box2> {
+    let mut found = BTreeMap::new();
+    for element in rt.elements() {
+        if !element.focusable || element.inert || element.exiting {
+            continue;
+        }
+        if element.opacity < 0.05 || element.rect[2] < 0.5 || element.rect[3] < 0.5 {
+            continue;
+        }
+        if let Some(key) = element.key.clone() {
+            found.entry(key).or_insert(Box2 {
+                x: element.rect[0],
+                y: element.rect[1],
+                w: element.rect[2],
+                h: element.rect[3],
+            });
+        }
+    }
+    found
+}
+
+/// Every arrow press that lands somewhere the eye would not follow: the new control is not in
+/// the pressed direction, or a vertical move leaves the pressed control's column entirely.
+/// A move into the rail is allowed to be diagonal, because that is what Left means here.
+pub(crate) fn directional_violations(state: State, size: (f32, f32)) -> Vec<String> {
+    let env = Env {
+        system_dark: true,
+        scale: 1.5,
+    };
+    let mut rt = Runtime::new(state, view, size, env);
+    rt.poll = Some(poll);
+    rt.on_key = Some(on_key);
+    rt.frame(0.0);
+    for _ in 0..30 {
+        frame(&mut rt);
+    }
+    let boxes = boxes(&rt);
+    let mut violations = Vec::new();
+    for (key, from) in &boxes {
+        for direction in [Key::Up, Key::Down, Key::Left, Key::Right] {
+            if !focus_settled(&mut rt, key) {
+                continue;
+            }
+            press(&mut rt, direction.clone());
+            let Some(next) = rt.focused_key() else {
+                continue;
+            };
+            if &next == key {
+                continue;
+            }
+            // The rail is its own list group: Rune owns its vertical edges and the escape
+            // into the page. The zones own content-to-content moves.
+            let vertical = matches!(direction, Key::Up | Key::Down);
+            let rail = |at: &str| at.starts_with("nav-");
+            if vertical && (rail(key) || rail(&next)) {
+                continue;
+            }
+            let Some(to) = boxes.get(&next) else {
+                violations.push(format!("{key}: {direction:?} -> {next} (not drawn)"));
+                continue;
+            };
+            let (fx, fy) = from.center();
+            let (tx, ty) = to.center();
+            let bad = match direction {
+                Key::Right => tx <= fx + 1.0,
+                Key::Left => tx >= fx - 1.0,
+                Key::Up => ty >= fy - 1.0,
+                Key::Down => ty <= fy + 1.0,
+                _ => false,
+            };
+            if bad {
+                violations.push(format!(
+                    "{key} [{:.0},{:.0}] {direction:?} -> {next} [{:.0},{:.0}]",
+                    fx, fy, tx, ty
+                ));
+            }
+        }
+    }
+    violations
 }

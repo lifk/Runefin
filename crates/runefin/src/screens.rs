@@ -16,6 +16,8 @@ use crate::state::{Route, State, Step};
 
 mod detail;
 mod downloads;
+mod home_rails;
+mod hub;
 mod in_app;
 mod keyboard;
 mod library;
@@ -31,19 +33,67 @@ mod settings;
 pub(super) const CARD_W: f32 = theme::CARD_W;
 pub(super) const CARD_H: f32 = theme::CARD_H;
 pub(super) const CARD_GAP: f32 = theme::CARD_GAP;
-pub(super) const RESUME_W: f32 = 304.0;
-pub(super) const RESUME_H: f32 = 171.0;
+pub(super) const RESUME_W: f32 = 174.0;
+pub(super) const RESUME_H: f32 = 98.0;
 pub(super) fn hero_style() -> TextStyle {
     // A page title, not a poster line: 40/650 with the tracking large type needs, and a line
     // height the subtitle can sit under without a gap.
-    TextStyle::new(40.0, 650.0).tracking(-0.9).lh(46.0)
+    TextStyle::new(46.0, 730.0).tracking(-1.3).lh(46.0)
 }
 pub(super) fn subtitle_style() -> TextStyle {
     type_::body()
 }
 
+/// One authored page transition. The key changes with the route, so Rune fades the old page
+/// out and the new one in as a group; `instant_changes` keeps every child from fading on its
+/// own, and a matched poster/portrait escapes it with `animated_changes`.
+fn route_key(s: &State) -> String {
+    match &s.route {
+        Route::Home => s
+            .shelf
+            .map_or_else(|| "home".to_string(), |shelf| format!("shelf-{shelf:?}")),
+        Route::Libraries => "libraries".into(),
+        Route::Library { id } => format!("library-{id}"),
+        Route::Detail { id } => format!("detail-{id}"),
+        Route::Person { id } => format!("person-{id}"),
+        Route::SeerrPerson { tmdb_id } => format!("seerr-person-{tmdb_id}"),
+        Route::Search { scope } => format!("search-{}", scope.as_deref().unwrap_or("all")),
+        Route::Remote => "remote".into(),
+        Route::Downloads => "downloads".into(),
+        Route::LiveTv => "live".into(),
+        Route::Settings => "settings".into(),
+        Route::Seerr => "seerr".into(),
+        Route::SeerrDetail {
+            media_type,
+            tmdb_id,
+        } => format!("seerr-{media_type}-{tmdb_id}"),
+    }
+}
+
+pub(super) fn page_transition(s: &State, base: El) -> El {
+    el().key(format!("page-{}", route_key(s)))
+        .w_full()
+        .h_full()
+        .transition(
+            rune::Transition::opacity()
+                .combined(rune::Transition::offset(
+                    0.0,
+                    if s.nav_delta < 0 {
+                        -6.0
+                    } else if s.nav_delta > 0 {
+                        8.0
+                    } else {
+                        0.0
+                    },
+                ))
+                .springs(theme::motion::PAGE),
+        )
+        .instant_changes()
+        .child(base)
+}
+
 pub fn view(s: &State, _cx: &mut Cx<State>) -> El {
-    let mut base = if !s.is_signed_in() {
+    let base = if !s.is_signed_in() {
         connect(s)
     } else if s.in_app.is_some() && !s.in_app_minimized {
         in_app::in_app_screen(s)
@@ -76,9 +126,11 @@ pub fn view(s: &State, _cx: &mut Cx<State>) -> El {
             Route::Settings => settings::settings_screen(s),
             Route::Seerr => seerr::seerr_screen(s),
             Route::SeerrDetail { .. } => seerr::seerr_detail_screen(s),
+            Route::Libraries => hub::libraries_screen(s),
             Route::Home => home(s),
         }
     };
+    let mut base = page_transition(s, base);
     if s.in_app_minimized {
         base = el()
             .key("mini-player-layer")
@@ -87,6 +139,12 @@ pub fn view(s: &State, _cx: &mut Cx<State>) -> El {
             .child(base)
             .child(mini_player(s));
     }
+    let base = with_rail(s, base);
+    let base = if s.home_rails_open {
+        base.child(home_rails::home_rails_sheet(s))
+    } else {
+        base
+    };
     let base = if s.shortcuts_open {
         el().key("shortcut-layer")
             .w_full()
@@ -156,8 +214,10 @@ pub fn view(s: &State, _cx: &mut Cx<State>) -> El {
                         .radius(12.0)
                         .transition(
                             rune::Transition::offset(0.0, 12.0)
-                                .combined(rune::Transition::opacity()),
+                                .combined(rune::Transition::opacity())
+                                .springs(theme::motion::TOAST_PAIR),
                         )
+                        .motion(theme::motion::TOAST)
                         .backdrop_blur(14.0)
                         .fill(theme::colors().card.alpha(0.68))
                         .gradient(Color::WHITE.alpha(0.06), Color::TRANSPARENT)
@@ -176,7 +236,7 @@ pub fn view(s: &State, _cx: &mut Cx<State>) -> El {
                                 .px(10.0)
                                 .radius(7.0)
                                 .center()
-                                .fill(tok::accent(0, true).alpha(0.16))
+                                .fill(crate::theme::accent().alpha(0.16))
                                 .hover(theme::colors().hover)
                                 .motion(crate::theme::motion::CONTROL)
                                 .focusable(true)
@@ -288,7 +348,7 @@ fn mini_player(s: &State) -> El {
                             el().w_full().h(3.0).radius(1.5).child(
                                 el().grow(progress.max(0.001))
                                     .h(3.0)
-                                    .fill(tok::accent(0, true)),
+                                    .fill(crate::theme::accent()),
                             ),
                         ),
                 ),
@@ -562,10 +622,10 @@ fn connect(s: &State) -> El {
         .role("button")
         .h(38.0)
         .radius(10.0)
-        .fill(tok::accent(0, true))
+        .fill(crate::theme::accent())
         .gradient(Color::WHITE.alpha(0.18), Color::TRANSPARENT)
         .shadow(1.0, 2.0, Color::BLACK.alpha(0.30))
-        .shadow(4.0, 12.0, tok::accent(0, true).alpha(0.35))
+        .shadow(4.0, 12.0, crate::theme::accent().alpha(0.35))
         .hover(t.hover)
         .motion(crate::theme::motion::CONTROL)
         .center()
@@ -680,8 +740,8 @@ fn connect(s: &State) -> El {
                     [0.5, 0.22],
                     430.0,
                     [
-                        (0.0, tok::accent(0, true).alpha(0.10)),
-                        (0.6, tok::accent(0, true).alpha(0.035)),
+                        (0.0, crate::theme::accent().alpha(0.10)),
+                        (0.6, crate::theme::accent().alpha(0.035)),
                         (1.0, Color::TRANSPARENT),
                     ],
                 ),
@@ -740,7 +800,7 @@ fn quick_card(quick: &crate::state::QuickLogin, t: &tok::Theme) -> El {
                     .color(if quick.code.is_empty() {
                         t.text_secondary
                     } else {
-                        tok::accent(0, true)
+                        crate::theme::accent()
                     }),
                 ),
         )
@@ -864,12 +924,12 @@ fn field(
         .px(10.0)
         .center_y()
         .fill(t.card)
-        .outline(if focused { 1.5 } else { 0.0 }, 0.0, tok::accent(0, true))
+        .outline(if focused { 1.5 } else { 0.0 }, 0.0, crate::theme::accent())
         .box_shadow(rune::Shadow {
             y: 0.0,
             blur: 0.0,
             spread: if focused { 3.0 } else { 0.0 },
-            color: tok::accent(0, true).alpha(if focused { 0.18 } else { 0.0 }),
+            color: crate::theme::accent().alpha(if focused { 0.18 } else { 0.0 }),
             inset: false,
             ..rune::Shadow::default()
         })
@@ -898,7 +958,11 @@ fn shelf_screen(s: &State, shelf: crate::state::HomeShelf) -> El {
     let items: &[Item] = match shelf {
         crate::state::HomeShelf::ContinueWatching => &s.home_data.resume,
         crate::state::HomeShelf::NextUp => &s.home_data.next_up,
-        crate::state::HomeShelf::RecentlyPlayed => &s.home_data.recently_played,
+        crate::state::HomeShelf::RecentlyAdded => s
+            .home_data
+            .latest
+            .first()
+            .map_or(&[], |rail| rail.items.as_slice()),
     };
     let mut grid = row().w_full().gap(CARD_GAP).flex_wrap();
     for item in items {
@@ -989,435 +1053,226 @@ fn home(s: &State) -> El {
         .child(content(s, &t))
 }
 
-pub(super) fn sidebar(s: &State, t: &tok::Theme) -> El {
-    let collapsed = s.sidebar_collapsed;
-    let width = if collapsed { 88.0 } else { theme::SIDEBAR_W };
-    let brand = if collapsed {
-        el().key("wordmark")
-            .role("button")
-            .label("Expand sidebar")
-            .help("Expand sidebar")
-            .w(40.0)
-            .h(40.0)
-            .radius(8.0)
-            .center()
-            .hover(t.hover)
-            .focusable(true)
-            .focus_visual(2.0)
-            .press_scale(0.94)
-            .cursor(rune::Cursor::Pointer)
-            .on_press(|s: &mut State| s.toggle_sidebar())
-            .child(
-                el().w(32.0)
-                    .h(32.0)
-                    .pixels_fit(theme::app_icon(), SurfaceFit::Fit),
-            )
-    } else {
-        let logo = el().key("wordmark").w(84.0).h(34.0).child(
-            el().w_full()
-                .h_full()
-                .pixels_fit(theme::logo(), SurfaceFit::Fit),
-        );
-        // The wordmark is drawn for dark ground: pale letters with a light edge. On the
-        // light theme it gets the app mark's own dark squircle as a plaque.
-        if theme::is_light() {
-            el().padding(5.0)
-                .radius(9.0)
-                .fill(Color::BLACK.alpha(0.86))
-                .child(logo)
-        } else {
-            logo
-        }
-    };
-    // A TV opens on the full sidebar and has no pointer to change that; the chevron would be
-    // an unreachable control.
-    let toggle = if s.big_screen {
-        el()
-    } else {
-        el().key("sidebar-toggle")
-            .role("button")
-            .label(if collapsed {
-                "Expand sidebar"
-            } else {
-                "Collapse sidebar"
-            })
-            .w(28.0)
-            .h(28.0)
-            .radius(7.0)
-            .center()
-            .fill(t.card)
-            .hover(t.hover)
-            .motion(crate::theme::motion::CONTROL)
-            .focusable(true)
-            .focus_visual(2.0)
-            .press_scale(0.94)
-            .help(if collapsed {
-                "Expand sidebar"
-            } else {
-                "Collapse sidebar"
-            })
-            .child(
-                icon(
-                    if collapsed {
-                        &theme::icon::CHEVRON_RIGHT
-                    } else {
-                        &theme::icon::CHEVRON_LEFT
-                    },
-                    14.0,
-                )
-                .color(t.text_secondary),
-            )
-            .cursor(rune::Cursor::Pointer)
-            .on_press(|s: &mut State| s.toggle_sidebar())
-    };
-    // Collapsed, the mark is the expand control and sits on the nav column's centre line: a
-    // row with the chevron would push it left of every icon below it.
-    let header = if collapsed {
-        col().w_full().items_center().child(brand)
-    } else {
-        row()
-            .w_full()
-            .gap(6.0)
-            .items_center()
-            .child(brand)
-            .child(el().grow(1.0))
-            .child(toggle)
-    };
-    let mut list = col()
-        .key("sidebar")
-        .w(width)
-        .h_full()
-        .padding(if collapsed { 10.0 } else { 18.0 })
-        .gap(if collapsed { 8.0 } else { 6.0 })
-        .fill(t.bg)
-        .gradient(t.card, t.bg)
-        .focus_group()
-        .child(header);
-    let mut nav = col()
-        .key("sidebar-nav")
-        .w_full()
-        .gap(if collapsed { 8.0 } else { 6.0 });
-    if collapsed {
-        nav = nav.items_center();
-    }
-    nav = nav.child(
-        nav_item(
-            "Home",
-            "nav-home",
-            matches!(s.route, Route::Home),
-            t,
-            &theme::icon::HOME,
-            collapsed,
-        )
-        .on_press(|s: &mut State| s.go_home()),
-    );
-
-    if !s.home_data.libraries.is_empty() {
-        if !collapsed {
-            nav = nav.child(
-                text("LIBRARIES")
-                    .key("libraries-label")
-                    .font(type_::section())
-                    .color(t.text_secondary)
-                    .mt(14.0)
-                    .mb(2.0),
-            );
-        }
-        for library in s.sidebar_libraries() {
-            let is_live = library.collection_type.as_deref() == Some("livetv");
-            let selected = if is_live {
-                matches!(s.route, Route::LiveTv)
-            } else {
-                matches!(&s.route, Route::Library { id } if id == &library.id)
-            };
-            let id = library.id.clone();
-            let name = library.name.clone();
-            let collection_type = library.collection_type.clone();
-            let glyph: &'static rune::Icon = match collection_type.as_deref() {
-                Some("movies") => &theme::icon::FILM,
-                Some("tvshows") => &theme::icon::TV,
-                Some("boxsets") => &theme::icon::LAYERS,
-                Some("livetv") => &theme::icon::ANTENNA,
-                Some("playlists") => &theme::icon::LIST,
-                _ if library.name.to_ascii_lowercase().contains("record") => &theme::icon::RECORD,
-                _ => &theme::icon::LIBRARY,
-            };
-            nav = nav.child(
-                nav_item(
-                    &library.name,
-                    &format!("library-{}", library.id),
-                    selected,
-                    t,
-                    glyph,
-                    collapsed,
-                )
-                .on_press(move |s: &mut State| {
-                    if collection_type.as_deref() == Some("livetv") {
-                        s.open_live_tv();
-                    } else {
-                        s.open_library(id.clone(), name.clone(), collection_type.clone());
-                    }
-                }),
-            );
-        }
-    } else if !s.home_loaded {
-        list = list
-            .child(skeleton_bar(80.0, t).mt(14.0))
-            .child(skeleton_bar(112.0, t))
-            .child(skeleton_bar(94.0, t));
-    }
-
-    nav = nav.child(
-        nav_item(
-            "Watchlist",
-            "nav-watchlist",
-            matches!(&s.route, Route::Library { id } if id == "__watchlist__"),
-            t,
-            &theme::icon::HEART,
-            collapsed,
-        )
-        .on_press(|s: &mut State| s.open_watchlist()),
-    );
-
-    if !s.playlists.is_empty() {
-        if !collapsed {
-            nav = nav.child(
-                text("PLAYLISTS")
-                    .key("playlists-label")
-                    .font(type_::section())
-                    .color(t.text_secondary)
-                    .mt(14.0)
-                    .mb(2.0),
-            );
-        }
-        for playlist in s.playlists.iter() {
-            let id = playlist.id.clone();
-            let name = playlist.name.clone();
-            nav = nav.child(
-                nav_item(
-                    &playlist.name,
-                    &format!("playlist-{}", playlist.id),
-                    matches!(&s.route, Route::Library { id } if id == &playlist.id),
-                    t,
-                    &theme::icon::LIST,
-                    collapsed,
-                )
-                .on_press(move |s: &mut State| s.open_playlist(id.clone(), name.clone())),
-            );
-        }
-    }
-
-    if !s.config.seerr_url.is_empty() {
-        let item = nav_item(
-            "Discover",
-            "nav-seerr",
-            matches!(s.route, Route::Seerr | Route::SeerrDetail { .. }),
-            t,
-            &theme::icon::COMPASS,
-            collapsed,
-        )
-        .on_press(|s: &mut State| s.open_seerr(crate::state::SeerrTab::Discover));
-        nav = nav.child(item);
-    }
-
-    if !collapsed {
-        nav = nav.child(
-            text("TOOLS")
-                .key("tools-label")
-                .font(type_::section())
-                .color(t.text_secondary)
-                .mt(8.0)
-                .mb(2.0),
-        );
-    }
-    nav = nav
-        .child(
-            nav_item(
-                "Search",
-                "nav-search",
-                matches!(s.route, Route::Search { .. }),
-                t,
-                &theme::icon::SEARCH,
-                collapsed,
-            )
-            .on_press(|s: &mut State| s.open_search(None)),
-        )
-        .child(
-            nav_item(
-                "Remote",
-                "nav-remote",
-                matches!(s.route, Route::Remote),
-                t,
-                &theme::icon::REMOTE,
-                collapsed,
-            )
-            .on_press(|s: &mut State| s.open_remote()),
-        )
-        .child(
-            nav_item(
-                "Downloads",
-                "nav-downloads",
-                matches!(s.route, Route::Downloads),
-                t,
-                &theme::icon::DOWNLOAD,
-                collapsed,
-            )
-            .on_press(|s: &mut State| s.open_downloads()),
-        )
-        .children(s.big_screen.then(|| {
-            nav_item(
-                "Controls",
-                "nav-controls",
-                s.shortcuts_open,
-                t,
-                &theme::icon::GAMEPAD,
-                collapsed,
-            )
-            .on_press(|s: &mut State| s.toggle_shortcuts())
-        }));
-
-    list = list.child(
-        el().key("sidebar-nav-scroll")
-            .w_full()
-            .grow(1.0)
-            .min_h(0.0)
-            .scroll(ScrollSpec {
-                stick_bottom: false,
-            })
-            .scroll_edge_fade(16.0)
-            .child(nav),
-    );
-    list = list
-        .child(
-            rune::hairline(t.separator)
-                .key("sidebar-footer-separator")
-                .w_full()
-                .mt(6.0)
-                .mb(4.0),
-        )
-        .child(
-            nav_item(
-                "Settings",
-                "nav-settings",
-                matches!(s.route, Route::Settings),
-                t,
-                &theme::icon::SETTINGS,
-                collapsed,
-            )
-            .on_press(|s: &mut State| s.open_settings()),
-        );
-
-    // The TV keeps the bottom row inside the safe area: the account is in Settings, and a
-    // second profile chip would push the Tools section past 720 points on a full server.
-    list.children((!s.big_screen).then(|| {
-        row()
-            .key("user-name")
-            .w_full()
-            .gap(8.0)
-            .child(
-                el().w(28.0)
-                    .h(28.0)
-                    .radius(14.0)
-                    .center()
-                    .fill(t.card)
-                    .child(
-                        text(
-                            s.config
-                                .user_name
-                                .chars()
-                                .next()
-                                .map_or_else(|| "?".to_string(), |c| c.to_uppercase().to_string()),
-                        )
-                        .font(type_::caption())
-                        .color(t.text_secondary),
-                    ),
-            )
-            .children((!collapsed).then(|| {
-                text(s.config.user_name.clone())
-                    .font(type_::meta())
-                    .color(t.text_secondary)
-            }))
-    }))
+/// Every screen reserves the rail's width with this spacer. The rail itself is one overlay in
+/// `with_rail`, so it can expand over the page without reflowing a single card.
+pub(super) fn sidebar(_s: &State, _t: &tok::Theme) -> El {
+    el().w(theme::SIDEBAR_W).h_full()
 }
 
-fn nav_item(
+/// The five destinations, in the screen spec's order: Search is the second anchor.
+pub(super) const RAIL_KEYS: [&str; 5] = [
+    "nav-home",
+    "nav-search",
+    "nav-libraries",
+    "nav-live",
+    "nav-settings",
+];
+
+fn rail_expanded(s: &State) -> bool {
+    s.focused_key
+        .as_deref()
+        .is_some_and(|key| RAIL_KEYS.contains(&key))
+}
+
+fn rail_visible(s: &State) -> bool {
+    // Detail and Seerr detail are full-bleed pages with their own Back; the rail would cover
+    // the poster and contradict the captures.
+    if matches!(s.route, Route::Detail { .. } | Route::SeerrDetail { .. }) {
+        return false;
+    }
+    let full_player = s.in_app.is_some() && !s.in_app_minimized;
+    s.is_signed_in() && !full_player && !s.in_app_launching && !s.launching && s.playback.is_none()
+}
+
+/// Wrap a page in the shell. The page already carries the 76 pt spacer from `sidebar`; the rail
+/// is an absolute overlay, so the content never moves when it opens.
+pub(super) fn with_rail(s: &State, base: El) -> El {
+    if !rail_visible(s) {
+        return base;
+    }
+    let t = theme::colors();
+    let expanded = rail_expanded(s);
+    let scrim = expanded.then(|| {
+        el().key("rail-scrim")
+            .absolute(0.0, 0.0)
+            .w_full()
+            .h_full()
+            .fill(Color::BLACK.alpha(0.38))
+            .motion(theme::motion::RAIL)
+            .transition(rune::Transition::opacity().springs(theme::motion::PAGE))
+            .no_focus_ring()
+    });
+    el().key("app-shell")
+        .w_full()
+        .h_full()
+        .child(base)
+        .children(scrim)
+        .child(nav_rail(s, &t, expanded))
+}
+
+fn nav_rail(s: &State, t: &tok::Theme, expanded: bool) -> El {
+    let width = if expanded {
+        theme::RAIL_OPEN_W
+    } else {
+        theme::SIDEBAR_W
+    };
+    let mark = if expanded {
+        el().w(84.0)
+            .h(34.0)
+            .pixels_fit(theme::logo(), SurfaceFit::Fit)
+    } else {
+        el().w(32.0)
+            .h(32.0)
+            .pixels_fit(theme::app_icon(), SurfaceFit::Fit)
+    };
+    let mut list = col()
+        .key("rail-list")
+        // A list group moves on Up/Down and stops at its ends; Left/Right fall through to the
+        // zone router. Without the role the group kept wrapping Home -> Settings.
+        .role("list")
+        .w_full()
+        .gap(if expanded { 4.0 } else { 7.0 })
+        .focus_group()
+        .child(
+            el().key("rail-mark")
+                .w_full()
+                .h(if expanded { 46.0 } else { 44.0 })
+                .center()
+                .child(mark),
+        )
+        .child(rail_item(
+            "Home",
+            "nav-home",
+            &theme::icon::HOME,
+            matches!(s.route, Route::Home),
+            RailMode {
+                expanded,
+                focused: s.focused_key.as_deref() == Some("nav-home"),
+            },
+            t,
+            |s| s.go_home(),
+        ))
+        .child(rail_item(
+            "Search",
+            "nav-search",
+            &theme::icon::SEARCH,
+            matches!(s.route, Route::Search { .. }),
+            RailMode {
+                expanded,
+                focused: s.focused_key.as_deref() == Some("nav-search"),
+            },
+            t,
+            |s| s.open_search(None),
+        ))
+        .child(rail_item(
+            "Libraries",
+            "nav-libraries",
+            &theme::icon::LIBRARY,
+            matches!(s.route, Route::Libraries | Route::Library { .. }),
+            RailMode {
+                expanded,
+                focused: s.focused_key.as_deref() == Some("nav-libraries"),
+            },
+            t,
+            |s| s.open_libraries(),
+        ))
+        .child(rail_item(
+            "Live TV",
+            "nav-live",
+            &theme::icon::ANTENNA,
+            matches!(s.route, Route::LiveTv),
+            RailMode {
+                expanded,
+                focused: s.focused_key.as_deref() == Some("nav-live"),
+            },
+            t,
+            |s| s.open_live_tv(),
+        ))
+        .child(el().grow(1.0))
+        .child(rail_item(
+            "Settings",
+            "nav-settings",
+            &theme::icon::SETTINGS,
+            matches!(s.route, Route::Settings),
+            RailMode {
+                expanded,
+                focused: s.focused_key.as_deref() == Some("nav-settings"),
+            },
+            t,
+            |s| s.open_settings(),
+        ));
+    list = list.padding(if expanded { 12.0 } else { 14.0 });
+    col()
+        .key("rail")
+        .absolute(0.0, 0.0)
+        .w(width)
+        .h_full()
+        .fill(t.bg)
+        .gradient(t.card, t.bg)
+        .outline(1.0, 0.0, t.separator)
+        .motion(theme::motion::RAIL)
+        .child(list)
+}
+
+#[derive(Clone, Copy)]
+struct RailMode {
+    expanded: bool,
+    focused: bool,
+}
+
+fn rail_item(
     label: &str,
     key: &str,
-    selected: bool,
-    t: &tok::Theme,
     glyph: &'static Icon,
-    collapsed: bool,
+    selected: bool,
+    mode: RailMode,
+    t: &tok::Theme,
+    on: impl Fn(&mut State) + 'static,
 ) -> El {
+    let expanded = mode.expanded;
+    let focused = mode.focused;
     let mut item = el()
         .key(key)
         .role("button")
-        .h(36.0)
-        .px(if collapsed { 0.0 } else { 10.0 })
+        .h(if expanded { 40.0 } else { 44.0 })
+        .radius(9.0)
         .gap(10.0)
-        .radius(8.0)
         .center_y()
         .fill(if selected {
-            tok::accent(0, true)
+            Color::WHITE.alpha(0.08)
         } else {
-            rune::Color::TRANSPARENT
+            Color::TRANSPARENT
         })
+        .outline(
+            if selected { 1.0 } else { 0.0 },
+            0.0,
+            Color::WHITE.alpha(0.12),
+        )
         .hover(t.hover)
-        .motion(crate::theme::motion::CONTROL)
+        .motion(theme::motion::HOVER)
+        .scale(if focused { 1.05 } else { 1.0 })
         .focusable(true)
         .focus_visual(2.0)
-        .press_scale(0.98)
+        .press_scale(0.96)
         .cursor(rune::Cursor::Pointer)
         .label(label.to_string())
         .help(label.to_string())
-        .child(icon(glyph, 18.0).color(if selected {
-            theme::on_accent()
-        } else {
-            t.text_secondary
-        }));
-    if selected {
-        // The nav scroll clips its contents, so an outer halo ends on a hard edge at the
-        // viewport sides. A contained top highlight lights the pill without an edge to cut.
+        .child(icon(glyph, 19.0).color(if selected { t.text } else { t.text_secondary }))
+        .on_press(move |s: &mut State| on(s));
+    if expanded {
         item = item
-            .box_shadow(rune::Shadow {
-                y: 1.0,
-                blur: 0.0,
-                spread: 0.0,
-                color: Color::WHITE.alpha(0.12),
-                inset: true,
-                ..rune::Shadow::default()
-            })
-            .box_shadow(rune::Shadow {
-                y: -1.0,
-                blur: 0.0,
-                spread: 0.0,
-                color: Color::BLACK.alpha(0.28),
-                inset: true,
-                ..rune::Shadow::default()
-            });
-    }
-    if collapsed {
-        item = item.w(60.0).center();
+            .w_full()
+            .px(10.0)
+            .child(text(label).font(type_::label()).color(if selected {
+                t.text
+            } else {
+                t.text_secondary
+            }))
+            .transition(rune::Transition::opacity().springs(theme::motion::SHEET_PAIR));
     } else {
-        item = item.child(text(label).font(type_::body()).color(if selected {
-            // White on the dark theme's state blue; near-black on the light theme's.
-            theme::on_accent()
-        } else {
-            t.text_secondary
-        }));
+        item = item.w(48.0).center();
     }
-    // The sidebar's focus cue is a wash, not the near-white ring: at 4K the 2 pt ring is six
-    // physical pixels of hard white around a 36 pt row, which reads as a line drawn around the
-    // item. A selected pill is already accent-filled, so its focus lifts a little further.
-    if theme::is_big_screen() {
-        item.focus_fill(if selected {
-            Color::WHITE.alpha(0.20)
-        } else {
-            Color::WHITE.alpha(0.14)
-        })
-        .no_focus_ring()
-    } else {
-        theme::tv_focus(item)
-    }
+    item
 }
 
 fn content(s: &State, t: &tok::Theme) -> El {
@@ -1426,38 +1281,35 @@ fn content(s: &State, t: &tok::Theme) -> El {
     } else {
         "Pick up where you left off"
     };
-    // The halo exists to separate words from artwork. Home's default surface is flat, so a
-    // shadow there is a visible double edge on every glyph.
-    let over_art = s.home_backdrop_key().is_some();
-    let heading = |value: &str, style: rune::TextStyle| {
-        if over_art {
-            theme::readable_text(value.to_string(), style, t.text)
-        } else {
-            text(value.to_string()).font(style).color(t.text)
-        }
+    let hero = s.home_hero.then(|| home_hero(s, t)).flatten();
+    let header = if hero.is_some() {
+        el()
+    } else {
+        row()
+            .key("home-header")
+            .w_full()
+            .pt(28.0)
+            .pb(22.0)
+            .px(theme::gutter())
+            .gap(16.0)
+            .items_start()
+            .child(
+                col()
+                    .grow(1.0)
+                    .gap(6.0)
+                    .child(
+                        text("Home")
+                            .font(hero_style())
+                            .color(t.text)
+                            .key("home-title"),
+                    )
+                    .child(
+                        text(subtitle.to_string())
+                            .font(subtitle_style())
+                            .color(t.text_secondary),
+                    ),
+            )
     };
-    let header = row()
-        .key("home-header")
-        .w_full()
-        .pt(28.0)
-        .pb(22.0)
-        .px(theme::gutter())
-        .gap(16.0)
-        .items_start()
-        .child(
-            col()
-                .grow(1.0)
-                .gap(6.0)
-                .child(heading("Home", hero_style()).key("home-title"))
-                .child(if over_art {
-                    theme::readable_text(subtitle.to_string(), subtitle_style(), t.text_secondary)
-                } else {
-                    text(subtitle.to_string())
-                        .font(subtitle_style())
-                        .color(t.text_secondary)
-                }),
-        );
-
     let body = if s.home_data.is_empty() {
         if let Some(message) = &s.home_error {
             error_state(message, t)
@@ -1476,28 +1328,35 @@ fn content(s: &State, t: &tok::Theme) -> El {
             .scroll(ScrollSpec {
                 stick_bottom: false,
             })
-            .px(theme::gutter())
             .pb(if s.in_app_minimized { 124.0 } else { 32.0 })
-            .gap(theme::RAIL_GAP)
             .children(
                 s.home_error
                     .as_ref()
                     .map(|message| error_banner(message, t)),
             )
-            .children(s.home_hero.then(|| home_hero(s, t)).flatten())
-            .child(rails(s, t))
+            .children(hero)
+            .child(
+                col()
+                    .w_full()
+                    .px(theme::gutter())
+                    .pt(if s.home_hero { 16.0 } else { 0.0 })
+                    .gap(theme::RAIL_GAP)
+                    .child(rails(s, t)),
+            )
     };
-
     let mut page = col()
         .key("home-content")
         .grow(1.0)
         .min_w(0.0)
         .min_h(0.0)
         .h_full()
-        .fill(t.bg)
-        .child(ambient(s, t));
-    // A lit band under the header: the top of the page catches the light, the rails stay on
-    // the page's own black. No artwork — one gradient, clipped to its own box.
+        .fill(t.bg);
+    // With the billboard up, its own gradient already ends in the page colour. The ambient
+    // backdrop under the rest of the page put a dim image below that solid edge, which read as
+    // a seam across the top item.
+    if !s.home_hero {
+        page = page.child(ambient(s, t));
+    }
     let band = el()
         .key("home-band")
         .absolute(0.0, 0.0)
@@ -1506,12 +1365,16 @@ fn content(s: &State, t: &tok::Theme) -> El {
         .linear_gradient(
             std::f32::consts::PI,
             [
-                (0.0, t.card.alpha(0.75)),
-                (0.55, t.card.alpha(0.32)),
+                (0.0, t.card.alpha(0.55)),
+                (0.55, t.card.alpha(0.22)),
                 (1.0, Color::TRANSPARENT),
             ],
         );
-    page = page.child(band).child(header).child(body);
+    if s.home_hero {
+        page = page.child(header).child(body);
+    } else {
+        page = page.child(band).child(header).child(body);
+    }
     page
 }
 
@@ -1558,16 +1421,16 @@ fn ambient(s: &State, t: &tok::Theme) -> El {
 /// first Continue Watching entry the reader has not hidden.
 fn home_hero(s: &State, t: &tok::Theme) -> Option<El> {
     let item = s.hero_item()?;
-    let image = s
-        .hero_backdrop_key()
-        .and_then(|key| poster_layers(s, &key, SurfaceFit::Fill))
+    let image_key = s.hero_backdrop_key().or_else(|| s.resume_image_key(item));
+    let image = image_key
+        .as_deref()
+        .and_then(|key| poster_layers(s, key, SurfaceFit::Fill))
         .unwrap_or_else(|| el().w_full().h_full().fill(t.card));
     let title = item
         .series_name
         .as_deref()
         .unwrap_or(&item.name)
         .to_string();
-    // An episode's name is the useful subject; a film's title is already the heading.
     let subtitle = match item.episode_label() {
         Some(label) => {
             let left = crate::home::remaining(item)
@@ -1577,98 +1440,109 @@ fn home_hero(s: &State, t: &tok::Theme) -> Option<El> {
         }
         None => crate::home::resume_subtitle(item),
     };
+    let series =
+        item.kind.eq_ignore_ascii_case("episode") || item.kind.eq_ignore_ascii_case("series");
+    let kicker = if series {
+        "Continue watching · Series"
+    } else {
+        "Continue watching · Film"
+    };
+    let mut facts = Vec::new();
+    if let Some(year) = item.production_year {
+        facts.push(year.to_string());
+    }
+    if let Some(rating) = &item.official_rating {
+        facts.push(rating.clone());
+    }
+    facts.push(subtitle);
+    let meta = facts.join("  ·  ");
     let id = item.series_id.clone().unwrap_or_else(|| item.id.clone());
     let play = item.clone();
+    let detail = id.clone();
+    let height = (s.window_size.1 * 0.5).clamp(300.0, 560.0);
     Some(
         el().key("home-hero")
             .w_full()
-            .h(180.0)
-            .radius(14.0)
-            .clip_rounded(14.0)
-            .fill(t.card)
-            .surface_sheen()
-            .outline(1.0, 0.0, t.card_border)
-            .shadow(1.0, 2.0, t.shadow)
-            .shadow(8.0, 24.0, t.shadow_soft)
+            .h(height)
+            .clip_rounded(0.0)
             .child(
                 el().absolute(0.0, 0.0)
                     .w_full()
                     .h_full()
-                    .opacity(0.55)
+                    .opacity(0.92)
                     .child(image),
             )
             .child(el().absolute(0.0, 0.0).w_full().h_full().linear_gradient(
                 std::f32::consts::FRAC_PI_2,
                 [
-                    (0.0, t.bg.alpha(0.95)),
-                    (0.55, t.bg.alpha(0.55)),
-                    (1.0, t.bg.alpha(0.20)),
+                    (0.0, t.bg.alpha(0.98)),
+                    (0.34, t.bg.alpha(0.78)),
+                    (0.70, t.bg.alpha(0.18)),
+                    (1.0, Color::TRANSPARENT),
+                ],
+            ))
+            .child(el().absolute(0.0, 0.0).w_full().h_full().linear_gradient(
+                std::f32::consts::PI,
+                [
+                    (0.0, Color::TRANSPARENT),
+                    (0.55, t.bg.alpha(0.10)),
+                    (1.0, t.bg),
                 ],
             ))
             .child(
                 col()
-                    .absolute(0.0, 0.0)
-                    .w_full()
-                    .h_full()
-                    .padding(22.0)
-                    .justify_center()
+                    .absolute(theme::gutter(), height - 164.0)
+                    .w(560.0)
                     .gap(8.0)
-                    .items_start()
+                    .child(text(kicker).font(type_::caption()).color(t.text_secondary))
                     .child(
-                        text("Featured")
-                            .font(type_::caption())
-                            .color(tok::accent(0, true)),
-                    )
-                    .child(
-                        theme::readable_text(title, type_::section(), t.text)
+                        theme::readable_text(title.clone(), hero_style(), t.text)
                             .key("home-hero-title"),
                     )
                     .child(
-                        theme::readable_text(subtitle, type_::meta(), t.text_secondary)
+                        theme::readable_text(meta, type_::meta(), t.text_secondary)
                             .key("home-hero-subtitle"),
                     )
                     .child(
                         row()
-                            .gap(8.0)
+                            .gap(9.0)
+                            .mt(6.0)
                             .child(
                                 el().key("home-hero-play")
                                     .role("button")
-                                    .h(36.0)
-                                    .px(16.0)
-                                    .radius(9.0)
+                                    .label("Resume")
+                                    .h(38.0)
+                                    .px(18.0)
+                                    .radius(8.0)
                                     .center()
-                                    .fill(tok::accent(0, true))
-                                    .gradient(Color::WHITE.alpha(0.14), Color::TRANSPARENT)
-                                    .shadow(1.0, 2.0, Color::BLACK.alpha(0.30))
-                                    .shadow(4.0, 12.0, tok::accent(0, true).alpha(0.35))
+                                    .fill(t.text)
                                     .hover(t.hover)
+                                    .motion(theme::motion::CONTROL)
                                     .focusable(true)
-                                    .focus_visual(2.0)
+                                    .focus_on_light()
+                                    .press_scale(0.97)
                                     .cursor(rune::Cursor::Pointer)
-                                    .child(
-                                        text("Resume")
-                                            .font(type_::label())
-                                            .color(theme::on_accent()),
-                                    )
+                                    .child(text("▸ Resume").font(type_::label()).color(t.bg))
                                     .on_press(move |s: &mut State| s.play_episode(play.clone())),
                             )
                             .child(
                                 el().key("home-hero-open")
                                     .role("button")
-                                    .h(36.0)
-                                    .px(14.0)
-                                    .radius(9.0)
+                                    .label("More info")
+                                    .h(38.0)
+                                    .px(16.0)
+                                    .radius(8.0)
                                     .center()
-                                    .fill(t.card)
-                                    .gradient(Color::WHITE.alpha(0.055), Color::TRANSPARENT)
-                                    .shadow(1.0, 2.0, Color::BLACK.alpha(0.30))
-                                    .shadow(2.0, 6.0, Color::BLACK.alpha(0.18))
+                                    .fill(Color::WHITE.alpha(0.10))
+                                    .outline(1.0, 0.0, Color::WHITE.alpha(0.10))
                                     .hover(t.hover)
+                                    .motion(theme::motion::CONTROL)
                                     .focusable(true)
                                     .focus_visual(2.0)
+                                    .press_scale(0.97)
                                     .cursor(rune::Cursor::Pointer)
-                                    .child(text("Details").font(type_::label()).color(t.text))
-                                    .on_press(move |s: &mut State| s.open_detail(id.clone())),
+                                    .child(text("More info").font(type_::label()).color(t.text))
+                                    .on_press(move |s: &mut State| s.open_detail(detail.clone())),
                             ),
                     ),
             ),
@@ -1679,12 +1553,14 @@ fn home_hero(s: &State, t: &tok::Theme) -> Option<El> {
 /// index, so a rail below the viewport costs nothing until it is scrolled to.
 pub(crate) enum HomeRail<'a> {
     Resume(&'a [Item]),
+    Libraries,
     Poster {
         title: String,
         key: String,
         items: &'a [Item],
         library: Option<(String, String, Option<String>)>,
         shelf: Option<crate::state::HomeShelf>,
+        wide: bool,
     },
     OnNow,
 }
@@ -1693,6 +1569,7 @@ impl HomeRail<'_> {
     pub(crate) fn key(&self) -> &str {
         match self {
             HomeRail::Resume(_) => "rail-continue-watching",
+            HomeRail::Libraries => "rail-libraries",
             HomeRail::Poster { key, .. } => key,
             HomeRail::OnNow => "rail-on-now",
         }
@@ -1708,28 +1585,8 @@ pub(crate) fn home_rails(s: &State) -> Vec<HomeRail<'_>> {
     if visible(&s.home_data.resume) {
         rails.push(HomeRail::Resume(&s.home_data.resume));
     }
-    if visible(&s.home_data.next_up) {
-        rails.push(HomeRail::Poster {
-            title: "Next up".to_string(),
-            key: "rail-next-up".to_string(),
-            items: &s.home_data.next_up,
-            library: None,
-            shelf: Some(crate::state::HomeShelf::NextUp),
-        });
-    }
-    if visible(&s.home_data.upcoming) {
-        // Not "Next up" (that is the next unwatched episode of something you follow): this is
-        // the server's air-date lookahead, which is the only Home rail that answers "when?".
-        rails.push(HomeRail::Poster {
-            title: "Coming up".to_string(),
-            key: "rail-upcoming".to_string(),
-            items: &s.home_data.upcoming,
-            library: None,
-            shelf: None,
-        });
-    }
-    if visible(&s.home_data.on_now) {
-        rails.push(HomeRail::OnNow);
+    if !s.home_data.libraries.is_empty() {
+        rails.push(HomeRail::Libraries);
     }
     for (index, recent) in s
         .home_data
@@ -1751,25 +1608,36 @@ pub(crate) fn home_rails(s: &State) -> Vec<HomeRail<'_>> {
                 )
             });
         rails.push(HomeRail::Poster {
-            title: format!("Recently added in {}", recent.library),
+            title: if recent.library_id.is_empty() {
+                "Recently added".to_string()
+            } else {
+                format!("Recently added in {}", recent.library)
+            },
             key: format!("rail-recent-{index}"),
             items: &recent.items,
             library,
-            shelf: None,
+            shelf: if recent.library_id.is_empty() {
+                Some(crate::state::HomeShelf::RecentlyAdded)
+            } else {
+                None
+            },
+            wide: true,
         });
     }
-    if visible(&s.home_data.recently_played) {
+    if visible(&s.home_data.next_up) {
         rails.push(HomeRail::Poster {
-            title: "Recently Played".to_string(),
-            key: "rail-recently-played".to_string(),
-            items: &s.home_data.recently_played,
+            title: "Next up".to_string(),
+            key: "rail-next-up".to_string(),
+            items: &s.home_data.next_up,
             library: None,
-            shelf: Some(crate::state::HomeShelf::RecentlyPlayed),
+            shelf: Some(crate::state::HomeShelf::NextUp),
+            wide: false,
         });
+    }
+    if visible(&s.home_data.on_now) {
+        rails.push(HomeRail::OnNow);
     }
     if !s.home_data.collections.is_empty() {
-        // The server exposes its box sets as a library too; "See all" opens that rather than a
-        // synthetic list, so the rail and the library can never disagree.
         let collections_library = s
             .home_data
             .libraries
@@ -1788,6 +1656,7 @@ pub(crate) fn home_rails(s: &State) -> Vec<HomeRail<'_>> {
             items: &s.home_data.collections,
             library: collections_library,
             shelf: None,
+            wide: true,
         });
     }
     rails
@@ -1809,7 +1678,19 @@ fn home_rail(s: &State, index: usize, t: &tok::Theme) -> El {
         return col().key(format!("home-rail-{index}"));
     };
     match descriptor {
-        HomeRail::Resume(items) => resume_rail("rail-continue-watching", items, s, t),
+        HomeRail::Resume(items) => wide_rail(
+            WideRail {
+                title: "Continue watching",
+                key: "rail-continue-watching",
+                items,
+                library: None,
+                shelf: Some(crate::state::HomeShelf::ContinueWatching),
+                show_progress: true,
+            },
+            s,
+            t,
+        ),
+        HomeRail::Libraries => library_strip(s, t),
         HomeRail::OnNow => on_now_rail(s, t),
         HomeRail::Poster {
             title,
@@ -1817,7 +1698,25 @@ fn home_rail(s: &State, index: usize, t: &tok::Theme) -> El {
             items,
             library,
             shelf,
-        } => rail(title, key, items, s, t, library.clone(), *shelf),
+            wide,
+        } => {
+            if *wide {
+                wide_rail(
+                    WideRail {
+                        title,
+                        key,
+                        items,
+                        library: library.clone(),
+                        shelf: *shelf,
+                        show_progress: false,
+                    },
+                    s,
+                    t,
+                )
+            } else {
+                rail(title, key, items, s, t, library.clone(), *shelf)
+            }
+        }
     }
 }
 
@@ -1845,6 +1744,7 @@ fn rails(s: &State, t: &tok::Theme) -> El {
         // viewports each side mounts nearly every rail. One viewport of overscan is the next
         // rail coming, which is all a reader can see; the window shifts halfway through it, so
         // the reader never meets a rail still being built.
+        .motion(theme::motion::LAYOUT)
         .virtual_overscan(1.0, 0.5)
         .virtual_rows(
             count,
@@ -1922,153 +1822,6 @@ fn rail(
                 .children(items.iter().map(|item| card(item, key, s, t))),
         ),
     )
-}
-
-fn resume_card(item: &Item, s: &State, t: &tok::Theme, highlight: bool) -> El {
-    let key = s.resume_image_key(item);
-    let image = key
-        .as_deref()
-        .and_then(|key| poster_layers(s, key, SurfaceFit::Fill))
-        .unwrap_or_else(|| placeholder(item, t));
-    let title = item.series_name.as_deref().unwrap_or(&item.name);
-    let id = item.series_id.clone().unwrap_or_else(|| item.id.clone());
-    let focus_key = format!("rail-continue-watching-{id}");
-    let watched = crate::home::progress(item);
-    let mut art = el()
-        .w(RESUME_W)
-        .h(RESUME_H)
-        .radius(12.0)
-        .clip_rounded(12.0)
-        .outline(
-            if highlight { 1.5 } else { 0.0 },
-            0.0,
-            tok::accent(0, true).alpha(0.72),
-        )
-        .fill(t.card)
-        .shadow(
-            0.0,
-            if highlight { 18.0 } else { 12.0 },
-            if highlight {
-                tok::accent(0, true).alpha(0.30)
-            } else {
-                t.shadow_soft
-            },
-        )
-        .matched(format!("poster-{id}"))
-        .child(image)
-        .child(el().absolute(0.0, 0.0).w_full().h_full().linear_gradient(
-            std::f32::consts::PI,
-            [
-                (0.0, rune::Color::TRANSPARENT),
-                (0.55, rune::Color::BLACK.alpha(0.58)),
-                (1.0, rune::Color::BLACK.alpha(0.94)),
-            ],
-        ))
-        .child(
-            el().absolute(0.0, 0.0)
-                .w_full()
-                .h_full()
-                .linear_gradient(
-                    std::f32::consts::FRAC_PI_4,
-                    [
-                        (0.0, rune::Color::WHITE.alpha(0.09)),
-                        (0.45, rune::Color::TRANSPARENT),
-                    ],
-                )
-                .group_opacity(0.0, 1.0),
-        )
-        .child(
-            el().absolute(0.0, 0.0)
-                .w_full()
-                .h_full()
-                .radius(12.0)
-                .outline(2.0, -1.0, rune::Color::WHITE.alpha(0.62))
-                .group_opacity(0.0, 1.0),
-        )
-        .child(
-            col()
-                .absolute(12.0, RESUME_H - 66.0)
-                .w(RESUME_W - 24.0)
-                .gap(2.0)
-                .child(
-                    theme::readable_text_on_art(
-                        title.to_string(),
-                        type_::card_title(),
-                        rune::Color::WHITE,
-                    )
-                    .truncate(),
-                )
-                .child(
-                    theme::readable_text_on_art(
-                        crate::home::resume_subtitle(item),
-                        type_::caption(),
-                        rune::Color::WHITE.alpha(0.86),
-                    )
-                    .truncate(),
-                ),
-        );
-    if !s.big_screen {
-        // Pointer-only: the remote removes a card from its menu instead, so a focused card
-        // must not grow an × the arrows cannot reach.
-        let remove_id = item.id.clone();
-        art = art.child(
-            el().key(format!("resume-remove-{remove_id}"))
-                .role("button")
-                .absolute(RESUME_W - 34.0, 8.0)
-                .w(24.0)
-                .h(24.0)
-                .radius(12.0)
-                .center()
-                .fill(rune::Color::BLACK.alpha(0.55))
-                .hover(rune::Color::WHITE.alpha(0.18))
-                .motion(crate::theme::motion::CONTROL)
-                .focusable(true)
-                .focus_visual(2.0)
-                .press_scale(0.92)
-                .group_opacity(0.0, 1.0)
-                .label("Remove from Continue Watching")
-                .help("Remove from Continue Watching")
-                .cursor(rune::Cursor::Pointer)
-                .child(text("×").font(type_::label()).color(rune::Color::WHITE))
-                .on_press(move |s: &mut State| s.remove_from_resume(&remove_id)),
-        );
-    }
-    if watched > 0.0 {
-        let filled = RESUME_W * watched;
-        art = art.child(
-            el().absolute(0.0, RESUME_H - 4.0)
-                .w(filled)
-                .h(4.0)
-                .fill(tok::accent(0, true))
-                .shadow(0.0, 6.0, tok::accent(0, true).alpha(0.35))
-                .child(
-                    el().absolute(0.0, 0.0)
-                        .w_full()
-                        .h(1.0)
-                        .fill(rune::Color::WHITE.alpha(0.35)),
-                )
-                .children((filled > 8.0).then(|| {
-                    el().absolute(filled - 4.0, 0.0)
-                        .w(4.0)
-                        .h(4.0)
-                        .radius(2.0)
-                        .fill(rune::Color::WHITE)
-                })),
-        );
-    }
-    art = report_focused_rect(art, s, &focus_key);
-    el().key(focus_key.clone())
-        .role("button")
-        .w(RESUME_W)
-        .hover_group_focus()
-        .hover_motion(crate::theme::motion::HOVER, crate::theme::motion::HOVER)
-        .focusable(true)
-        .focus_lift_only(4.0)
-        .press_scale(0.985)
-        .motion(crate::theme::motion::CONTROL)
-        .cursor(rune::Cursor::Pointer)
-        .on_press(move |s: &mut State| s.open_detail(id.clone()))
-        .child(art)
 }
 
 /// Live channels with a current program. A channel is not a poster item, so it gets its own
@@ -2150,57 +1903,265 @@ fn on_now_rail(s: &State, t: &tok::Theme) -> El {
         )
 }
 
-fn resume_rail(key: &str, items: &[Item], s: &State, t: &tok::Theme) -> El {
+fn wide_card(item: &Item, rail: &str, s: &State, t: &tok::Theme, show_progress: bool) -> El {
+    let key_id = item.series_id.as_deref().unwrap_or(&item.id);
+    let focus_key = format!("{rail}-{key_id}");
+    let image = s
+        .resume_image_key(item)
+        .or_else(|| s.image_key(item))
+        .as_deref()
+        .and_then(|key| poster_layers(s, key, SurfaceFit::Fill))
+        .unwrap_or_else(|| placeholder(item, t));
+    let title = item
+        .series_name
+        .as_deref()
+        .unwrap_or(&item.name)
+        .to_string();
+    let meta = match item.episode_label() {
+        Some(label) => {
+            let left = crate::home::remaining(item)
+                .map(|minutes| format!(" · {minutes} min left"))
+                .unwrap_or_default();
+            format!("{label} · {}{left}", item.name)
+        }
+        None => crate::home::resume_subtitle(item),
+    };
+    let watched = crate::home::progress(item);
+    let focused = s.focused_key.as_deref() == Some(focus_key.as_str());
+    let detail_id = item.series_id.clone().unwrap_or_else(|| item.id.clone());
+    let card_key = focus_key.clone();
+    let mut card = el()
+        .key(focus_key.clone())
+        .role("button")
+        .label(title.clone())
+        .help(title.clone())
+        .w(RESUME_W)
+        .h(RESUME_H)
+        .radius(10.0)
+        .clip_rounded(10.0)
+        .fill(t.card)
+        .outline(1.0, 0.0, t.card_border)
+        .shadow(1.0, 2.0, Color::BLACK.alpha(0.25))
+        .shadow(6.0, 18.0, t.shadow_soft)
+        .scale(if focused { 1.05 } else { 1.0 })
+        .motion(theme::motion::HOVER)
+        .matched(format!("poster-{focus_key}"))
+        .matched_motion(theme::motion::DETAIL)
+        .animated_changes()
+        .hover(t.hover)
+        .motion(theme::motion::CONTROL)
+        .focusable(true)
+        .focus_visual(2.0)
+        .press_scale(0.98)
+        .cursor(rune::Cursor::Pointer)
+        .on_press(move |s: &mut State| s.open_detail(detail_id.clone()))
+        .child(image)
+        .child(el().absolute(0.0, 0.0).w_full().h_full().linear_gradient(
+            std::f32::consts::PI,
+            [
+                (0.30, Color::TRANSPARENT),
+                (0.72, Color::BLACK.alpha(0.45)),
+                (1.0, Color::BLACK.alpha(0.88)),
+            ],
+        ))
+        .children(focused.then(|| crate::theme::focus_edge(10.0)))
+        .child(
+            col()
+                .absolute(10.0, RESUME_H - 44.0)
+                .w(RESUME_W - 20.0)
+                .gap(2.0)
+                .child(
+                    text(title.clone())
+                        .font(type_::label())
+                        .color(t.text)
+                        .max_lines(1),
+                )
+                .child(
+                    text(meta)
+                        .font(type_::caption())
+                        .color(t.text_secondary)
+                        .max_lines(1),
+                ),
+        );
+    if show_progress && watched > 0.0 {
+        card = card.child(
+            el().absolute(0.0, RESUME_H - 3.0)
+                .w((RESUME_W * watched).max(2.0))
+                .h(2.5)
+                .fill(crate::theme::accent())
+                .motion(theme::motion::PROGRESS),
+        );
+    }
+    report_focused_rect(card, s, &card_key)
+}
+
+struct WideRail<'a> {
+    title: &'a str,
+    key: &'a str,
+    items: &'a [Item],
+    library: Option<(String, String, Option<String>)>,
+    shelf: Option<crate::state::HomeShelf>,
+    show_progress: bool,
+}
+
+fn wide_rail(rail: WideRail<'_>, s: &State, t: &tok::Theme) -> El {
+    let WideRail {
+        title,
+        key,
+        items,
+        library,
+        shelf,
+        show_progress,
+    } = rail;
+    let mut header = row().w_full().items_end().gap(12.0).child(
+        text(title.to_string())
+            .font(type_::row())
+            .color(t.text)
+            .key(format!("{key}-title"))
+            .grow(1.0),
+    );
+    if let Some((id, name, collection_type)) = library {
+        header = header.child(
+            el().key(format!("{key}-all"))
+                .role("button")
+                .label(format!("See all {title}"))
+                .h(26.0)
+                .px(8.0)
+                .radius(6.0)
+                .center()
+                .fill(t.bg)
+                .hover(t.hover)
+                .motion(theme::motion::CONTROL)
+                .focusable(true)
+                .focus_visual(2.0)
+                .press_scale(0.96)
+                .child(text("See all").font(type_::label()).color(t.text_secondary))
+                .cursor(rune::Cursor::Pointer)
+                .on_press(move |s: &mut State| {
+                    s.open_library(id.clone(), name.clone(), collection_type.clone())
+                }),
+        );
+    } else if let Some(shelf) = shelf {
+        header = header.child(
+            el().key(format!("{key}-all"))
+                .role("button")
+                .label(format!("See all {title}"))
+                .h(26.0)
+                .px(8.0)
+                .radius(6.0)
+                .center()
+                .fill(t.bg)
+                .hover(t.hover)
+                .motion(theme::motion::CONTROL)
+                .focusable(true)
+                .focus_visual(2.0)
+                .press_scale(0.96)
+                .child(text("See all").font(type_::label()).color(t.text_secondary))
+                .cursor(rune::Cursor::Pointer)
+                .on_press(move |s: &mut State| s.open_shelf(shelf)),
+        );
+    }
     col()
         .key(key)
         .w_full()
         .min_w(0.0)
         .gap(10.0)
-        .child(
-            row()
-                .w_full()
-                .items_end()
-                .gap(12.0)
-                .child(
-                    theme::readable_text("Continue Watching", type_::section(), t.text_secondary)
-                        .key(format!("{key}-title"))
-                        .grow(1.0),
-                )
-                .child(
-                    el().key("rail-continue-watching-all")
-                        .role("button")
-                        .h(26.0)
-                        .px(8.0)
-                        .radius(6.0)
-                        .center()
-                        .fill(t.bg)
-                        .hover(t.hover)
-                        .motion(crate::theme::motion::CONTROL)
-                        .focusable(true)
-                        .focus_visual(2.0)
-                        .press_scale(0.96)
-                        .child(text("See all").font(type_::label()).color(t.text_secondary))
-                        .cursor(rune::Cursor::Pointer)
-                        .on_press(|s: &mut State| {
-                            s.open_shelf(crate::state::HomeShelf::ContinueWatching)
-                        }),
-                ),
-        )
+        .child(header)
         .child(
             el().w_full()
                 .min_w(0.0)
                 .scroll_x()
                 .scroll_edge_fade(28.0)
                 .child(
-                    row().gap(theme::CARD_GAP).focus_group().children(
+                    row().gap(12.0).focus_group().children(
                         items
                             .iter()
                             .filter(|item| !s.is_home_hidden(&item.id))
-                            .enumerate()
-                            .map(|(index, item)| resume_card(item, s, t, index == 0)),
+                            .map(|item| wide_card(item, key, s, t, show_progress)),
                     ),
                 ),
         )
+}
+
+fn library_strip(s: &State, t: &tok::Theme) -> El {
+    let libraries: Vec<&jellyfin_api::LibraryView> = s.sidebar_libraries().take(8).collect();
+    let mut chips = row().key("home-libraries").w_full().flex_wrap().gap(8.0);
+    for library in &libraries {
+        let id = library.id.clone();
+        let name = library.name.clone();
+        let kind = library.collection_type.clone();
+        let is_live = kind.as_deref() == Some("livetv");
+        chips = chips.child(
+            el().key(format!("home-library-{}", library.id))
+                .role("button")
+                .label(format!("{} library", library.name))
+                .help(format!("Open {}", library.name))
+                .h(34.0)
+                .px(11.0)
+                .radius(8.0)
+                .gap(8.0)
+                .center_y()
+                .fill(t.card)
+                .outline(1.0, 0.0, t.card_border)
+                .hover(t.hover)
+                .motion(theme::motion::CONTROL)
+                .focusable(true)
+                .focus_visual(2.0)
+                .press_scale(0.97)
+                .cursor(rune::Cursor::Pointer)
+                .child(icon(&theme::icon::LIBRARY, 16.0).color(t.text_secondary))
+                .child(
+                    text(library.name.clone())
+                        .font(type_::label())
+                        .color(t.text),
+                )
+                .on_press(move |s: &mut State| {
+                    if is_live {
+                        s.open_live_tv();
+                    } else {
+                        s.open_library(id.clone(), name.clone(), kind.clone());
+                    }
+                }),
+        );
+    }
+    chips = chips.child(
+        el().key("home-library-all")
+            .role("button")
+            .label("All libraries")
+            .help("Open all libraries")
+            .h(34.0)
+            .px(11.0)
+            .radius(8.0)
+            .center()
+            .fill(t.card)
+            .outline(1.0, 0.0, t.card_border)
+            .hover(t.hover)
+            .motion(theme::motion::CONTROL)
+            .focusable(true)
+            .focus_visual(2.0)
+            .press_scale(0.97)
+            .child(
+                text(format!("All {}", libraries.len()))
+                    .font(type_::label())
+                    .color(t.text_secondary),
+            )
+            .cursor(rune::Cursor::Pointer)
+            .on_press(|s: &mut State| s.open_libraries()),
+    );
+    col()
+        .key("rail-libraries")
+        .w_full()
+        .gap(8.0)
+        .child(
+            row().w_full().items_end().gap(12.0).child(
+                text("Your libraries")
+                    .font(type_::row())
+                    .color(t.text)
+                    .key("rail-libraries-title")
+                    .grow(1.0),
+            ),
+        )
+        .child(chips)
 }
 
 /// The right-click menu on a poster. It is drawn in-app on every platform: Rune's native
@@ -2687,6 +2648,7 @@ pub(super) fn card(item: &Item, rail: &str, s: &State, t: &tok::Theme) -> El {
     // search rail can hold two episodes of one series, while Rune matches the last id in tree
     // order. The detail page takes the pressed card's id through `open_detail_from_card`.
     let match_id = format!("poster-{focus_key}");
+    let focused = s.focused_key.as_deref() == Some(focus_key.as_str());
     let press_id = detail_id.clone();
     let key = s.image_key(item);
     let poster = key
@@ -2702,7 +2664,11 @@ pub(super) fn card(item: &Item, rail: &str, s: &State, t: &tok::Theme) -> El {
         .inset_edge()
         .outline(1.0, 0.0, t.card_border)
         .shadow(10.0, 24.0, t.shadow_soft)
+        .scale(if focused { 1.05 } else { 1.0 })
+        .motion(theme::motion::HOVER)
         .matched(match_id.clone())
+        .matched_motion(theme::motion::DETAIL)
+        .animated_changes()
         .child(
             el().absolute(0.0, 0.0)
                 .w_full()
@@ -2799,7 +2765,7 @@ pub(super) fn card(item: &Item, rail: &str, s: &State, t: &tok::Theme) -> El {
                 .h(36.0)
                 .radius(18.0)
                 .center()
-                .fill(tok::accent(0, true))
+                .fill(crate::theme::accent())
                 .shadow(0.0, 8.0, rune::Color::BLACK.alpha(0.4))
                 .group_opacity(0.0, 1.0)
                 .hover(t.hover)
@@ -3009,7 +2975,7 @@ pub(super) fn card(item: &Item, rail: &str, s: &State, t: &tok::Theme) -> El {
                 .radius(7.0)
                 .center()
                 .fill(if chosen {
-                    tok::accent(0, true)
+                    crate::theme::accent()
                 } else {
                     rune::Color::BLACK.alpha(0.68)
                 })
@@ -3054,8 +3020,11 @@ pub(super) fn card(item: &Item, rail: &str, s: &State, t: &tok::Theme) -> El {
             el().absolute(0.0, CARD_H - 4.0)
                 .w(CARD_W * watched)
                 .h(4.0)
-                .fill(tok::accent(0, true)),
+                .fill(crate::theme::accent()),
         );
+    }
+    if focused {
+        poster_box = poster_box.child(crate::theme::focus_edge(10.0));
     }
     let title = item.series_name.as_deref().unwrap_or(&item.name);
     col()

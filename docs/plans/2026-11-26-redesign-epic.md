@@ -5,6 +5,10 @@ Research: [`docs/research/28-modern-tv-ui-2026-11-26.md`](../research/28-modern-
 Mockups: three directions evaluated (Nocturne, Marquee, Big Picture); **Nocturne is the
 chosen base**. The mockups are evaluation artifacts from this session; the token/layout spec
 below is the durable contract.
+Execution: [`2026-11-26-nocturne-implementation-plan.md`](2026-11-26-nocturne-implementation-plan.md)
+— the phase order, file map, tests, snapshots and gates. Motion:
+[`2026-11-26-nocturne-motion-spec.md`](2026-11-26-nocturne-motion-spec.md) — every scene's
+transitions.
 
 ---
 
@@ -15,7 +19,8 @@ functional base (Jellyfin client, playback, focus model, offline downloads) and 
 visual language, navigation shell and screen compositions.
 
 **Success looks like:** a neutral graphite surface where artwork supplies the colour; a
-five-destination rail instead of a 15-row sidebar; a 60 % billboard that leads into six-up
+five-destination rail instead of a 15-row sidebar; a 50 % billboard (60 % without the libraries
+strip) that leads into six-up
 16:9 and six-up poster rails which fill the width; a library that shows six complete columns
 with no dead band; a detail page built around a backdrop and a logo; a calm player OSD; every
 view reachable with the D-pad and every focused control visible.
@@ -33,7 +38,8 @@ gaps only if a phase cannot ship without it.
 3. **Full width, deliberate density.** At the 1280×720 design: content width 1092 pt after a
    76 pt rail and 56 pt gutters. Six complete poster columns and six 16:9 cards. No one-card
    dead band on the right; a rail with fewer items ends at its last card, not at a fixed column.
-4. **Hero at 60 %, never 90 %.** The next rail is visible above the fold.
+4. **Hero at 50 % with the libraries strip (60 % without), never 90 %.** The next rail is visible
+   above the fold.
 5. **One focus language.** Scale + lift + a light edge; the rail and cards share it. No rings
    that vanish on art, no four-bar halo workaround in the new shell.
 6. **Artwork first.** Backdrop + clearlogo on Home/Detail; poster crops consistent; one static
@@ -62,8 +68,9 @@ gaps only if a phase cannot ship without it.
 No blue is mixed into `bg`/`surface`/`separator` (today it is 2.8–4 %). The Jellyfin cyan in the
 logo stays a brand mark; the UI accent is the lighter `#38BDF8` used as light, not fill.
 
-**Type (design points, big screen).** `DISPLAY 48/700/-0.03`, `PAGE 32/700/-0.02`,
-`SECTION 22/650/-0.01`, `CARD_TITLE 15/600`, `BODY 15/450`, `META 12/450` with `tnum`.
+**Type (design points, big screen).** `HERO 46/730/-0.035`, `PAGE 36/700/-0.03`,
+`SECTION 20/650/-0.01`, `ROW 19/640`, `CARD_TITLE 15/600`, `BODY 15/450`, `META 12/450` with
+`tnum`; the implementation plan's table is the exact list.
 The current big-screen override flattens card title/label/caption/meta to 16; stop doing that.
 
 **Spacing.** 4/8/12/16/24/32/48. Gutter 56 (big screen), rail gap 32, card gap 16 (12 for 16:9
@@ -85,10 +92,10 @@ rows). Safe area from `Cx::safe_area`.
 
 ## 5. Screen by screen
 
-**Home.** 60 % billboard: backdrop + clearlogo (fallback title), one metadata line, Resume +
-Details, left/bottom scrim. Below: Continue Watching as six 16:9 cards (166×93, 12 gap),
+**Home.** 50 % billboard (60 % only when the libraries strip is off): backdrop + clearlogo
+(fallback title), one metadata line, Resume + Details, left/bottom scrim. Below: Continue Watching as six 16:9 cards (166×93, 12 gap),
 progress bar, `S2E04 · 12 min left`; Next Up / Recently Added as six 2:3 posters (168×252).
-Section heads 22/650 with a muted count; “See all” as a quiet text action. Artwork-derived
+Section heads 20/650 with a muted count; “See all” as a quiet text action. Artwork-derived
 wash at 8 % behind the page. No chips, no outlined panels.
 
 **Library.** Full-width poster grid, six columns (168×252) at 1280 design; the A-Z rail becomes
@@ -135,6 +142,8 @@ only in-flight state), a now-playing poster request on playback start, retiring 
 decode handle, and queue cancellation on route/scale change.
 
 ### Phase 1 — Tokens and type (1–2 commits)
+The detailed work, order and gates are in the implementation plan; the phase headings below are
+the rationale and the original scope.
 Rewrite `theme.rs` `colors()` to the table above; remove the accent mix from surfaces; add
 `DISPLAY`, `PAGE`, `SECTION`, `CARD_TITLE`, `BODY`, `META`; stop the big-screen flattening;
 add elevation/radius tokens. Update `docs/design.md` §5 and the snapshots. Acceptance: no
@@ -147,7 +156,8 @@ rendered list; scoped scroll; Back contract; reachability tests. Acceptance: eve
 view is reachable in ≤3 D-pad steps from Home and Back restores the rail; no hidden focus keys.
 
 ### Phase 3 — Home (2 commits)
-60 % billboard, clearlogo/title, metadata line, actions; six-up 16:9 Continue Watching with
+50 % billboard (60 % without the libraries strip), clearlogo/title, metadata line, actions; six-up
+16:9 Continue Watching with
 progress; six-up 2:3 Next Up; Recently Added; section heads; artwork wash. Acceptance: the
 rails fill the width at 1280 and 4K; the first rail is visible under the hero; snapshot pair.
 

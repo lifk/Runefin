@@ -93,6 +93,7 @@ impl State {
     /// Open a person from a detail page or search. Opening from a detail parks that page so Back
     /// can restore it; opening from anywhere else returns to that route.
     pub fn open_person(&mut self, person: &jellyfin_api::Person) {
+        self.person_show_all = false;
         self.person_return = self.route.clone();
         self.person_detail = if matches!(self.route, Route::Detail { .. }) {
             self.detail.take()
@@ -109,9 +110,16 @@ impl State {
         self.load_person(person.id.clone());
     }
 
+    /// Show the rest of a long filmography. The first 36 cards are the window; this is the
+    /// explicit "Show all" that reaches the remainder.
+    pub fn show_all_person_credits(&mut self) {
+        self.person_show_all = true;
+    }
+
     /// Open a person from a Seerr cast rail. The TMDB id is the only identity we start with; the
     /// server's person is found by name and checked against the same TMDB id.
     pub fn open_seerr_person(&mut self, tmdb_id: u64, name: String, profile_path: Option<String>) {
+        self.person_show_all = false;
         self.person_return = self.route.clone();
         self.person_detail = None;
         self.route = Route::SeerrPerson { tmdb_id };

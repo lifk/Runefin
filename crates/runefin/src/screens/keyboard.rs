@@ -306,7 +306,7 @@ fn key_button(
         .radius(8.0)
         .center()
         .fill(if active {
-            tok::accent(0, true).alpha(0.22)
+            crate::theme::accent().alpha(0.22)
         } else {
             t.bg
         })
@@ -314,7 +314,7 @@ fn key_button(
             1.0,
             0.0,
             if active {
-                tok::accent(0, true).alpha(0.55)
+                crate::theme::accent().alpha(0.55)
             } else {
                 t.card_border
             },

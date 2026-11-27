@@ -183,6 +183,12 @@ fn body(s: &State, person: &PersonPage, t: &tok::Theme) -> El {
                     ),
                 );
         }
+        let remaining = person.items.len().saturating_sub(highlighted);
+        let shown = if s.person_show_all {
+            remaining
+        } else {
+            remaining.min(36)
+        };
         body = body
             .child(section_heading(
                 if highlighted > 0 {
@@ -192,7 +198,32 @@ fn body(s: &State, person: &PersonPage, t: &tok::Theme) -> El {
                 },
                 t,
             ))
-            .child(grid(s, &person.items[highlighted..], t));
+            .child(grid(s, &person.items[highlighted..highlighted + shown], t));
+        if remaining > shown {
+            body = body.child(
+                el().key("person-show-all")
+                    .role("button")
+                    .label(format!("Show all {} credits", person.items.len()))
+                    .h(34.0)
+                    .px(12.0)
+                    .radius(7.0)
+                    .center()
+                    .fill(t.card)
+                    .outline(1.0, 0.0, t.card_border)
+                    .hover(t.hover)
+                    .motion(crate::theme::motion::CONTROL)
+                    .focusable(true)
+                    .focus_visual(2.0)
+                    .press_scale(0.97)
+                    .cursor(rune::Cursor::Pointer)
+                    .child(
+                        text(format!("Show all {} credits", person.items.len()))
+                            .font(type_::label())
+                            .color(t.text),
+                    )
+                    .on_press(|s: &mut State| s.show_all_person_credits()),
+            );
+        }
     }
     if person.seerr_loading && person.seerr_credits.is_empty() {
         body = body.child(quiet(
@@ -352,7 +383,7 @@ fn grid(s: &State, items: &[Item], t: &tok::Theme) -> El {
         .focus_group()
         .w_full()
         .gap(theme::CARD_GAP);
-    for chunk in items.chunks(5) {
+    for chunk in items.chunks(6) {
         grid = grid.child(
             row()
                 .gap(theme::CARD_GAP)
@@ -366,7 +397,7 @@ fn grid(s: &State, items: &[Item], t: &tok::Theme) -> El {
 fn grid_skeleton(t: &tok::Theme) -> El {
     let mut grid = col().key("person-loading").w_full().gap(theme::CARD_GAP);
     for _ in 0..2 {
-        grid = grid.child(row().gap(theme::CARD_GAP).children((0..5).map(|_| {
+        grid = grid.child(row().gap(theme::CARD_GAP).children((0..6).map(|_| {
             el().w(theme::CARD_W)
                 .h(theme::CARD_H)
                 .radius(10.0)

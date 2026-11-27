@@ -127,6 +127,10 @@ pub struct Config {
     /// Home items the reader hid with “Not interested”.
     #[serde(default)]
     pub hidden_home: Option<Vec<String>>,
+    /// Libraries pinned to their own Recently added rail, in rail order. Empty means one
+    /// combined rail; at most four are read.
+    #[serde(default)]
+    pub home_libraries: Option<Vec<String>>,
     #[serde(default)]
     pub spoiler_guard: Option<bool>,
     #[serde(default)]

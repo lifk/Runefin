@@ -10,21 +10,23 @@ pub mod type_ {
     use super::text_scale;
 
     /// A route title: Library, Detail or Settings.
-    pub const PAGE: TextStyle = TextStyle::new(32.0, 700.0).lh(38.0);
+    pub const PAGE: TextStyle = TextStyle::new(36.0, 700.0).lh(40.0);
     /// A section title inside a page.
-    pub const SECTION: TextStyle = TextStyle::new(20.0, 600.0).lh(26.0);
+    pub const SECTION: TextStyle = TextStyle::new(20.0, 650.0).lh(26.0);
+    /// A rail head: one step below a page section.
+    pub const ROW: TextStyle = TextStyle::new(19.0, 640.0).lh(24.0);
     /// A card title or a compact panel title.
     pub const TITLE: TextStyle = TextStyle::new(18.0, 600.0).lh(24.0);
     /// One-line card title.
-    pub const CARD_TITLE: TextStyle = TextStyle::new(14.0, 600.0).lh(20.0);
+    pub const CARD_TITLE: TextStyle = TextStyle::new(15.0, 600.0).lh(20.0);
     /// The default reading size.
-    pub const BODY: TextStyle = TextStyle::new(16.0, 400.0).lh(23.0);
+    pub const BODY: TextStyle = TextStyle::new(15.0, 450.0).lh(22.0);
     /// One metadata line.
-    pub const META: TextStyle = TextStyle::new(14.0, 400.0).lh(20.0);
+    pub const META: TextStyle = TextStyle::new(12.0, 450.0).lh(16.0);
     /// Button and control labels.
-    pub const LABEL: TextStyle = TextStyle::new(14.0, 600.0).lh(20.0);
+    pub const LABEL: TextStyle = TextStyle::new(13.0, 600.0).lh(18.0);
     /// Captions, badges and timecodes.
-    pub const CAPTION: TextStyle = TextStyle::new(12.0, 500.0).lh(16.0);
+    pub const CAPTION: TextStyle = TextStyle::new(11.0, 500.0).lh(14.0);
     /// Episode and item descriptions.
     pub const OVERVIEW: TextStyle = TextStyle::new(15.0, 400.0).lh(23.0);
 
@@ -70,6 +72,9 @@ pub mod type_ {
     pub fn section() -> TextStyle {
         scaled(SECTION)
     }
+    pub fn row() -> TextStyle {
+        scaled(ROW)
+    }
     pub fn title() -> TextStyle {
         scaled(TITLE)
     }
@@ -80,16 +85,16 @@ pub mod type_ {
         scaled(BODY)
     }
     pub fn meta() -> TextStyle {
-        scaled(big(META, 16.0))
+        scaled(big(META, 15.0))
     }
     pub fn label() -> TextStyle {
-        scaled(big(LABEL, 16.0))
+        scaled(big(LABEL, 15.0))
     }
     pub fn caption() -> TextStyle {
-        scaled(big(CAPTION, 16.0))
+        scaled(big(CAPTION, 14.0))
     }
     pub fn mono_caption() -> TextStyle {
-        scaled(big(CAPTION, 16.0))
+        scaled(big(CAPTION, 14.0))
     }
     pub fn overview() -> TextStyle {
         scaled(OVERVIEW)
@@ -99,12 +104,34 @@ pub mod type_ {
 /// The motion ladder from `docs/design.md`. Rune's `SNAPPY` is 500 ms with bounce 0.15 —
 /// three times the design's hover time — so every call site reads these instead.
 pub mod motion {
-    use rune::Spring;
+    use rune::{Spring, SpringPair};
 
     /// Card hover in and out (the same spring both ways; 160 ms).
     pub const HOVER: Spring = Spring::new(0.16, 0.0);
     /// A control's wash, border and focus state (180 ms).
     pub const CONTROL: Spring = Spring::new(0.18, 0.0);
+    /// Entering and leaving the rail: width, labels and scrim (200 / 180 ms).
+    pub const RAIL: Spring = Spring::new(0.20, 0.0);
+    /// A page entering (180 ms) and leaving (140 ms).
+    pub const PAGE_IN: Spring = Spring::new(0.18, 0.0);
+    pub const PAGE_OUT: Spring = Spring::new(0.14, 0.0);
+    pub const PAGE: SpringPair = SpringPair::new(PAGE_IN, PAGE_OUT);
+    /// The card-to-hero flight: the one permitted overshoot (260 ms).
+    pub const DETAIL: Spring = Spring::new(0.26, 0.05);
+    /// The OSD and its dim (120 ms).
+    pub const OSD: Spring = Spring::new(0.12, 0.0);
+    /// Sheets, menus and the keyboard (160 / 130 ms).
+    pub const SHEET: Spring = Spring::new(0.16, 0.0);
+    pub const SHEET_OUT: Spring = Spring::new(0.13, 0.0);
+    pub const SHEET_PAIR: SpringPair = SpringPair::new(SHEET, SHEET_OUT);
+    /// Toasts and undo (160 / 120 ms).
+    pub const TOAST: Spring = Spring::new(0.16, 0.0);
+    pub const TOAST_OUT: Spring = Spring::new(0.12, 0.0);
+    pub const TOAST_PAIR: SpringPair = SpringPair::new(TOAST, TOAST_OUT);
+    /// Input-caused reflow, not data (200 ms).
+    pub const LAYOUT: Spring = Spring::new(0.20, 0.0);
+    /// Progress and download percent (280 ms), never a bounce.
+    pub const PROGRESS: Spring = Spring::new(0.28, 0.0);
 }
 
 /// The wordmark and the app mark, decoded once from the committed PNGs. Decoding is the same
@@ -144,18 +171,20 @@ pub fn text_scale() -> f32 {
     f32::from_bits(TEXT_SCALE.load(std::sync::atomic::Ordering::Relaxed))
 }
 
-pub const CARD_W: f32 = 176.0;
-pub const CARD_H: f32 = 264.0;
-pub const CARD_GAP: f32 = 16.0;
+pub const CARD_W: f32 = 172.0;
+pub const CARD_H: f32 = 258.0;
+pub const CARD_GAP: f32 = 14.0;
 pub const RAIL_GAP: f32 = 40.0;
-pub const GUTTER: f32 = 40.0;
-pub const SIDEBAR_W: f32 = 224.0;
+pub const GUTTER: f32 = 48.0;
+/// The resting rail. Every screen reserves this width; the rail itself is an overlay.
+pub const SIDEBAR_W: f32 = 76.0;
+pub const RAIL_OPEN_W: f32 = 284.0;
 
 /// The accent's state blue, kept for the glows and washes that are not text.
 pub const FOCUS: Color = Color {
-    r: 0.26,
-    g: 0.57,
-    b: 0.97,
+    r: 0.0409,
+    g: 0.5089,
+    b: 0.9387,
     a: 1.0,
 };
 
@@ -191,25 +220,36 @@ pub fn on_accent() -> Color {
 /// distance without turning into a selection box.
 pub trait FocusVisual {
     fn focus_visual(self, radius: f32) -> El;
-    /// A lifted card shows focus by its scale alone; desktop keeps its ring.
+    /// A lifted card shows focus by its scale and a light inner edge; desktop keeps its ring.
     fn focus_lift_only(self, radius: f32) -> El;
+    /// A control whose fill is already near-white: an inner dark edge instead of a white one.
+    fn focus_on_light(self) -> El;
 }
 
 impl FocusVisual for El {
     fn focus_visual(self, radius: f32) -> El {
-        let el = self.focus_ring(focus_width(), radius, ring());
         if is_big_screen() {
-            el.focus_fill(colors().hover)
+            // Inside the border box: a full-bleed poster or a rail card is clipped by its
+            // scroll viewport, and a ring drawn outside was cut in half by the neighbour.
+            self.focus_ring(focus_width(), -focus_width(), ring())
         } else {
-            el
+            self.focus_ring(focus_width(), radius, ring())
         }
     }
 
     fn focus_lift_only(self, radius: f32) -> El {
         if is_big_screen() {
-            self.no_focus_ring()
+            self.focus_ring(focus_width(), -focus_width(), ring())
         } else {
             self.focus_ring(focus_width(), radius, ring())
+        }
+    }
+
+    fn focus_on_light(self) -> El {
+        if is_big_screen() {
+            self.focus_ring(focus_width(), -focus_width(), colors().bg.alpha(0.92))
+        } else {
+            self.focus_ring(focus_width(), 2.0, colors().bg.alpha(0.92))
         }
     }
 }
@@ -242,25 +282,30 @@ impl SurfaceStyle for El {
 /// The focus halo, drawn at the window root so a rail's scroll clip cannot cut it. Four
 /// blurred bars form a frame outside the focused poster; the centre stays clear, so the card's
 /// artwork is never washed out.
+/// A 2 pt edge drawn inside an image area, above the art. A focus ring on a clipped poster is
+/// painted under the image; this overlay is the visible light edge the motion spec asks for.
+pub fn focus_edge(radius: f32) -> El {
+    el().absolute(0.0, 0.0)
+        .w_full()
+        .h_full()
+        .radius(radius)
+        .outline(focus_width(), -focus_width(), ring())
+        .no_focus_ring()
+}
+
+/// The lift under a focused card: a soft dark shadow, wider and lower than the card's own, so
+/// the focused poster sits above the rail. It used to be a white halo; on a clipped card that
+/// read as a pale line cut off at the rail's edge, not as lift.
 pub fn focus_glow(rect: [f32; 4]) -> El {
     let (x, y, w, h) = (rect[0], rect[1], rect[2], rect[3]);
-    let glow = Color::WHITE.alpha(0.24);
-    let bar = |left: f32, top: f32, width: f32, height: f32| {
-        el().absolute(left, top)
-            .w(width)
-            .h(height)
-            .radius(4.0)
-            .fill(glow)
-            .blur(10.0)
-    };
+    let shadow = Color::BLACK.alpha(0.55);
     el().key("focus-glow")
-        .absolute(x - 6.0, y - 6.0)
-        .w(w + 12.0)
-        .h(h + 12.0)
-        .child(bar(0.0, 0.0, w + 12.0, 6.0))
-        .child(bar(0.0, h + 6.0, w + 12.0, 6.0))
-        .child(bar(0.0, 6.0, 6.0, h))
-        .child(bar(w + 6.0, 6.0, 6.0, h))
+        .absolute(x - 8.0, y + 4.0)
+        .w(w + 16.0)
+        .h(h + 20.0)
+        .radius(14.0)
+        .fill(shadow)
+        .blur(22.0)
         .no_focus_ring()
 }
 
@@ -301,7 +346,7 @@ pub fn is_big_screen() -> bool {
 
 /// The page gutter. A TV keeps 5 % of the width clear for overscan; the desk layout uses 40 pt.
 pub fn gutter() -> f32 {
-    if is_big_screen() { 64.0 } else { GUTTER }
+    if is_big_screen() { 48.0 } else { GUTTER }
 }
 
 static LIGHT: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
@@ -329,12 +374,6 @@ pub fn readable_lines(
     lines: usize,
 ) -> El {
     shadowed(value.into(), style, color, Some(lines))
-}
-
-/// White text over artwork, in either theme. `readable_text` follows the theme's ink, so in
-/// the light theme it would put a white halo behind white resume-card titles and erase them.
-pub fn readable_text_on_art(value: impl Into<String>, style: rune::TextStyle, color: Color) -> El {
-    shadowed_with(value.into(), style, color, None, Color::BLACK.alpha(0.82))
 }
 
 fn shadowed(value: String, style: rune::TextStyle, color: Color, lines: Option<usize>) -> El {
@@ -390,24 +429,58 @@ pub fn palette(seed: &str) -> (Color, Color) {
     }
 }
 
+/// A design token from a CSS-style colour. `hex` returns linear light, which is what Rune's
+/// blend path expects; an unreadable token falls back to the surface colour rather than
+/// panicking at startup.
+fn token_ink(value: &str, fallback: Color) -> Color {
+    rune::color::hex(value).unwrap_or(fallback)
+}
+
+/// The Nocturne accent: focus edges, progress and one action. Never a surface.
+pub fn accent() -> Color {
+    if is_light() {
+        token_ink("#0284C7", Color::BLACK)
+    } else {
+        token_ink("#38BDF8", Color::WHITE)
+    }
+}
+
 pub fn colors() -> Theme {
     let mut theme = tok::theme(!is_light());
-    let cool = tok::accent(0, true);
-    theme.bg = theme.bg.mix(cool, 0.028);
-    theme.card = theme.card.mix(cool, 0.038);
-    theme.separator = theme.separator.mix(cool, 0.04);
-    // The secondary label is the app's most-used text: card meta, settings values, rail titles,
-    // captions on art. Rune's 0.72 lightness measured 3.27:1 on `bg`, below AA for 12–16 pt
-    // text. Raised to 0.80 (≈5.5:1) in the dark theme and to 0.44 in the light one.
-    theme.text_secondary = if is_light() {
-        rune::color::oklch(0.44, 0.01, 265.0)
+    // Graphite, with no accent mixed into a surface. Artwork supplies the colour.
+    theme.bg = if is_light() {
+        token_ink("#F4F6F8", theme.bg)
     } else {
-        rune::color::oklch(0.80, 0.01, 265.0)
+        token_ink("#0A0C0F", theme.bg)
     };
-    // Rune's dark default is a 1.6 % white wash, which is invisible on a card. A 10 % wash is
-    // enough for a button to answer the pointer without turning into a second fill.
+    theme.card = if is_light() {
+        token_ink("#FFFFFF", theme.card)
+    } else {
+        token_ink("#12161B", theme.card)
+    };
+    theme.card_border = if is_light() {
+        Color::BLACK.alpha(0.10)
+    } else {
+        Color::WHITE.alpha(0.08)
+    };
+    theme.separator = theme.card_border;
+    theme.text = if is_light() {
+        token_ink("#12161B", theme.text)
+    } else {
+        token_ink("#F4F6F8", theme.text)
+    };
+    // #98A2AC measures about 5.5:1 on the graphite surface; it is the app's most-used text.
+    theme.text_secondary = if is_light() {
+        token_ink("#5F6A74", theme.text_secondary)
+    } else {
+        token_ink("#98A2AC", theme.text_secondary)
+    };
     theme.hover = Color::WHITE.alpha(0.10);
     theme.press = Color::WHITE.alpha(0.16);
+    if is_light() {
+        theme.hover = Color::BLACK.alpha(0.06);
+        theme.press = Color::BLACK.alpha(0.10);
+    }
     if is_high_contrast() {
         theme.bg = theme.bg.mix(Color::BLACK, 0.55);
         theme.card = theme.card.mix(Color::BLACK, 0.45);
@@ -678,11 +751,6 @@ pub mod icon {
         name: "runefin-stop",
         view: 20.0,
         body: r#"<rect x="5" y="5" width="10" height="10" rx="1.5" fill="currentColor"/>"#,
-    };
-    pub static CHEVRON_LEFT: Icon = Icon {
-        name: "runefin-chevron-left",
-        view: 20.0,
-        body: r#"<path d="M12.5 5L7.5 10l5 5" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>"#,
     };
     pub static CHEVRON_RIGHT: Icon = Icon {
         name: "runefin-chevron-right",

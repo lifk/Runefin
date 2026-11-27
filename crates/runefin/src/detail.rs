@@ -84,6 +84,9 @@ pub struct DetailState {
     pub seasons: Vec<Item>,
     pub active_season: Option<String>,
     pub episodes: Vec<Item>,
+    /// The ten-episode page of the active season. The page never builds more than ten rows,
+    /// so a 300-episode season is 30 pages rather than 300 laid-out cards.
+    pub episode_page: usize,
     pub next_up: Option<Item>,
     pub collection: Vec<Item>,
     /// The order the collection grid is drawn in; the server's order is the default.
@@ -126,6 +129,7 @@ impl DetailState {
             seasons: Vec::new(),
             active_season: None,
             episodes: Vec::new(),
+            episode_page: 0,
             next_up: None,
             collection: Vec::new(),
             collection_sort: CollectionSort::default(),

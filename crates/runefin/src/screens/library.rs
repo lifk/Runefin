@@ -37,7 +37,7 @@ fn library_content(s: &State, library: &LibraryState, t: &tok::Theme) -> El {
         .px(theme::gutter())
         .gap(10.0)
         .items_start()
-        .child(back_button(t))
+        .child(back_button(s, t))
         .child(
             row()
                 .w_full()
@@ -177,7 +177,7 @@ fn play_queue_button(label: &str, key: &str, t: &tok::Theme, shuffle: bool) -> E
         .fill(if shuffle {
             t.card
         } else {
-            tok::accent(0, true)
+            crate::theme::accent()
         })
         .gradient(
             if shuffle {
@@ -195,7 +195,7 @@ fn play_queue_button(label: &str, key: &str, t: &tok::Theme, shuffle: bool) -> E
             if shuffle {
                 Color::BLACK.alpha(0.18)
             } else {
-                tok::accent(0, true).alpha(0.35)
+                crate::theme::accent().alpha(0.35)
             },
         )
         .hover(t.hover)
@@ -218,7 +218,7 @@ fn play_queue_button(label: &str, key: &str, t: &tok::Theme, shuffle: bool) -> E
         .on_press(move |s: &mut State| s.play_library_queue(shuffle))
 }
 
-fn back_button(t: &tok::Theme) -> El {
+fn back_button(s: &State, t: &tok::Theme) -> El {
     el().key("library-back")
         .role("button")
         .h(34.0)
@@ -233,9 +233,13 @@ fn back_button(t: &tok::Theme) -> El {
         .focusable(true)
         .focus_visual(2.0)
         .press_scale(0.97)
-        .child(text("← Home").font(type_::label()).color(t.text))
+        .child(
+            text(format!("← {}", s.library_back_label()))
+                .font(type_::label())
+                .color(t.text),
+        )
         .cursor(rune::Cursor::Pointer)
-        .on_press(|s: &mut State| s.go_home())
+        .on_press(|s: &mut State| s.back_from_library())
 }
 
 fn library_toolbar(s: &State, library: &LibraryState, t: &tok::Theme) -> El {
@@ -264,7 +268,7 @@ fn library_toolbar(s: &State, library: &LibraryState, t: &tok::Theme) -> El {
                     if s.library_search.focused { 1.5 } else { 1.0 },
                     0.0,
                     if s.library_search.focused {
-                        tok::accent(0, true)
+                        crate::theme::accent()
                     } else {
                         t.card_border
                     },
@@ -273,7 +277,7 @@ fn library_toolbar(s: &State, library: &LibraryState, t: &tok::Theme) -> El {
                     y: 0.0,
                     blur: 0.0,
                     spread: if s.library_search.focused { 3.0 } else { 0.0 },
-                    color: tok::accent(0, true).alpha(if s.library_search.focused {
+                    color: crate::theme::accent().alpha(if s.library_search.focused {
                         0.18
                     } else {
                         0.0
@@ -746,7 +750,7 @@ fn filters_panel(s: &State, library: &LibraryState, t: &tok::Theme) -> El {
                     .radius(15.0)
                     .center()
                     .fill(if selected {
-                        tok::accent(0, true).alpha(0.24)
+                        crate::theme::accent().alpha(0.24)
                     } else {
                         t.card
                     })
@@ -754,7 +758,7 @@ fn filters_panel(s: &State, library: &LibraryState, t: &tok::Theme) -> El {
                         1.0,
                         0.0,
                         if selected {
-                            tok::accent(0, true)
+                            crate::theme::accent()
                         } else {
                             t.card_border
                         },
@@ -976,7 +980,7 @@ fn genre_chip(
         .radius(7.0)
         .center()
         .fill(if selected {
-            tok::accent(0, true)
+            crate::theme::accent()
         } else {
             t.card
         })
@@ -1008,7 +1012,7 @@ fn toolbar_button(
         .radius(8.0)
         .center()
         .fill(if selected {
-            tok::accent(0, true)
+            crate::theme::accent()
         } else {
             t.card
         })
@@ -1074,7 +1078,7 @@ fn library_body(s: &State, library: &LibraryState, t: &tok::Theme) -> El {
             library_list(s, t)
         });
 
-    let mut body = row()
+    let body = row()
         .key("library-body")
         .w_full()
         .grow(1.0)
@@ -1084,9 +1088,6 @@ fn library_body(s: &State, library: &LibraryState, t: &tok::Theme) -> El {
         .pb(if s.in_app_minimized { 116.0 } else { 20.0 })
         .gap(12.0)
         .child(viewport);
-    if library.sort == SortMode::Name && library.total_items() >= 100 {
-        body = body.child(letter_rail(library, t));
-    }
     let mut stack = el()
         .key("library-body-stack")
         .w_full()
@@ -1094,6 +1095,19 @@ fn library_body(s: &State, library: &LibraryState, t: &tok::Theme) -> El {
         .min_h(0.0)
         .h_full()
         .child(body);
+    if library.sort == SortMode::Name && library.total_items() >= 100 {
+        stack = stack.child(
+            row()
+                .key("letter-layer")
+                .absolute(0.0, 0.0)
+                .w_full()
+                .h_full()
+                .justify_end()
+                .pt(8.0)
+                .pr(20.0)
+                .child(letter_rail(library, t)),
+        );
+    }
     if let Some(section) = current_section(library) {
         // The current letter stays put while its group scrolls under it, so a long
         // name-sorted grid always says where the reader is.
@@ -1166,6 +1180,9 @@ fn library_grid(s: &State, t: &tok::Theme) -> El {
         .w_full()
         .growth(GrowthSpec::default())
         .virtual_rows_version(library.version())
+        // One row of overscan: at the bottom of the window the next row is already mounted,
+        // so Down from the last visible card can move instead of aiming at an absent key.
+        .virtual_overscan(3.0, 1.5)
         .virtual_rows(
             rows,
             GRID_ROW_H,
@@ -1207,6 +1224,7 @@ fn library_list(s: &State, t: &tok::Theme) -> El {
         .w_full()
         .growth(GrowthSpec::default())
         .virtual_rows_version(library.version())
+        .virtual_overscan(3.0, 1.5)
         .virtual_rows(
             library.items.len(),
             LIST_ROW_H,
@@ -1351,7 +1369,7 @@ fn library_list_row(item: &Item, s: &State, t: &tok::Theme) -> El {
                                     el().w(80.0 * watched)
                                         .h(3.0)
                                         .radius(1.5)
-                                        .fill(tok::accent(0, true)),
+                                        .fill(crate::theme::accent()),
                                 )
                             })),
                     )
@@ -1379,7 +1397,7 @@ fn library_list_row(item: &Item, s: &State, t: &tok::Theme) -> El {
 }
 
 fn letter_rail(library: &LibraryState, t: &tok::Theme) -> El {
-    let mut rail = col().key("letter-rail").w(28.0).gap(2.0).pt(2.0);
+    let mut rail = col().key("letter-rail").w(28.0).gap(1.0).pt(2.0);
     for letter in 'A'..='Z' {
         let selected = library
             .letter
@@ -1389,10 +1407,14 @@ fn letter_rail(library: &LibraryState, t: &tok::Theme) -> El {
             el().key(format!("letter-{letter}"))
                 .role("button")
                 .w(28.0)
-                .h(24.0)
-                .radius(5.0)
+                .h(19.0)
+                .radius(4.0)
                 .center()
-                .fill(if selected { tok::accent(0, true) } else { t.bg })
+                .fill(if selected {
+                    rune::Color::WHITE.alpha(0.14)
+                } else {
+                    t.bg.alpha(0.55)
+                })
                 .hover(t.hover)
                 .motion(crate::theme::motion::CONTROL)
                 .focusable(true)
@@ -1401,7 +1423,7 @@ fn letter_rail(library: &LibraryState, t: &tok::Theme) -> El {
                 .child(
                     text(letter.to_string())
                         .font(type_::mono_caption())
-                        .color(if selected { t.bg } else { t.text_secondary }),
+                        .color(if selected { t.text } else { t.text_secondary }),
                 )
                 .cursor(rune::Cursor::Pointer)
                 .on_press(move |s: &mut State| s.toggle_letter(letter)),
@@ -1703,11 +1725,11 @@ mod tests {
         })
         .collect();
         library.total = 10;
-        assert_eq!(library.columns, 5);
+        assert_eq!(library.columns, 6);
         // At the top there is nothing to stick yet.
         assert_eq!(current_section(&library), None);
         library.set_scroll_y(GRID_ROW_H * 1.5);
-        assert_eq!(current_section(&library).as_deref(), Some("F"));
+        assert_eq!(current_section(&library).as_deref(), Some("G"));
         library.view = ViewMode::List;
         library.set_scroll_y(LIST_ROW_H * 7.2);
         assert_eq!(current_section(&library).as_deref(), Some("H"));

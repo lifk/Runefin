@@ -1,6 +1,6 @@
 # Snapshot captures
 
-Ten views are committed here. Each is rendered by `scripts/snapshots.sh` from a named
+Fourteen views are committed here. Each is rendered by `scripts/snapshots.sh` from a named
 `AppSpec` scene, headlessly, at a fixed virtual time and scale — the same renderer the window
 uses, so a diff in the image is a diff in the UI. Personal live captures are never committed:
 they contain the real session's ids and artwork.
@@ -11,22 +11,26 @@ they contain the real session's ids and artwork.
 | `detail.png` | `detail` | 1280×800 at 2× | hero, badges, actions and the season strip |
 | `search.png` | `search` | 1280×800 at 2× | grouped results across movies, shows and people |
 | `live-tv.png` | `live-tv` | 1280×800 at 2× | channels, now/next and progress |
-| `settings.png` | `settings` | 1280×800 at 2× | the settings index and rows |
+| `settings.png` | `settings` | 1280×800 at 2× | the settings sections and rows |
+| `media-settings.png` | `media-settings` | 1280×800 at 2× | the SteamOS mode controls |
+| `downloads.png` | `downloads` | 1280×800 at 2× | storage, rows and offline actions |
 | `in-app-osd.png` | `in-app-osd` | 1280×800 at 2× | the player chrome and timeline |
 | `home-big.png` | `home` | 1920×1080 at 1.5× | the 10-foot home; linked from the README |
 | `library-big.png` | `library` | 1920×1080 at 1.5× | the 10-foot library; linked from AppStream |
-| `focus-card-big.png` | `home` | 1920×1080 at 1.5× | a focused card's hover outline and soft halo |
-| `focus-sidebar-big.png` | `home` | 1920×1080 at 1.5× | focus on the selected sidebar entry |
+| `keyboard-big.png` | `keyboard` | 1920×1080 at 1.5× | the couch keyboard |
+| `focus-card-big.png` | `home` | 1920×1080 at 1.5× | a focused card's outline and halo |
+| `hub-big.png` | `hub` | 1920×1080 at 1.5× | the Libraries hub, Recent and the all-libraries grid |
+| `rail-focus-big.png` | `home` | 1920×1080 at 1.5× | the five-anchor rail open over the page |
 
-These ten are the screens a change is most likely to touch, plus the two frames the README and
-the AppStream metadata link to and the focus pair. Focus is runtime state, not scene state, so
-the two focus frames render past the first poll; the sidebar one walks there with a script. The rest of the catalogue still exists — it is rendered on your
+These fourteen are the screens a change is most likely to touch, plus the two frames the README
+and the AppStream metadata link to, the keyboard and the focus pair. Focus is runtime state, not scene state,
+so the two focus frames render past the first poll; the rail one walks there with a script. The rest of the catalogue still exists — it is rendered on your
 machine, not stored in the repository.
 
 ## Rendering
 
 ```sh
-scripts/snapshots.sh              # the ten above, in place; commit intended diffs
+scripts/snapshots.sh              # the twelve above, in place; commit intended diffs
 scripts/snapshots.sh --all        # every scene into /tmp/runefin-snapshots
 scripts/snapshots.sh --all DIR    # every scene into DIR
 target/debug/runefin --list-scenes

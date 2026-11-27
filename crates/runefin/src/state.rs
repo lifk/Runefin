@@ -96,6 +96,8 @@ pub use seerr_state::{
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Route {
     Home,
+    /// The Libraries hub: every video library, playlist and tool.
+    Libraries,
     Library {
         id: String,
     },
@@ -165,7 +167,7 @@ pub struct InAppStart {
 pub enum HomeShelf {
     ContinueWatching,
     NextUp,
-    RecentlyPlayed,
+    RecentlyAdded,
 }
 
 impl HomeShelf {
@@ -173,7 +175,7 @@ impl HomeShelf {
         match self {
             HomeShelf::ContinueWatching => "Continue Watching",
             HomeShelf::NextUp => "Next Up",
-            HomeShelf::RecentlyPlayed => "Recently Played",
+            HomeShelf::RecentlyAdded => "Recently Added",
         }
     }
 }
@@ -372,6 +374,7 @@ struct FocusLayers {
     sleep: bool,
     goto: bool,
     card: bool,
+    home_rails: bool,
     gear: bool,
     gear_visible: bool,
     subtitles: bool,
@@ -396,6 +399,24 @@ pub struct HoverPreview {
     pub tile_at: Option<std::time::Instant>,
 }
 
+/// How deep a route sits, used only to give the page transition a direction. A push rises
+/// from below; Back settles from above; two top-level tabs crossfade.
+fn route_depth(route: &Route) -> i8 {
+    match route {
+        Route::Home => 0,
+        Route::Libraries
+        | Route::Search { .. }
+        | Route::Remote
+        | Route::Downloads
+        | Route::LiveTv
+        | Route::Settings
+        | Route::Seerr => 1,
+        Route::Library { .. } | Route::SeerrDetail { .. } => 2,
+        Route::Detail { .. } => 3,
+        Route::Person { .. } | Route::SeerrPerson { .. } => 4,
+    }
+}
+
 pub struct State {
     pub config: Config,
     pub server: TextEdit,
@@ -416,6 +437,11 @@ pub struct State {
     home_collections: Latest<Vec<Item>>,
     pub home_loaded: bool,
     pub home_error: Option<String>,
+    pub home_rails_open: bool,
+    /// Whether the person page shows the whole filmography instead of its first 36 cards.
+    pub person_show_all: bool,
+    /// The hub's local filter; it never reaches the server.
+    pub hub_filter: rune::TextEdit,
     home_started: bool,
     pub image_cache: Option<ImageCache>,
     pub images: HashMap<String, Image>,
@@ -426,11 +452,17 @@ pub struct State {
     /// screen does not blank while it is open just because another menu filled the cache.
     pub current_images: HashSet<String>,
     last_route: Route,
+    /// The last route change's depth: positive is a push, negative is Back, zero is a tab.
+    pub nav_delta: i8,
     pub image_notice: Option<String>,
     image_order: VecDeque<String>,
     /// Keys whose full image is still held at zero opacity for the placeholder beat.
     image_fades: HashMap<String, Instant>,
     pub route: Route,
+    /// Where a library page returns to: the hub when opened there, Home otherwise.
+    library_return: Route,
+    /// The last libraries opened on this device, newest first; the hub's Recent row.
+    pub recent_libraries: Vec<String>,
     /// A Home rail's full grid, shown over Home without pushing a route.
     pub shelf: Option<HomeShelf>,
     pub library: Option<LibraryState>,
@@ -935,6 +967,9 @@ impl State {
             home_collections: Latest::default(),
             home_loaded: false,
             home_error: None,
+            home_rails_open: false,
+            person_show_all: false,
+            hub_filter: rune::TextEdit::new(""),
             home_started: false,
             image_cache: None,
             images: HashMap::new(),
@@ -942,6 +977,9 @@ impl State {
             requested_images: HashSet::new(),
             current_images: HashSet::new(),
             last_route: Route::Home,
+            nav_delta: 0,
+            library_return: Route::Home,
+            recent_libraries: Vec::new(),
             image_notice: None,
             image_order: VecDeque::new(),
             image_fades: HashMap::new(),
@@ -1291,7 +1329,7 @@ impl State {
         state.quality_choices = state.config.quality_choices.clone().unwrap_or_default();
         state.spoiler_guard = state.config.spoiler_guard.unwrap_or(true);
         state.saved_views = state.config.saved_views.clone().unwrap_or_default();
-        state.home_hero = state.config.home_hero.unwrap_or(false);
+        state.home_hero = state.config.home_hero.unwrap_or(true);
         state.hover_preview_enabled = state.config.hover_preview.unwrap_or(false);
         state.light_theme = state.config.light_theme.unwrap_or(false);
         crate::theme::set_light(state.light_theme);
@@ -1939,7 +1977,7 @@ impl State {
             format!("{} — Runefin", session.item.name)
         } else {
             match &self.route {
-                Route::Home => "Runefin".to_string(),
+                Route::Home | Route::Libraries => "Runefin".to_string(),
                 Route::Library { .. } => format!(
                     "{} — Runefin",
                     self.library
@@ -2319,6 +2357,7 @@ impl State {
         let on_now_client = client.clone();
         let collections_client = client.clone();
         let watching_client = client.clone();
+        let pins = self.config.home_libraries.clone().unwrap_or_default();
         self.home_watching.request((), move |()| {
             let t = crate::bench::timer();
             let answer = crate::home::load_watching(&watching_client, now);
@@ -2327,7 +2366,7 @@ impl State {
         });
         self.home_rails.request((), move |()| {
             let t = crate::bench::timer();
-            let answer = crate::home::load_rails(&client);
+            let answer = crate::home::load_rails(&client, &pins);
             crate::bench::lap("home.rails", t);
             answer
         });
@@ -2456,7 +2495,74 @@ impl State {
         })
     }
 
+    /// Open the Home rails chooser. The sheet is a layer; Back closes it.
+    pub fn open_home_rails(&mut self) {
+        self.home_rails_open = true;
+    }
+
+    pub fn close_home_rails(&mut self) {
+        self.home_rails_open = false;
+        let _ = self.config.save();
+        self.load_home();
+    }
+
+    /// Toggle a library pin. Four is the cap; the selection order is the rail order.
+    pub fn toggle_home_library(&mut self, id: String) {
+        let mut pins = self.config.home_libraries.clone().unwrap_or_default();
+        if let Some(index) = pins.iter().position(|pinned| pinned == &id) {
+            pins.remove(index);
+        } else if pins.len() < 4 {
+            pins.push(id);
+        } else {
+            self.show_toast("Remove a library before adding another.");
+            return;
+        }
+        self.config.home_libraries = Some(pins);
+    }
+
+    pub fn reset_home_libraries(&mut self) {
+        self.config.home_libraries = None;
+    }
+
+    pub fn home_pins(&self) -> Vec<String> {
+        self.config.home_libraries.clone().unwrap_or_default()
+    }
+
+    pub fn open_libraries(&mut self) {
+        self.capture_library_scroll();
+        self.stop_theme_media();
+        self.route = Route::Libraries;
+        self.remember_place();
+        self.request_images();
+    }
+
+    /// The Back button's destination label on a library page.
+    pub fn library_back_label(&self) -> &'static str {
+        if matches!(self.library_return, Route::Libraries) {
+            "Libraries"
+        } else {
+            "Home"
+        }
+    }
+
+    /// Back from a library: the hub it came from, or Home.
+    pub fn back_from_library(&mut self) {
+        if matches!(self.library_return, Route::Libraries) {
+            self.open_libraries();
+        } else {
+            self.go_home();
+        }
+    }
+
     pub fn open_library(&mut self, id: String, name: String, collection_type: Option<String>) {
+        self.library_return = if matches!(self.route, Route::Libraries) {
+            Route::Libraries
+        } else {
+            Route::Home
+        };
+        self.recent_libraries.retain(|recent| recent != &id);
+        self.recent_libraries.insert(0, id.clone());
+        self.recent_libraries.truncate(3);
         self.capture_library_scroll();
         self.stop_theme_media();
         self.detail_stack.clear();
@@ -2896,9 +3002,6 @@ impl State {
             });
         }
         let key = match &self.route {
-            Route::Home if self.home_hero && self.hero_item().is_some() => {
-                Some("home-hero-play".into())
-            }
             Route::Home => self
                 .home_data
                 .resume
@@ -2909,6 +3012,10 @@ impl State {
                         "rail-continue-watching-{}",
                         item.series_id.as_deref().unwrap_or(&item.id)
                     )
+                })
+                .or_else(|| {
+                    (self.home_hero && self.hero_item().is_some())
+                        .then(|| "home-hero-play".to_string())
                 })
                 .or_else(|| {
                     self.home_data
@@ -2969,6 +3076,16 @@ impl State {
                     format!("live-channel-{}", channel.id)
                 }
             }),
+            Route::Libraries => self
+                .recent_libraries
+                .first()
+                .cloned()
+                .or_else(|| {
+                    self.sidebar_libraries()
+                        .next()
+                        .map(|library| library.id.clone())
+                })
+                .map(|id| format!("hub-recent-{id}")),
         };
         if key.is_some() {
             self.focus_first = false;
@@ -2991,6 +3108,14 @@ impl State {
     }
 
     fn layer_focus_key(&mut self) -> Option<String> {
+        let rails = self.home_rails_open;
+        if rails != self.focus_layers.home_rails {
+            self.focus_layers.home_rails = rails;
+            if rails {
+                return Some("home-rails-all".into());
+            }
+            self.focus_first = true;
+        }
         let card = self.card_menu.is_some();
         if card != self.focus_layers.card {
             self.focus_layers.card = card;
@@ -3861,6 +3986,11 @@ impl State {
     /// The watchlist is the server's favourite flag shown as one cross-library page. It is not
     /// a second store, so adding from a card and opening here always agree.
     pub fn open_watchlist(&mut self) {
+        self.library_return = if matches!(self.route, Route::Libraries) {
+            Route::Libraries
+        } else {
+            Route::Home
+        };
         self.capture_library_scroll();
         self.stop_theme_media();
         self.detail_stack.clear();
@@ -3879,6 +4009,11 @@ impl State {
     }
 
     pub fn open_playlist(&mut self, id: String, name: String) {
+        self.library_return = if matches!(self.route, Route::Libraries) {
+            Route::Libraries
+        } else {
+            Route::Home
+        };
         self.route = Route::Library { id: id.clone() };
         self.playlist_editing = false;
         self.library = Some(LibraryState::new(id, name, Some("playlists".into())));
@@ -4141,10 +4276,6 @@ impl State {
         } else {
             1.0
         }
-    }
-
-    pub fn toggle_sidebar(&mut self) {
-        self.sidebar_collapsed = !self.sidebar_collapsed;
     }
 
     pub fn toggle_shortcuts(&mut self) {
@@ -4512,6 +4643,9 @@ mod tests {
             home_collections: Latest::default(),
             home_loaded: false,
             home_error: None,
+            home_rails_open: false,
+            person_show_all: false,
+            hub_filter: rune::TextEdit::new(""),
             home_started: false,
             image_cache: None,
             images: HashMap::new(),
@@ -4519,6 +4653,9 @@ mod tests {
             requested_images: HashSet::new(),
             current_images: HashSet::new(),
             last_route: Route::Home,
+            nav_delta: 0,
+            library_return: Route::Home,
+            recent_libraries: Vec::new(),
             image_notice: None,
             image_order: VecDeque::new(),
             image_fades: HashMap::new(),

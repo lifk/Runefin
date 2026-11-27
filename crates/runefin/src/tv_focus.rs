@@ -14,6 +14,9 @@ pub struct Zone {
     columns: usize,
     /// Where Left at the first column, or Up from the first row, goes.
     parent: Option<usize>,
+    /// The parent key to land on, when the parent is a column of its own (Settings' section
+    /// list). `None` keeps the source column index.
+    parent_at: Option<usize>,
 }
 
 /// Whether `key` is one of the zones' keys. A focused panel, menu or scrollbar is not, and the
@@ -41,6 +44,7 @@ pub fn owns_screen(s: &State) -> bool {
             | Route::Remote
             | Route::Downloads
             | Route::Settings
+            | Route::Libraries
     ) || (s.in_app.is_some() && s.osd_visible)
 }
 
@@ -74,21 +78,47 @@ pub fn step(s: &State, focused: Option<&str>, action: TvAction) -> Option<String
     };
     let col = idx % cols;
     let row = idx / cols;
+    // A rail's "See all" sits on the header line above its cards, not at the end of the row.
+    // Treated as a rail key, Left jumped to the far-right card and Right did nothing.
+    let rail_all = is_rail_all(focused);
     match action {
-        TvAction::Left if col > 0 => Some(zone.keys[idx - 1].clone()),
+        TvAction::Left if !rail_all && col > 0 => Some(zone.keys[idx - 1].clone()),
         TvAction::Left => parent_key(s, &zones, sidebar, zi, idx),
-        TvAction::Right if col + 1 < cols && idx + 1 < zone.keys.len() => {
+        // The section list is a column at the top of the page: its ends stop, and Right is the
+        // way into a section. Up at the top used to jump down to the rail's Settings row.
+        TvAction::Up if focused.starts_with("settings-nav-") && idx == 0 => None,
+        TvAction::Down if focused.starts_with("settings-nav-") && idx + 1 >= zone.keys.len() => {
+            None
+        }
+        TvAction::Down if rail_all => zone.keys.iter().find(|key| !is_rail_all(key)).cloned(),
+        // The card before a rail's See all does not slide onto it: that key is above the row.
+        TvAction::Right
+            if col + 1 < cols && idx + 1 < zone.keys.len() && !is_rail_all(&zone.keys[idx + 1]) =>
+        {
             Some(zone.keys[idx + 1].clone())
         }
         // The sidebar's Right enters the content it belongs to.
         TvAction::Right if sidebar && zi == 0 => {
             zones.get(1).and_then(|zone| zone.keys.first()).cloned()
         }
+        TvAction::Right if rail_all => None,
+        // A rail's header row is above its cards: Up from any card reaches its See all, then
+        // Up again leaves the rail. Without this the header was reachable by no key at all.
+        TvAction::Up if !rail_all && zone.keys.last().is_some_and(|key| is_rail_all(key)) => {
+            zone.keys.last().cloned()
+        }
+        // Right from the section list enters that section's first control, not the top of the
+        // whole pane.
+        TvAction::Right if focused.starts_with("settings-nav-") => zones
+            .iter()
+            .skip(zi + 1)
+            .find(|zone| zone.parent == Some(zi) && zone.parent_at == Some(idx))
+            .and_then(|zone| zone.keys.first().cloned()),
         TvAction::Right => None,
         TvAction::Up if row > 0 => Some(zone.keys[idx - cols].clone()),
-        TvAction::Up => adjacent(s, &zones, sidebar, zi, idx, -1),
+        TvAction::Up => adjacent(&zones, sidebar, zi, idx, -1),
         TvAction::Down if idx + cols < zone.keys.len() => Some(zone.keys[idx + cols].clone()),
-        TvAction::Down => adjacent(s, &zones, sidebar, zi, idx, 1),
+        TvAction::Down => adjacent(&zones, sidebar, zi, idx, 1),
         _ => None,
     }
 }
@@ -103,19 +133,19 @@ fn parent_key(s: &State, zones: &[Zone], sidebar: bool, zi: usize, idx: usize) -
         return nav_key(s);
     }
     let zone = &zones[parent];
+    let at = zones[zi].parent_at.unwrap_or(idx);
     zone.keys
-        .get(idx.min(zone.keys.len().saturating_sub(1)))
+        .get(at.min(zone.keys.len().saturating_sub(1)))
         .cloned()
 }
 
-fn adjacent(
-    s: &State,
-    zones: &[Zone],
-    sidebar: bool,
-    zi: usize,
-    idx: usize,
-    delta: isize,
-) -> Option<String> {
+/// A rail's "See all": `rail-recent-0-all`, `rail-continue-watching-all`. The strip's own
+/// `home-library-all` is a chip at the end of its row, not a header, so it must not match.
+fn is_rail_all(key: &str) -> bool {
+    key.starts_with("rail-") && key.ends_with("-all")
+}
+
+fn adjacent(zones: &[Zone], sidebar: bool, zi: usize, idx: usize, delta: isize) -> Option<String> {
     // The sidebar is a fixed list: Down at its end and Up at its start stay put, and Right is
     // the way into content.
     if sidebar && zi == 0 {
@@ -126,7 +156,8 @@ fn adjacent(
         return None;
     }
     if sidebar && target == 0 {
-        return nav_key(s);
+        // Up/Down stop at the page's first or last row; the rail is reached with Left.
+        return None;
     }
     let zone = &zones[target];
     // Entering a rail from a vertical list starts at its first item: the list's row number is
@@ -137,10 +168,23 @@ fn adjacent(
         .keys
         .first()
         .is_some_and(|key| key.starts_with("home-hero"));
+    let source_cols = if zones[zi].columns == 0 {
+        zones[zi].keys.len().max(1)
+    } else {
+        zones[zi].columns
+    };
+    let col = idx % source_cols;
     let at = if hero || (zones[zi].columns == 1 && zone.columns == 0) {
         0
     } else {
-        idx.min(zone.keys.len().saturating_sub(1))
+        let at = col.min(zone.keys.len().saturating_sub(1));
+        // Entering a rail from above lands on a card, not on its "See all" header when the
+        // column ran past the shorter rail's cards.
+        if is_rail_all(&zone.keys[at]) && at > 0 {
+            at - 1
+        } else {
+            at
+        }
     };
     zone.keys.get(at).cloned()
 }
@@ -150,26 +194,19 @@ fn adjacent(
 fn nav_key(s: &State) -> Option<String> {
     match &s.route {
         Route::Home => Some("nav-home".into()),
-        Route::Library { id } if id == "__watchlist__" => Some("nav-watchlist".into()),
-        Route::Library { id } => Some(format!("library-{id}")),
+        Route::Libraries | Route::Library { .. } => Some("nav-libraries".into()),
         Route::Search { .. } => Some("nav-search".into()),
-        Route::Remote => Some("nav-remote".into()),
-        Route::Downloads => Some("nav-downloads".into()),
+        Route::LiveTv => Some("nav-live".into()),
         Route::Settings => Some("nav-settings".into()),
-        Route::Seerr | Route::SeerrDetail { .. } => Some("nav-seerr".into()),
-        Route::LiveTv => s
-            .home_data
-            .libraries
-            .iter()
-            .find(|library| library.collection_type.as_deref() == Some("livetv"))
-            .map(|library| format!("library-{}", library.id))
-            .or_else(|| Some("nav-home".into())),
-        Route::Detail { .. } => match &s.detail_return {
-            Route::Library { id } if id == "__watchlist__" => Some("nav-watchlist".into()),
-            Route::Library { id } => Some(format!("library-{id}")),
-            _ => Some("nav-home".into()),
-        },
-        _ => Some("nav-home".into()),
+        Route::Remote | Route::Downloads | Route::Seerr | Route::SeerrDetail { .. } => {
+            Some("nav-libraries".into())
+        }
+        Route::Detail { .. } | Route::Person { .. } | Route::SeerrPerson { .. } => {
+            match &s.detail_return {
+                Route::Library { .. } => Some("nav-libraries".into()),
+                _ => Some("nav-home".into()),
+            }
+        }
     }
 }
 
@@ -182,11 +219,13 @@ fn zones(s: &State) -> (Vec<Zone>, bool) {
     }
     match &s.route {
         Route::Home => (home_zones(s), true),
+        Route::Libraries => (hub_zones(s), true),
         Route::Library { .. } => (library_zones(s), true),
         Route::Detail { .. } => (detail_zones(s), false),
         Route::Search { .. } => (search_zones(s), false),
         Route::Person { .. } => (person_zones(s), false),
         Route::Seerr => (seerr_zones(s), false),
+        Route::Settings => (settings_zones(s), true),
         Route::LiveTv => (live_zones(s), true),
         Route::Remote => (remote_zones(s), true),
         Route::Downloads => (download_zones(s), false),
@@ -204,32 +243,106 @@ pub fn in_sidebar(s: &State, key: &str) -> bool {
             .is_some_and(|zone| zone.keys.iter().any(|zone_key| zone_key == key))
 }
 
-fn sidebar(s: &State) -> Zone {
-    let mut keys = vec!["nav-home".to_string()];
-    for library in s.sidebar_libraries() {
-        keys.push(format!("library-{}", library.id));
-    }
-    keys.push("nav-watchlist".into());
-    for playlist in &s.playlists {
-        keys.push(format!("playlist-{}", playlist.id));
-    }
-    if !s.config.seerr_url.is_empty() {
-        keys.push("nav-seerr".into());
-    }
-    keys.extend(
-        ["nav-search", "nav-remote", "nav-downloads"]
-            .into_iter()
-            .map(String::from),
-    );
-    if s.big_screen {
-        keys.push("nav-controls".into());
-    }
-    keys.push("nav-settings".into());
+fn sidebar(_s: &State) -> Zone {
     Zone {
-        keys,
+        keys: [
+            "nav-home",
+            "nav-search",
+            "nav-libraries",
+            "nav-live",
+            "nav-settings",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect(),
         columns: 1,
         parent: None,
+        parent_at: None,
     }
+}
+
+fn hub_zones(s: &State) -> Vec<Zone> {
+    let libraries: Vec<&jellyfin_api::LibraryView> = s.sidebar_libraries().collect();
+    let recent: Vec<&jellyfin_api::LibraryView> = {
+        let picked: Vec<_> = s
+            .recent_libraries
+            .iter()
+            .filter_map(|id| libraries.iter().copied().find(|library| &library.id == id))
+            .take(3)
+            .collect();
+        if picked.is_empty() {
+            libraries.iter().copied().take(3).collect()
+        } else {
+            picked
+        }
+    };
+    let mut zones = vec![sidebar(s)];
+    zones.push(Zone {
+        keys: vec!["hub-filter".into()],
+        columns: 1,
+        parent: Some(0),
+        parent_at: None,
+    });
+    if !recent.is_empty() {
+        zones.push(Zone {
+            keys: recent
+                .iter()
+                .map(|library| format!("hub-recent-{}", library.id))
+                .collect(),
+            columns: 3,
+            parent: Some(0),
+            parent_at: None,
+        });
+    }
+    if !libraries.is_empty() {
+        zones.push(Zone {
+            keys: libraries
+                .iter()
+                .map(|library| format!("hub-library-{}", library.id))
+                .collect(),
+            columns: 6,
+            parent: Some(0),
+            parent_at: None,
+        });
+    }
+    let mut tools = vec![
+        "hub-tool-downloads".to_string(),
+        "hub-tool-remote".to_string(),
+        "hub-tool-home-rails".to_string(),
+    ];
+    if s.big_screen {
+        tools.push("hub-tool-controls".into());
+    }
+    let tool_count = tools.len();
+    zones.push(Zone {
+        keys: tools,
+        columns: tool_count,
+        parent: Some(0),
+        parent_at: None,
+    });
+    if !s.playlists.is_empty() {
+        zones.push(Zone {
+            keys: s
+                .playlists
+                .iter()
+                .map(|playlist| format!("hub-playlist-{}", playlist.id))
+                .collect(),
+            columns: 4,
+            parent: Some(0),
+            parent_at: None,
+        });
+    }
+    let mut extras = vec!["hub-watchlist".to_string()];
+    if !s.config.seerr_url.is_empty() {
+        extras.push("hub-seerr".into());
+    }
+    zones.push(Zone {
+        keys: extras,
+        columns: 2,
+        parent: Some(0),
+        parent_at: None,
+    });
+    zones
 }
 
 fn item_key(rail: &str, item: &jellyfin_api::Item) -> String {
@@ -240,12 +353,12 @@ fn home_zones(s: &State) -> Vec<Zone> {
     let mut zones = vec![sidebar(s)];
     let visible =
         |items: &[jellyfin_api::Item]| items.iter().any(|item| !s.is_home_hidden(&item.id));
-    // The optional compact hero sits above the first rail: its two decisions are one zone.
     if s.home_hero && s.hero_item().is_some() {
         zones.push(Zone {
             keys: vec!["home-hero-play".into(), "home-hero-open".into()],
             columns: 0,
             parent: Some(0),
+            parent_at: None,
         });
     }
     if visible(&s.home_data.resume) {
@@ -260,6 +373,41 @@ fn home_zones(s: &State) -> Vec<Zone> {
                 .collect(),
             columns: 0,
             parent: Some(0),
+            parent_at: None,
+        });
+    }
+    if !s.home_data.libraries.is_empty() {
+        zones.push(Zone {
+            keys: s
+                .sidebar_libraries()
+                .take(8)
+                .map(|library| format!("home-library-{}", library.id))
+                .chain(std::iter::once("home-library-all".to_string()))
+                .collect(),
+            columns: 0,
+            parent: Some(0),
+            parent_at: None,
+        });
+    }
+    for (index, recent) in s
+        .home_data
+        .latest
+        .iter()
+        .filter(|rail| rail.items.iter().any(|item| !s.is_home_hidden(&item.id)))
+        .enumerate()
+    {
+        let mut keys: Vec<String> = recent
+            .items
+            .iter()
+            .filter(|item| !s.is_home_hidden(&item.id))
+            .map(|item| item_key(&format!("rail-recent-{index}"), item))
+            .collect();
+        keys.push(format!("rail-recent-{index}-all"));
+        zones.push(Zone {
+            keys,
+            columns: 0,
+            parent: Some(0),
+            parent_at: None,
         });
     }
     if visible(&s.home_data.next_up) {
@@ -274,6 +422,7 @@ fn home_zones(s: &State) -> Vec<Zone> {
                 .collect(),
             columns: 0,
             parent: Some(0),
+            parent_at: None,
         });
     }
     if visible(&s.home_data.on_now) {
@@ -286,39 +435,7 @@ fn home_zones(s: &State) -> Vec<Zone> {
                 .collect(),
             columns: 0,
             parent: Some(0),
-        });
-    }
-    for (index, recent) in s
-        .home_data
-        .latest
-        .iter()
-        .filter(|rail| rail.items.iter().any(|item| !s.is_home_hidden(&item.id)))
-        .enumerate()
-    {
-        zones.push(Zone {
-            keys: recent
-                .items
-                .iter()
-                .filter(|item| !s.is_home_hidden(&item.id))
-                .map(|item| item_key(&format!("rail-recent-{index}"), item))
-                .chain(std::iter::once(format!("rail-recent-{index}-all")))
-                .collect(),
-            columns: 0,
-            parent: Some(0),
-        });
-    }
-    if visible(&s.home_data.recently_played) {
-        zones.push(Zone {
-            keys: s
-                .home_data
-                .recently_played
-                .iter()
-                .filter(|item| !s.is_home_hidden(&item.id))
-                .map(|item| item_key("rail-recently-played", item))
-                .chain(std::iter::once("rail-recently-played-all".to_string()))
-                .collect(),
-            columns: 0,
-            parent: Some(0),
+            parent_at: None,
         });
     }
     if !s.home_data.collections.is_empty() {
@@ -327,10 +444,152 @@ fn home_zones(s: &State) -> Vec<Zone> {
                 .home_data
                 .collections
                 .iter()
+                .filter(|item| !s.is_home_hidden(&item.id))
                 .map(|item| item_key("rail-collections", item))
+                .chain(std::iter::once("rail-collections-all".to_string()))
                 .collect(),
             columns: 0,
             parent: Some(0),
+            parent_at: None,
+        });
+    }
+    zones
+}
+
+/// The settings screen is two panes: the section list on the left and its form on the right.
+/// Rune's own traversal wrapped the rail (Up at Home landed on Settings) and treated a row of
+/// two stepper buttons as one horizontal run, so Down inside a row moved right. The rows are
+/// declared here in reading order; every content row knows which section it belongs to, so
+/// Left lands on that section in the list and Right from a section enters its first control.
+fn settings_zones(s: &State) -> Vec<Zone> {
+    let nav = [
+        "settings-nav-appearance",
+        "settings-nav-playback",
+        "settings-nav-subtitles",
+        "settings-nav-keyboard",
+        "settings-nav-metadata",
+        "settings-nav-seerr",
+        "settings-nav-downloads",
+        "settings-nav-storage",
+        "settings-nav-history",
+        "settings-nav-account",
+        "settings-nav-home-rails",
+    ]
+    .map(String::from)
+    .to_vec();
+    let mut zones = vec![
+        sidebar(s),
+        Zone {
+            keys: nav,
+            columns: 1,
+            parent: Some(0),
+            parent_at: None,
+        },
+    ];
+    // A filtered form hides rows; leave those to Rune rather than step onto an absent key.
+    if !s.settings_query.text.trim().is_empty() {
+        return zones;
+    }
+    // One zone per visual row. `parent_at` is the section list row Left should land on.
+    let mut rows: Vec<(&[&str], usize)> = Vec::new();
+    if s.media {
+        rows.push((
+            &["mode-switch-desktop", "mode-switch-game", "mode-restart"],
+            0,
+        ));
+    }
+    let rest: Vec<(&[&str], usize)> = vec![
+        (&["settings-search"], 0),
+        (&["settings-home-rails"], 10),
+        (&["setting-ui-mode-value"], 0),
+        (&["setting-keyboard-value"], 0),
+        (&["setting-high-contrast-value"], 0),
+        (&["setting-light-theme-value"], 0),
+        (&["setting-text-scale-value"], 0),
+        (&["setting-home-hero-value"], 0),
+        (&["setting-hover-preview-value"], 0),
+        (&["setting-reduce-motion-value"], 0),
+        (&["setting-autoplay-value"], 1),
+        (&["setting-seek-step-value"], 1),
+        (&["setting-skip-segments-value"], 1),
+        (&["setting-still-watching-value"], 1),
+        (&["setting-spoiler-guard-value"], 1),
+        (&["setting-notifications-value"], 1),
+        (&["setting-audio-passthrough-value"], 1),
+        (&["setting-hdr-value"], 1),
+        (&["setting-loudness-value"], 1),
+        (&["setting-resume-rewind-value"], 1),
+        (&["setting-volume-down", "setting-volume-up"], 1),
+        (&["setting-downmix-value"], 1),
+        (&["setting-audio-mode-value"], 1),
+        (&["setting-subtitle-mode-value"], 2),
+        (&["setting-subtitle-background-value"], 2),
+        (&["setting-subtitle-font-value"], 2),
+        (&["setting-subtitle-color-value"], 2),
+        (&["setting-subtitle-outline-value"], 2),
+        (&["setting-subtitle-style-value"], 2),
+        (&["setting-subtitle-position-value"], 2),
+        (&["setting-subtitle-language-value"], 2),
+        (&["setting-audio-language-value"], 2),
+        (
+            &[
+                "setting-subtitle-opacity-down",
+                "setting-subtitle-opacity-up",
+            ],
+            2,
+        ),
+        (
+            &[
+                "setting-subtitle-plate-opacity-down",
+                "setting-subtitle-plate-opacity-up",
+            ],
+            2,
+        ),
+        (&["setting-key-change-play-/-pause"], 3),
+        (&["setting-key-change-mute"], 3),
+        (&["setting-key-change-cycle-subtitles"], 3),
+        (&["setting-key-change-skip-intro-/-credits"], 3),
+        (&["setting-key-change-next-episode"], 3),
+        (&["setting-key-change-previous-episode"], 3),
+        (&["setting-key-change-fit-/-fill-the-picture"], 3),
+        (&["setting-key-change-fullscreen"], 3),
+        (&["settings-shortcuts-reset"], 3),
+        (&["setting-omdb-key"], 4),
+        (&["setting-omdb-get-key"], 4),
+        (&["setting-seerr-url"], 5),
+        (&["setting-seerr-user"], 5),
+        (
+            &[
+                "setting-seerr-test",
+                "setting-seerr-clear",
+                "setting-seerr-open",
+            ],
+            5,
+        ),
+        (&["setting-downloads-path"], 6),
+        (&["setting-downloads-path-apply"], 6),
+        (&["setting-download-quality-value"], 6),
+        (
+            &[
+                "setting-downloads-budget-down",
+                "setting-downloads-budget-up",
+            ],
+            6,
+        ),
+        (&["settings-clear-images", "settings-remote"], 7),
+        (&["settings-history-export"], 8),
+        (&["settings-history-clear"], 8),
+        (&["settings-reset", "settings-export"], 9),
+        (&["settings-sign-out"], 9),
+        (&["settings-quit"], 9),
+    ];
+    rows.extend(rest);
+    for (keys, section) in rows {
+        zones.push(Zone {
+            keys: keys.iter().map(|key| (*key).to_string()).collect(),
+            columns: keys.len(),
+            parent: Some(1),
+            parent_at: Some(section),
         });
     }
     zones
@@ -353,16 +612,21 @@ fn library_zones(s: &State) -> Vec<Zone> {
             header.push("library-shuffle".into());
         }
     }
-    let mut toolbar = vec!["library-search".to_string()];
-    toolbar.extend(
-        ["sort-name", "sort-added", "sort-rating", "sort-direction"]
-            .into_iter()
-            .map(String::from),
-    );
+    // The toolbar wraps onto two lines at 720p: the sort row, then the filters. One zone for
+    // both made Right at the end of the sorts jump back left to the first filter.
+    let mut lead = vec!["library-search".to_string()];
     if playlist {
-        toolbar.push("playlist-edit".into());
+        lead.push("playlist-edit".into());
     } else {
-        toolbar.extend(
+        lead.extend(
+            ["sort-name", "sort-added", "sort-rating", "sort-direction"]
+                .into_iter()
+                .map(String::from),
+        );
+    }
+    let mut trail: Vec<String> = Vec::new();
+    if !playlist {
+        trail.extend(
             [
                 "filter-unwatched",
                 "filter-favorites",
@@ -374,7 +638,7 @@ fn library_zones(s: &State) -> Vec<Zone> {
             .map(String::from),
         );
     }
-    toolbar.extend(["view-grid", "view-list"].into_iter().map(String::from));
+    trail.extend(["view-grid", "view-list"].into_iter().map(String::from));
     let grid = library.view == crate::library::ViewMode::Grid;
     let keys = library
         .items
@@ -393,11 +657,19 @@ fn library_zones(s: &State) -> Vec<Zone> {
             keys: header,
             columns: 0,
             parent: Some(0),
+            parent_at: None,
         },
         Zone {
-            keys: toolbar,
+            keys: lead,
             columns: 0,
             parent: Some(0),
+            parent_at: None,
+        },
+        Zone {
+            keys: trail,
+            columns: 0,
+            parent: Some(0),
+            parent_at: None,
         },
     ];
     if library.filters_open {
@@ -414,12 +686,14 @@ fn library_zones(s: &State) -> Vec<Zone> {
             keys: genre_keys,
             columns: 0,
             parent: Some(0),
+            parent_at: None,
         });
     }
     zones.push(Zone {
         keys,
         columns: if grid { library.columns.max(1) } else { 1 },
         parent: Some(0),
+        parent_at: None,
     });
     zones
 }
@@ -478,11 +752,13 @@ fn filters_zones(s: &State, library: &crate::library::LibraryState) -> Vec<Zone>
             keys: filters,
             columns: 0,
             parent: Some(0),
+            parent_at: None,
         },
         Zone {
             keys: sorts,
             columns: 0,
             parent: Some(0),
+            parent_at: None,
         },
     ];
     if !saved.is_empty() {
@@ -490,12 +766,14 @@ fn filters_zones(s: &State, library: &crate::library::LibraryState) -> Vec<Zone>
             keys: saved,
             columns: 0,
             parent: Some(0),
+            parent_at: None,
         });
     }
     zones.push(Zone {
         keys: deep,
         columns: 0,
         parent: Some(0),
+        parent_at: None,
     });
     if !library.genres.is_empty() {
         zones.push(Zone {
@@ -506,6 +784,7 @@ fn filters_zones(s: &State, library: &crate::library::LibraryState) -> Vec<Zone>
                 .collect(),
             columns: 0,
             parent: Some(0),
+            parent_at: None,
         });
     }
     if library.studios_open {
@@ -521,6 +800,7 @@ fn filters_zones(s: &State, library: &crate::library::LibraryState) -> Vec<Zone>
             keys: studios,
             columns: 0,
             parent: Some(0),
+            parent_at: None,
         });
     }
     if library.tags_open {
@@ -530,6 +810,7 @@ fn filters_zones(s: &State, library: &crate::library::LibraryState) -> Vec<Zone>
             keys: tags,
             columns: 0,
             parent: Some(0),
+            parent_at: None,
         });
     }
     zones
@@ -544,7 +825,11 @@ fn shelf_zones(s: &State) -> Vec<Zone> {
     let items: &[jellyfin_api::Item] = match shelf {
         crate::state::HomeShelf::ContinueWatching => &s.home_data.resume,
         crate::state::HomeShelf::NextUp => &s.home_data.next_up,
-        crate::state::HomeShelf::RecentlyPlayed => &s.home_data.recently_played,
+        crate::state::HomeShelf::RecentlyAdded => s
+            .home_data
+            .latest
+            .first()
+            .map_or(&[], |rail| rail.items.as_slice()),
     };
     let card_w = crate::theme::CARD_W + crate::theme::CARD_GAP;
     let width = s.window_size.0.max(900.0) - crate::theme::SIDEBAR_W - 2.0 * crate::theme::gutter();
@@ -559,6 +844,7 @@ fn shelf_zones(s: &State) -> Vec<Zone> {
             keys: vec!["shelf-back".into()],
             columns: 1,
             parent: Some(0),
+            parent_at: None,
         },
     ];
     if !cards.is_empty() {
@@ -566,6 +852,7 @@ fn shelf_zones(s: &State) -> Vec<Zone> {
             keys: cards,
             columns,
             parent: Some(0),
+            parent_at: None,
         });
     }
     zones
@@ -634,20 +921,15 @@ fn detail_zones(s: &State) -> Vec<Zone> {
         actions.push("detail-collection-add".into());
     }
 
-    let mut zones = vec![
-        Zone {
-            keys: vec!["detail-back".into()],
-            columns: 1,
-            parent: None,
-        },
-        Zone {
-            keys: actions,
-            columns: 0,
-            parent: Some(0),
-        },
-    ];
-    // The hero's own facts: the version chips, the technical-details toggle and the IMDb
-    // fallback link. They sit under the actions and above the first rail.
+    let mut zones = vec![Zone {
+        keys: vec!["detail-back".into()],
+        columns: 1,
+        parent: None,
+        parent_at: None,
+    }];
+    // The hero's own facts: the IMDb fallback link and the version chips sit under the title,
+    // above the actions. The IMDb link used to be declared after them, so Down from Play went
+    // up to it.
     let mut facts = Vec::new();
     if detail.item.media_sources.len() > 1 {
         facts.extend(
@@ -671,17 +953,15 @@ fn detail_zones(s: &State) -> Vec<Zone> {
             keys: facts,
             columns: 0,
             parent: Some(0),
+            parent_at: None,
         });
     }
-    // Below the actions the page runs: Next up (when the server has one), the season chips,
-    // the episode controls and list, then collections, cast, extras and similar titles.
-    if detail.next_up.is_some() {
-        zones.push(Zone {
-            keys: vec!["detail-next-up-card".into()],
-            columns: 1,
-            parent: Some(0),
-        });
-    }
+    zones.push(Zone {
+        keys: actions,
+        columns: 0,
+        parent: Some(0),
+        parent_at: None,
+    });
     if !detail.seasons.is_empty() {
         zones.push(Zone {
             keys: detail
@@ -691,6 +971,16 @@ fn detail_zones(s: &State) -> Vec<Zone> {
                 .collect(),
             columns: 0,
             parent: Some(0),
+            parent_at: None,
+        });
+    }
+    // The page then reads: the server's next episode, the season's actions, the episode list.
+    if detail.next_up.is_some() {
+        zones.push(Zone {
+            keys: vec!["detail-next-up-card".into()],
+            columns: 1,
+            parent: Some(0),
+            parent_at: None,
         });
     }
     if !detail.loading_episodes && !detail.episodes.is_empty() {
@@ -705,6 +995,7 @@ fn detail_zones(s: &State) -> Vec<Zone> {
             .collect(),
             columns: 0,
             parent: Some(0),
+            parent_at: None,
         });
         zones.push(Zone {
             keys: detail
@@ -714,6 +1005,7 @@ fn detail_zones(s: &State) -> Vec<Zone> {
                 .collect(),
             columns: 1,
             parent: Some(0),
+            parent_at: None,
         });
     }
     if !s.detail_collections.is_empty() {
@@ -725,6 +1017,7 @@ fn detail_zones(s: &State) -> Vec<Zone> {
                 .collect(),
             columns: 0,
             parent: Some(0),
+            parent_at: None,
         });
     }
     if !detail.item.people.is_empty() {
@@ -738,6 +1031,7 @@ fn detail_zones(s: &State) -> Vec<Zone> {
                 .collect(),
             columns: 0,
             parent: Some(0),
+            parent_at: None,
         });
     }
     if !s.detail_extras.is_empty() {
@@ -749,6 +1043,7 @@ fn detail_zones(s: &State) -> Vec<Zone> {
                 .collect(),
             columns: 0,
             parent: Some(0),
+            parent_at: None,
         });
     }
     if !detail.similar.is_empty() {
@@ -770,6 +1065,7 @@ fn detail_zones(s: &State) -> Vec<Zone> {
                 .collect(),
             columns: 0,
             parent: Some(0),
+            parent_at: None,
         });
     }
     zones
@@ -783,6 +1079,7 @@ fn search_zones(s: &State) -> Vec<Zone> {
             keys: vec!["search-input".into()],
             columns: 1,
             parent: Some(0),
+            parent_at: None,
         },
     ];
     let rail = |prefix: &str, items: &[jellyfin_api::Item]| {
@@ -805,6 +1102,7 @@ fn search_zones(s: &State) -> Vec<Zone> {
             keys,
             columns: 0,
             parent: Some(0),
+            parent_at: None,
         }
     };
     if !results.movies.is_empty() {
@@ -825,6 +1123,7 @@ fn search_zones(s: &State) -> Vec<Zone> {
                 .collect(),
             columns: 0,
             parent: Some(0),
+            parent_at: None,
         });
     }
     if !s.search.seerr.results.is_empty() {
@@ -838,6 +1137,7 @@ fn search_zones(s: &State) -> Vec<Zone> {
                 .collect(),
             columns: 0,
             parent: Some(0),
+            parent_at: None,
         });
     }
     zones
@@ -853,6 +1153,7 @@ fn person_zones(s: &State) -> Vec<Zone> {
             keys: vec!["person-back".into()],
             columns: 1,
             parent: Some(0),
+            parent_at: None,
         },
     ];
     // The screen shows the first five as "Known for" only when more than five exist, and the
@@ -867,7 +1168,8 @@ fn person_zones(s: &State) -> Vec<Zone> {
         zones.push(Zone {
             keys: known,
             columns: 0,
-            parent: Some(1),
+            parent: Some(0),
+            parent_at: None,
         });
     }
     let grid: Vec<String> = person.items.iter().skip(split).map(key).collect();
@@ -875,7 +1177,8 @@ fn person_zones(s: &State) -> Vec<Zone> {
         zones.push(Zone {
             keys: grid,
             columns: 5,
-            parent: if split > 0 { Some(2) } else { Some(1) },
+            parent: Some(0),
+            parent_at: None,
         });
     }
     zones
@@ -900,6 +1203,7 @@ fn seerr_zones(s: &State) -> Vec<Zone> {
         keys: toolbar.into_iter().map(String::from).collect(),
         columns: 0,
         parent: Some(0),
+        parent_at: None,
     });
     match s.seerr.tab {
         SeerrTab::Discover => {
@@ -907,6 +1211,7 @@ fn seerr_zones(s: &State) -> Vec<Zone> {
                 keys: vec!["seerr-mode-explore".into(), "seerr-mode-browse".into()],
                 columns: 0,
                 parent: Some(0),
+                parent_at: None,
             });
             if s.seerr.discover_mode == DiscoverMode::Browse {
                 // One zone per filter row, then the result grid.
@@ -923,6 +1228,7 @@ fn seerr_zones(s: &State) -> Vec<Zone> {
                     .collect(),
                     columns: 0,
                     parent: Some(0),
+                    parent_at: None,
                 });
                 zones.push(Zone {
                     keys: [
@@ -938,6 +1244,7 @@ fn seerr_zones(s: &State) -> Vec<Zone> {
                     .collect(),
                     columns: 0,
                     parent: Some(0),
+                    parent_at: None,
                 });
                 let mut genres = vec!["seerr-browse-genre-all".to_string()];
                 genres.extend(
@@ -951,6 +1258,7 @@ fn seerr_zones(s: &State) -> Vec<Zone> {
                     keys: genres,
                     columns: 0,
                     parent: Some(0),
+                    parent_at: None,
                 });
                 let hubs = match s.seerr.discover.filters.kind {
                     DiscoverKind::Movies => crate::state::STUDIOS,
@@ -962,6 +1270,7 @@ fn seerr_zones(s: &State) -> Vec<Zone> {
                     keys: hub_keys,
                     columns: 0,
                     parent: Some(0),
+                    parent_at: None,
                 });
                 let mut cards: Vec<String> = s
                     .seerr
@@ -980,6 +1289,7 @@ fn seerr_zones(s: &State) -> Vec<Zone> {
                         keys: cards,
                         columns: 5,
                         parent: Some(0),
+                        parent_at: None,
                     });
                 }
             } else {
@@ -997,6 +1307,7 @@ fn seerr_zones(s: &State) -> Vec<Zone> {
                         keys: cards,
                         columns: 5,
                         parent: Some(0),
+                        parent_at: None,
                     });
                 }
             }
@@ -1020,6 +1331,7 @@ fn seerr_zones(s: &State) -> Vec<Zone> {
                 keys,
                 columns: 1,
                 parent: Some(0),
+                parent_at: None,
             });
         }
     }
@@ -1041,6 +1353,7 @@ fn live_zones(s: &State) -> Vec<Zone> {
             .collect(),
             columns: 0,
             parent: Some(0),
+            parent_at: None,
         },
     ];
     if s.live.guide_open {
@@ -1055,8 +1368,15 @@ fn live_zones(s: &State) -> Vec<Zone> {
                 keys,
                 columns: 1,
                 parent: Some(0),
+                parent_at: None,
             });
         }
+        zones.push(Zone {
+            keys: vec!["live-preview-watch".into()],
+            columns: 1,
+            parent: Some(2),
+            parent_at: None,
+        });
         return zones;
     }
     // One row per channel: the card itself, its reminder (when there is a next program) and
@@ -1071,6 +1391,7 @@ fn live_zones(s: &State) -> Vec<Zone> {
             keys,
             columns: 0,
             parent: Some(0),
+            parent_at: None,
         });
     }
     zones
@@ -1099,6 +1420,7 @@ fn download_zones(s: &State) -> Vec<Zone> {
             keys,
             columns: 0,
             parent: Some(0),
+            parent_at: None,
         });
     }
     zones
@@ -1111,6 +1433,7 @@ fn remote_zones(s: &State) -> Vec<Zone> {
             keys: vec!["remote-refresh".into()],
             columns: 1,
             parent: Some(0),
+            parent_at: None,
         },
     ];
     // One row per session: the card, then its pause/seek/stop controls when it is playing.
@@ -1125,6 +1448,7 @@ fn remote_zones(s: &State) -> Vec<Zone> {
             keys,
             columns: 0,
             parent: Some(0),
+            parent_at: None,
         });
     }
     zones
@@ -1140,6 +1464,7 @@ fn seerr_detail_zones(s: &State) -> Vec<Zone> {
             keys: vec!["seerr-detail-back".into()],
             columns: 1,
             parent: Some(0),
+            parent_at: None,
         },
     ];
     let Some(details) = &detail.details else {
@@ -1176,6 +1501,7 @@ fn seerr_detail_zones(s: &State) -> Vec<Zone> {
             keys: actions,
             columns: 0,
             parent: Some(parent),
+            parent_at: None,
         });
     }
     if let seerr_api::Details::Tv(tv) = details
@@ -1194,6 +1520,7 @@ fn seerr_detail_zones(s: &State) -> Vec<Zone> {
             keys: seasons,
             columns: 1,
             parent: Some(0),
+            parent_at: None,
         });
     }
     // The rail is drawn only from named cast, and only the first twelve.
@@ -1210,6 +1537,7 @@ fn seerr_detail_zones(s: &State) -> Vec<Zone> {
             keys: cast,
             columns: 0,
             parent: Some(0),
+            parent_at: None,
         });
     }
     zones
@@ -1228,6 +1556,7 @@ fn in_app_zones(s: &State) -> Vec<Zone> {
             ],
             columns: 0,
             parent: None,
+            parent_at: None,
         }];
     }
     if s.resume_conflict.is_some() {
@@ -1238,6 +1567,7 @@ fn in_app_zones(s: &State) -> Vec<Zone> {
             ],
             columns: 0,
             parent: None,
+            parent_at: None,
         }];
     }
     // The queue is a grid of rows, each with reorder and remove buttons: four keys per row.
@@ -1256,6 +1586,7 @@ fn in_app_zones(s: &State) -> Vec<Zone> {
             keys,
             columns: 4,
             parent: None,
+            parent_at: None,
         }];
     }
     // The end-of-episode card replaces the transport: its three decisions are the screen.
@@ -1272,6 +1603,7 @@ fn in_app_zones(s: &State) -> Vec<Zone> {
             ],
             columns: 0,
             parent: None,
+            parent_at: None,
         }];
     }
     // A live stream has no timeline: the transport is the whole OSD.
@@ -1282,6 +1614,7 @@ fn in_app_zones(s: &State) -> Vec<Zone> {
             keys: vec!["in-app-stop".into()],
             columns: 1,
             parent: None,
+            parent_at: None,
         },
         Zone {
             keys: if live {
@@ -1295,6 +1628,7 @@ fn in_app_zones(s: &State) -> Vec<Zone> {
             },
             columns: 0,
             parent: None,
+            parent_at: None,
         },
     ];
     if !live {
@@ -1302,12 +1636,14 @@ fn in_app_zones(s: &State) -> Vec<Zone> {
             keys: vec!["in-app-seek".into()],
             columns: 1,
             parent: None,
+            parent_at: None,
         });
         if s.offered_in_app_segment().is_some() {
             zones.push(Zone {
                 keys: vec!["in-app-skip-segment".into()],
                 columns: 1,
                 parent: None,
+                parent_at: None,
             });
         }
     }
@@ -1329,6 +1665,7 @@ fn in_app_zones(s: &State) -> Vec<Zone> {
         keys: control_keys,
         columns: 0,
         parent: None,
+        parent_at: None,
     });
     zones
 }
@@ -1354,14 +1691,18 @@ mod tests {
             step(&state, Some(first), TvAction::Right).as_deref(),
             Some("rail-continue-watching-service")
         );
-        // Up from the first rail lands on the sidebar destination, not the rail's other end.
+        // Up from a card reaches the rail's See all header, then the lane above it.
         assert_eq!(
             step(&state, Some(first), TvAction::Up).as_deref(),
-            Some("nav-home")
+            Some("rail-continue-watching-all")
         );
-        // Down switches to the next lane.
+        assert_eq!(
+            step(&state, Some("rail-continue-watching-all"), TvAction::Up).as_deref(),
+            Some("home-hero-play")
+        );
+        // Down switches to the libraries strip, the next lane.
         let down = step(&state, Some(first), TvAction::Down).expect("a lane below");
-        assert!(down.starts_with("rail-next-up-"), "{down}");
+        assert!(down.starts_with("home-library-"), "{down}");
     }
 
     #[test]
@@ -1386,9 +1727,14 @@ mod tests {
             step(&state, Some("home-hero-play"), TvAction::Down).as_deref(),
             Some("rail-continue-watching-quiet-floor")
         );
-        // Up from any rail lands on the hero's primary decision, not on Details.
+        // Up from a rail card reaches its See all header; Up again is the hero's primary
+        // decision, not Details.
         assert_eq!(
             step(&state, Some("rail-continue-watching-service"), TvAction::Up).as_deref(),
+            Some("rail-continue-watching-all")
+        );
+        assert_eq!(
+            step(&state, Some("rail-continue-watching-all"), TvAction::Up).as_deref(),
             Some("home-hero-play")
         );
         // Off is the default: the sidebar's Right reaches the first rail directly.
@@ -1422,10 +1768,10 @@ mod tests {
             .as_deref(),
             Some("nav-home")
         );
-        // Right from the sidebar enters the content.
+        // Right from the rail enters the billboard's first decision.
         assert_eq!(
             step(&state, Some("nav-home"), TvAction::Right).as_deref(),
-            Some("rail-continue-watching-quiet-floor")
+            Some("home-hero-play")
         );
         // Up from the first sidebar row clamps.
         assert_eq!(step(&state, Some("nav-home"), TvAction::Up), None);
@@ -1440,12 +1786,12 @@ mod tests {
         state.library = Some(library);
         assert_eq!(
             step(&state, Some("library-film-002"), TvAction::Down).as_deref(),
-            Some("library-film-007"),
-            "five columns: down moves a row"
+            Some("library-film-008"),
+            "six columns: down moves a row"
         );
         assert_eq!(
             step(&state, Some("library-film-000"), TvAction::Left).as_deref(),
-            Some(format!("library-{id}").as_str())
+            Some("nav-libraries")
         );
     }
 
@@ -1458,6 +1804,11 @@ mod tests {
         state.detail = Some(crate::demo::detail());
         assert_eq!(
             step(&state, Some("detail-back"), TvAction::Down).as_deref(),
+            Some("detail-imdb-link"),
+            "the hero's facts sit under the title, above the actions"
+        );
+        assert_eq!(
+            step(&state, Some("detail-imdb-link"), TvAction::Down).as_deref(),
             Some("detail-play")
         );
         assert_eq!(
@@ -1467,26 +1818,22 @@ mod tests {
         );
         assert_eq!(
             step(&state, Some("detail-play"), TvAction::Up).as_deref(),
-            Some("detail-back")
+            Some("detail-imdb-link")
         );
-        // The hero's facts come first, then Next up, the season chips and the episode list.
+        // The hero's facts come first; the page then reads season chips, Next up, the season's
+        // actions and the episode list.
         assert!(contains(&state, "detail-next-up-card"));
         assert!(contains(&state, "detail-play-season"));
         assert!(contains(&state, "detail-shuffle-season"));
         assert!(contains(&state, "detail-season-watched"));
-        assert_eq!(
-            step(&state, Some("detail-play"), TvAction::Down).as_deref(),
-            Some("detail-imdb-link")
-        );
-        assert_eq!(
-            step(&state, Some("detail-imdb-link"), TvAction::Down).as_deref(),
-            Some("detail-next-up-card")
-        );
-        let season =
-            step(&state, Some("detail-next-up-card"), TvAction::Down).expect("the season chips");
+        let season = step(&state, Some("detail-play"), TvAction::Down).expect("the season chips");
         assert!(season.starts_with("season-"), "{season}");
         assert_eq!(
             step(&state, Some(&season), TvAction::Down).as_deref(),
+            Some("detail-next-up-card")
+        );
+        assert_eq!(
+            step(&state, Some("detail-next-up-card"), TvAction::Down).as_deref(),
             Some("detail-play-season")
         );
         assert_eq!(
@@ -1510,9 +1857,13 @@ mod tests {
         detail.item.people = crate::demo::detail().item.people;
         state.detail = Some(detail);
         state.detail_extras = crate::demo::extras();
-        let fact = step(&state, Some("detail-play"), TvAction::Down).expect("the version chips");
+        let fact = step(&state, Some("detail-play"), TvAction::Up).expect("the version chips");
         assert!(fact.starts_with("detail-version-"), "{fact}");
-        let cast = step(&state, Some(&fact), TvAction::Down).expect("the cast is below");
+        assert_eq!(
+            step(&state, Some(&fact), TvAction::Down).as_deref(),
+            Some("detail-play")
+        );
+        let cast = step(&state, Some("detail-play"), TvAction::Down).expect("the cast is below");
         assert!(cast.starts_with("detail-cast-"), "{cast}");
         // Right walks the cast rail; Down leaves it for the extras.
         let next_cast = step(&state, Some(&cast), TvAction::Right).expect("another cast member");

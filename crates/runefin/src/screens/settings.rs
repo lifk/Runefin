@@ -12,20 +12,13 @@ use crate::state::State;
 use super::sidebar;
 
 /// Text fields keep Left/Right for their caret, but on a TV Up/Down must leave the field for
-/// the form. Rune's input consumes all four arrows; this hands Up/Down back to the tab chain.
+/// the form. Rune's input consumes all four arrows; this hands Up/Down to the zone router, so
+/// the move follows the visible rows rather than the page's tab order.
 fn arrows_leave(input: El) -> El {
     input.on_input_key(|s: &mut State, key: &rune::KeyEvent, tx: &mut rune::Tx| {
-        if s.big_screen && matches!(key.key, rune::Key::Up | rune::Key::Down) {
-            tx.send_key(rune::KeyEvent {
-                key: rune::Key::Tab,
-                mods: rune::Mods {
-                    shift: key.key == rune::Key::Up,
-                    ..Default::default()
-                },
-            });
-            return true;
-        }
-        false
+        s.big_screen
+            && matches!(key.key, rune::Key::Up | rune::Key::Down)
+            && crate::tv_key(s, key, tx)
     })
 }
 
@@ -142,6 +135,134 @@ fn modes_section(s: &State, t: &tok::Theme) -> El {
         )
 }
 
+/// The section list on the left. It replaces the horizontal index: one column names every
+/// section, and the right pane scrolls to it without losing the reader's place.
+fn settings_nav(t: &tok::Theme) -> El {
+    let rows = [
+        (
+            "Interface",
+            "appearance",
+            "settings-section-appearance",
+            "setting-ui-mode-value",
+        ),
+        (
+            "Playback",
+            "playback",
+            "settings-section-playback",
+            "setting-autoplay-value",
+        ),
+        (
+            "Subtitles",
+            "subtitles",
+            "settings-section-subtitles",
+            "setting-subtitle-mode-value",
+        ),
+        (
+            "Keyboard",
+            "keyboard",
+            "settings-section-keyboard",
+            "setting-key-change-play-/-pause",
+        ),
+        (
+            "Metadata",
+            "metadata",
+            "settings-section-metadata",
+            "setting-omdb-key",
+        ),
+        (
+            "Seerr",
+            "seerr",
+            "settings-section-seerr",
+            "setting-seerr-url",
+        ),
+        (
+            "Downloads",
+            "downloads",
+            "settings-section-downloads",
+            "setting-downloads-path",
+        ),
+        (
+            "Storage",
+            "storage",
+            "settings-section-storage",
+            "settings-clear-images",
+        ),
+        (
+            "History",
+            "history",
+            "settings-section-history",
+            "settings-history-export",
+        ),
+        (
+            "Account",
+            "account",
+            "settings-section-account",
+            "settings-reset",
+        ),
+    ];
+    let mut nav = col()
+        .key("settings-nav")
+        .role("list")
+        .w(220.0)
+        .h_full()
+        .padding(24.0)
+        .gap(2.0)
+        .child(
+            text("SETTINGS")
+                .key("settings-nav-title")
+                .font(type_::caption())
+                .color(t.text_secondary)
+                .mb(8.0),
+        );
+    for (label, id, target, first) in rows {
+        let key = format!("settings-nav-{id}");
+        nav = nav.child(
+            el().key(key)
+                .role("button")
+                .label(label)
+                .h(38.0)
+                .px(12.0)
+                .radius(8.0)
+                .center_y()
+                .fill(Color::TRANSPARENT)
+                .hover(t.hover)
+                .motion(crate::theme::motion::CONTROL)
+                .focusable(true)
+                .focus_visual(2.0)
+                .press_scale(0.98)
+                .cursor(rune::Cursor::Pointer)
+                .child(text(label).font(type_::label()).color(t.text_secondary))
+                .on_press_tx(move |_s: &mut State, tx: &mut rune::Tx| {
+                    tx.focus(first, true);
+                    tx.scroll_center(target);
+                }),
+        );
+    }
+    nav = nav.child(
+        el().key("settings-nav-home-rails")
+            .role("button")
+            .label("Home rails")
+            .h(38.0)
+            .px(12.0)
+            .radius(8.0)
+            .center_y()
+            .fill(Color::TRANSPARENT)
+            .hover(t.hover)
+            .motion(crate::theme::motion::CONTROL)
+            .focusable(true)
+            .focus_visual(2.0)
+            .press_scale(0.98)
+            .cursor(rune::Cursor::Pointer)
+            .child(
+                text("Home rails")
+                    .font(type_::label())
+                    .color(t.text_secondary),
+            )
+            .on_press(|s: &mut State| s.open_home_rails()),
+    );
+    nav
+}
+
 pub(super) fn settings_screen(s: &State) -> El {
     let t = theme::colors();
     let mut content = col()
@@ -171,7 +292,7 @@ pub(super) fn settings_screen(s: &State) -> El {
                     if s.settings_query.focused { 1.5 } else { 1.0 },
                     0.0,
                     if s.settings_query.focused {
-                        tok::accent(0, true)
+                        crate::theme::accent()
                     } else {
                         t.card_border
                     },
@@ -180,7 +301,7 @@ pub(super) fn settings_screen(s: &State) -> El {
                     y: 0.0,
                     blur: 0.0,
                     spread: if s.settings_query.focused { 3.0 } else { 0.0 },
-                    color: tok::accent(0, true).alpha(if s.settings_query.focused {
+                    color: crate::theme::accent().alpha(if s.settings_query.focused {
                         0.18
                     } else {
                         0.0
@@ -205,96 +326,33 @@ pub(super) fn settings_screen(s: &State) -> El {
         )
         .child(
             row()
-                .key("settings-index")
+                .key("settings-home-rails-row")
                 .w_full()
                 .gap(6.0)
-                .flex_wrap()
-                .children(
-                    [
-                        (
-                            "Appearance",
-                            "settings-jump-appearance",
-                            "settings-section-appearance",
-                            "setting-ui-mode-value",
-                        ),
-                        (
-                            "Playback",
-                            "settings-jump-playback",
-                            "settings-section-playback",
-                            "setting-autoplay-value",
-                        ),
-                        (
-                            "Subtitles",
-                            "settings-jump-subtitles",
-                            "settings-section-subtitles",
-                            "setting-subtitle-mode-value",
-                        ),
-                        (
-                            "Keyboard",
-                            "settings-jump-keyboard",
-                            "settings-section-keyboard",
-                            "setting-key-change-play-/-pause",
-                        ),
-                        (
-                            "Metadata",
-                            "settings-jump-metadata",
-                            "settings-section-metadata",
-                            "setting-omdb-key",
-                        ),
-                        (
-                            "Seerr",
-                            "settings-jump-seerr",
-                            "settings-section-seerr",
-                            "setting-seerr-url",
-                        ),
-                        (
-                            "Downloads",
-                            "settings-jump-downloads",
-                            "settings-section-downloads",
-                            "setting-downloads-path",
-                        ),
-                        (
-                            "Storage",
-                            "settings-jump-storage",
-                            "settings-section-storage",
-                            "settings-clear-images",
-                        ),
-                        (
-                            "History",
-                            "settings-jump-history",
-                            "settings-section-history",
-                            "settings-history-export",
-                        ),
-                        (
-                            "Account",
-                            "settings-jump-account",
-                            "settings-section-account",
-                            "settings-reset",
-                        ),
-                    ]
-                    .map(|(label, key, target, first)| {
-                        el().key(key)
-                            .role("button")
-                            .h(28.0)
-                            .px(10.0)
-                            .radius(7.0)
-                            .center()
-                            .fill(t.bg)
-                            .outline(1.0, 0.0, t.card_border)
-                            .hover(t.hover)
-                            .motion(crate::theme::motion::CONTROL)
-                            .focusable(true)
-                            .focus_visual(2.0)
-                            .press_scale(0.96)
-                            .child(text(label).font(type_::caption()).color(t.text_secondary))
-                            .cursor(rune::Cursor::Pointer)
-                            .on_press_tx(move |_s: &mut State, tx: &mut rune::Tx| {
-                                // The chip is both a jump and a focus move: the selector lands
-                                // on the section's first control, and the page glides there.
-                                tx.focus(first, true);
-                                tx.scroll_center(target);
-                            })
-                    }),
+                .child(
+                    el().key("settings-home-rails")
+                        .role("button")
+                        .label("Home rails")
+                        .help("Choose which libraries get their own Home rail")
+                        .h(30.0)
+                        .px(12.0)
+                        .radius(7.0)
+                        .center()
+                        .fill(t.bg)
+                        .outline(1.0, 0.0, t.card_border)
+                        .hover(t.hover)
+                        .motion(crate::theme::motion::CONTROL)
+                        .focusable(true)
+                        .focus_visual(2.0)
+                        .press_scale(0.96)
+                        .cursor(rune::Cursor::Pointer)
+                        .child(text("Home rails").font(type_::label()).color(t.text))
+                        .on_press(|s: &mut State| s.open_home_rails()),
+                )
+                .child(
+                    text("Choose up to four libraries for their own Recently added rail.")
+                        .font(type_::meta())
+                        .color(t.text_secondary),
                 ),
         )
         .child(
@@ -472,7 +530,7 @@ pub(super) fn settings_screen(s: &State) -> El {
         ),
         (
             "setting-home-hero",
-            "Compact Home hero",
+            "Home billboard",
             if s.home_hero { "On" } else { "Off" }.to_string(),
             (|s: &mut State| s.toggle_home_hero()) as fn(&mut State),
         ),
@@ -628,7 +686,7 @@ pub(super) fn settings_screen(s: &State) -> El {
                 .h(if big { 32.0 } else { 22.0 })
                 .radius(if big { 16.0 } else { 11.0 })
                 .fill(if on {
-                    tok::accent(0, true)
+                    crate::theme::accent()
                 } else {
                     t.control_off
                 })
@@ -1107,7 +1165,7 @@ pub(super) fn settings_screen(s: &State) -> El {
                         .child(
                             text("Get a key")
                                 .font(type_::caption())
-                                .color(tok::accent(0, true)),
+                                .color(crate::theme::accent()),
                         )
                         .cursor(rune::Cursor::Pointer)
                         .on_press(|s: &mut State| {
@@ -1309,10 +1367,10 @@ pub(super) fn settings_screen(s: &State) -> El {
                             .w(120.0)
                             .radius(8.0)
                             .center()
-                            .fill(tok::accent(0, true))
+                            .fill(crate::theme::accent())
                             .gradient(Color::WHITE.alpha(0.18), Color::TRANSPARENT)
                             .shadow(1.0, 2.0, Color::BLACK.alpha(0.30))
-                            .shadow(4.0, 12.0, tok::accent(0, true).alpha(0.35))
+                            .shadow(4.0, 12.0, crate::theme::accent().alpha(0.35))
                             .hover(t.hover)
                             .motion(crate::theme::motion::CONTROL)
                             .focusable(true)
@@ -1875,6 +1933,8 @@ pub(super) fn settings_screen(s: &State) -> El {
         .h_full()
         .fill(t.bg)
         .child(sidebar(s, &t))
+        .child(el().w(1.0).h_full().fill(t.separator))
+        .child(settings_nav(&t))
         .child(el().w(1.0).h_full().fill(t.separator))
         .child(content)
 }

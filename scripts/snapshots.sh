@@ -69,9 +69,6 @@ render_focus() {
 # The committed set: one frame per main view, the two big-screen frames the README and the
 # AppStream metadata link to, and the focus pair that pins the router's visual contract.
 core() {
-    local focus_script
-    focus_script=$(mktemp)
-    printf '%s\n' '{"events":[{"t":0.15,"type":"key","name":"Up"}]}' > "$focus_script"
     render home home 1280 800
     render detail detail 1280 800
     render search search 1280 800
@@ -81,11 +78,15 @@ core() {
     render downloads downloads 1280 800
     render in-app-osd in-app-osd 1280 800
     render_big home home
+    render_big hub hub
     render_big library library
     render_focus keyboard keyboard
     render_focus home focus-card
-    render_focus home focus-sidebar "$focus_script"
-    rm -f "$focus_script"
+    local rail_script
+    rail_script=$(mktemp)
+    printf '%s\n' '{"events":[{"t":0.15,"type":"key","name":"Left"}]}' > "$rail_script"
+    render_focus home rail-focus "$rail_script"
+    rm -f "$rail_script"
 }
 
 # Every scene, for local review only.
@@ -111,6 +112,9 @@ render card-menu card-menu 1280 800
 render toast toast 1280 800
 render cast-picker cast-picker 1280 800
 render home home-1440 1440 900
+render hub hub 1280 800
+render home-pins home-pins 1280 800
+render library-10k library-10k 1280 800
 render home-collapsed home-collapsed 1280 800
 render home-loading home-loading 1280 800
 render home-empty home-empty 1280 800

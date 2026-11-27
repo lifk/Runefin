@@ -158,7 +158,8 @@ pub(super) fn live_tv_screen(s: &State) -> El {
                 .padding(theme::gutter())
                 .gap(20.0)
                 .child(header)
-                .child(body),
+                .child(body)
+                .children(s.live.guide_open.then(|| live_preview(s, &t)).flatten()),
         )
 }
 
@@ -317,7 +318,7 @@ fn channel_row(s: &State, channel: &jellyfin_api::Item, t: &tok::Theme) -> El {
                             el().grow(progress.max(0.001))
                                 .h(3.0)
                                 .radius(1.5)
-                                .fill(tok::accent(0, true)),
+                                .fill(crate::theme::accent()),
                         )
                         .child(el().grow((1.0 - progress).max(0.001)).h(3.0))
                 }))
@@ -382,7 +383,7 @@ fn channel_row(s: &State, channel: &jellyfin_api::Item, t: &tok::Theme) -> El {
                 .radius(15.0)
                 .center()
                 .fill(if s.live.favorites.contains(&channel.id) {
-                    tok::accent(0, true).alpha(0.22)
+                    crate::theme::accent().alpha(0.22)
                 } else {
                     t.bg
                 })
@@ -411,10 +412,10 @@ fn channel_row(s: &State, channel: &jellyfin_api::Item, t: &tok::Theme) -> El {
                 .px(14.0)
                 .radius(8.0)
                 .center()
-                .fill(tok::accent(0, true))
+                .fill(crate::theme::accent())
                 .gradient(Color::WHITE.alpha(0.18), Color::TRANSPARENT)
                 .shadow(1.0, 2.0, Color::BLACK.alpha(0.30))
-                .shadow(4.0, 12.0, tok::accent(0, true).alpha(0.35))
+                .shadow(4.0, 12.0, crate::theme::accent().alpha(0.35))
                 .child(text("Watch").font(type_::label()).color(theme::on_accent())),
         )
 }
@@ -458,7 +459,7 @@ fn button(
         .radius(8.0)
         .center()
         .fill(if selected {
-            tok::accent(0, true).alpha(0.20)
+            crate::theme::accent().alpha(0.20)
         } else {
             t.card
         })
@@ -466,7 +467,7 @@ fn button(
             1.0,
             0.0,
             if selected {
-                tok::accent(0, true).alpha(0.65)
+                crate::theme::accent().alpha(0.65)
             } else {
                 t.card_border
             },
@@ -525,20 +526,185 @@ fn guide_grid(s: &State, t: &tok::Theme) -> El {
                     )
                 })),
         );
-    let mut grid = col().key("live-guide").w_full().gap(8.0).child(header);
-    for channel in s
+    let theme = *t;
+    let count = s
         .live
         .channels
         .iter()
         .filter(|channel| !s.live.favorites_only || s.live.favorites.contains(&channel.id))
-    {
-        grid = grid.child(guide_row(s, channel, now, slice_seconds, t));
-    }
+        .count();
+    let grid = col()
+        .key("live-guide")
+        .w_full()
+        .child(header.pb(8.0))
+        .child(
+            col()
+                .key("live-guide-rows")
+                .w_full()
+                .growth(rune::GrowthSpec::default())
+                .virtual_rows(
+                    count,
+                    66.0,
+                    move |s: &State, index| {
+                        s.live
+                            .channels
+                            .iter()
+                            .filter(|channel| {
+                                !s.live.favorites_only || s.live.favorites.contains(&channel.id)
+                            })
+                            .nth(index)
+                            .map_or_else(
+                                || format!("live-guide-row-{index}"),
+                                |channel| format!("live-guide-row-{}", channel.id),
+                            )
+                            .into()
+                    },
+                    move |s: &State, index| {
+                        s.live
+                            .channels
+                            .iter()
+                            .filter(|channel| {
+                                !s.live.favorites_only || s.live.favorites.contains(&channel.id)
+                            })
+                            .nth(index)
+                            .map_or_else(el, |channel| {
+                                guide_row(s, channel, now, slice_seconds, &theme).pb(8.0)
+                            })
+                    },
+                ),
+        );
     col()
         .key("live-guide-scroll")
         .w_full()
-        .gap(10.0)
+        .grow(1.0)
+        .min_h(0.0)
+        .scroll(rune::ScrollSpec {
+            stick_bottom: false,
+        })
+        .scroll_edge_fade(18.0)
         .child(grid)
+}
+
+fn live_preview(s: &State, t: &tok::Theme) -> Option<El> {
+    let channel = s
+        .focused_key
+        .as_deref()
+        .and_then(|key| key.strip_prefix("live-guide-row-"))
+        .and_then(|id| s.live.channels.iter().find(|channel| channel.id == id))
+        .or_else(|| s.live.channels.first())?;
+    let (program_name, start_date, end_date) = if let Some(program) = &channel.current_program {
+        (
+            program.name.clone(),
+            program.start_date.clone(),
+            program.end_date.clone(),
+        )
+    } else if let Some(program) = s
+        .live
+        .guide
+        .get(&channel.id)
+        .and_then(|programs| programs.first())
+    {
+        (
+            program.name.clone(),
+            program.start_date.clone(),
+            program.end_date.clone(),
+        )
+    } else {
+        ("No programme information".to_string(), None, None)
+    };
+    let image = s
+        .image_key(channel)
+        .and_then(|key| super::poster_layers(s, &key, SurfaceFit::Fit))
+        .unwrap_or_else(|| {
+            el().w_full().h_full().center().child(
+                text(
+                    channel
+                        .name
+                        .chars()
+                        .next()
+                        .map_or_else(|| "?".to_string(), |c| c.to_uppercase().to_string()),
+                )
+                .font(type_::section())
+                .color(t.text_secondary),
+            )
+        });
+    let play = channel.clone();
+    Some(
+        row()
+            .key("live-preview")
+            .w_full()
+            .h(112.0)
+            .radius(10.0)
+            .clip_rounded(10.0)
+            .fill(t.card)
+            .outline(1.0, 0.0, t.card_border)
+            .padding(10.0)
+            .gap(14.0)
+            .items_center()
+            .child(
+                el().w(164.0)
+                    .h(92.0)
+                    .radius(7.0)
+                    .clip_rounded(7.0)
+                    .fill(t.bg)
+                    .child(image),
+            )
+            .child(
+                col()
+                    .grow(1.0)
+                    .min_w(0.0)
+                    .gap(4.0)
+                    .child(
+                        text(format!(
+                            "{} · {}",
+                            channel.name,
+                            channel.channel_number.clone().unwrap_or_else(|| "—".into())
+                        ))
+                        .font(type_::caption())
+                        .color(t.text_secondary),
+                    )
+                    .child(
+                        text(program_name)
+                            .font(type_::section())
+                            .color(t.text)
+                            .max_lines(1),
+                    )
+                    .children(
+                        start_date
+                            .as_deref()
+                            .and_then(jellyfin_api::iso_seconds)
+                            .zip(end_date.as_deref().and_then(jellyfin_api::iso_seconds))
+                            .map(|(start, end)| {
+                                text(format!("{} – {}", clock(start), clock(end)))
+                                    .font(type_::meta())
+                                    .color(t.text_secondary)
+                            }),
+                    ),
+            )
+            .child(
+                el().key("live-preview-watch")
+                    .role("button")
+                    .label("Watch")
+                    .h(36.0)
+                    .px(16.0)
+                    .radius(8.0)
+                    .center()
+                    .fill(t.text)
+                    .hover(t.hover)
+                    .motion(crate::theme::motion::CONTROL)
+                    .focusable(true)
+                    .focus_on_light()
+                    .press_scale(0.97)
+                    .cursor(rune::Cursor::Pointer)
+                    .child(text("Watch").font(type_::label()).color(t.bg))
+                    .on_press(move |s: &mut State| s.play_live_channel(play.clone())),
+            ),
+    )
+}
+
+fn clock(seconds: i64) -> String {
+    let minutes = (seconds / 60).rem_euclid(24 * 60);
+    format!("{:02}:{:02}", minutes / 60, minutes % 60)
 }
 
 struct Span<'a> {
@@ -634,7 +800,7 @@ fn guide_row(s: &State, channel: &Item, now: i64, slice_seconds: i64, t: &tok::T
                     .px(7.0)
                     .radius(6.0)
                     .fill(if current {
-                        tok::accent(0, true).alpha(0.20)
+                        crate::theme::accent().alpha(0.20)
                     } else {
                         t.card
                     })
@@ -642,7 +808,7 @@ fn guide_row(s: &State, channel: &Item, now: i64, slice_seconds: i64, t: &tok::T
                         1.0,
                         0.0,
                         if current {
-                            tok::accent(0, true).alpha(0.55)
+                            crate::theme::accent().alpha(0.55)
                         } else {
                             t.card_border
                         },

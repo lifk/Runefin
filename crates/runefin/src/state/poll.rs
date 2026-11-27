@@ -9,6 +9,11 @@ use super::*;
 impl State {
     /// `poll` asks this every frame; it returns true only when something visible changed.
     pub fn poll(&mut self) -> bool {
+        // A route changed in the event handler before this tick: remember which way the page
+        // moved while the old route is still in `last_route`. The view reads `nav_delta` once
+        // and the next tick clears it.
+        let previous = std::mem::replace(&mut self.last_route, self.route.clone());
+        self.nav_delta = super::route_depth(&self.route) - super::route_depth(&previous);
         // Four contiguous passes, in the order the app has always run them. Ingest pulls in what
         // arrived, Derive turns answers into state, React runs timers and follow-ups, and Persist
         // flushes what the frame observed. Keeping the boundaries contiguous preserves the exact

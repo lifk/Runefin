@@ -198,6 +198,7 @@ impl State {
         detail.seasons = page.seasons;
         detail.active_season = detail.seasons.first().map(|season| season.id.clone());
         detail.episodes = page.episodes;
+        detail.episode_page = 0;
         detail.next_up = page.next_up;
         detail.collection = page.collection;
         detail.local_trailers = page.local_trailers;
@@ -290,11 +291,27 @@ impl State {
         self.detail_tech_open = !self.detail_tech_open;
     }
 
+    /// Move to the next ten-episode page, if there is one.
+    pub fn next_episode_page(&mut self) {
+        if let Some(detail) = &mut self.detail {
+            let pages = detail.episodes.len().div_ceil(10).max(1);
+            detail.episode_page = (detail.episode_page + 1).min(pages - 1);
+        }
+    }
+
+    /// Move to the previous ten-episode page.
+    pub fn previous_episode_page(&mut self) {
+        if let Some(detail) = &mut self.detail {
+            detail.episode_page = detail.episode_page.saturating_sub(1);
+        }
+    }
+
     pub fn select_season(&mut self, season: String) {
         let changed = match &mut self.detail {
             Some(detail) if detail.active_season.as_deref() != Some(season.as_str()) => {
                 detail.active_season = Some(season.clone());
                 detail.episodes.clear();
+                detail.episode_page = 0;
                 detail.loading_episodes = true;
                 true
             }
@@ -325,6 +342,7 @@ impl State {
             return;
         }
         detail.loading_episodes = false;
+        detail.episode_page = 0;
         if let Some(error) = page.error {
             detail.error = Some(error);
         } else {

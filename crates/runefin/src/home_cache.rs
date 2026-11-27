@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::home::HomeData;
 
-const VERSION: u32 = 1;
+const VERSION: u32 = 2;
 /// Quiet time after the last rail landed before the snapshot is written: the rails arrive within
 /// a few hundred milliseconds of each other, and one write is enough.
 const SETTLE: std::time::Duration = std::time::Duration::from_millis(600);

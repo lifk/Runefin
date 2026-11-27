@@ -215,7 +215,7 @@ fn row_for(s: &State, entry: &Entry, t: &tok::Theme) -> El {
                                     el().grow(entry.progress().unwrap_or(0.0).max(0.001))
                                         .h(3.0)
                                         .radius(1.5)
-                                        .fill(tok::accent(0, true)),
+                                        .fill(crate::theme::accent()),
                                 ),
                             )
                     }),
@@ -295,7 +295,7 @@ fn state_colour(state: EntryState, t: &tok::Theme) -> rune::Color {
     match state {
         EntryState::Done => theme::status::success(),
         EntryState::Failed => theme::status::danger(),
-        EntryState::Downloading => tok::accent(0, true),
+        EntryState::Downloading => crate::theme::accent(),
         _ => t.text_secondary,
     }
 }
