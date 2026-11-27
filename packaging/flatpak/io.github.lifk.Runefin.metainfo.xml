@@ -50,6 +50,19 @@
   </screenshots>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.4.3" date="2026-11-27">
+      <description>
+        <p>
+          The Home billboard now comes back on upgrade: a one-time layout migration turns it on
+          for configs that still carry the old compact default, while a later Off is kept. The
+          billboard is the first non-hidden Continue Watching item, then the newest rail's first
+          item, so the backdrop is deterministic. A library no longer sits on flat black: a
+          full-height graphite band and a cool radial wash sit behind its grid, and the first row
+          starts inside the scroll viewport so the focused card's 1.05 scale and its 2 pt ring
+          are complete. Everything from 0.4.2 carries over.
+        </p>
+      </description>
+    </release>
     <release version="0.4.2" date="2026-11-27">
       <description>
         <p>
