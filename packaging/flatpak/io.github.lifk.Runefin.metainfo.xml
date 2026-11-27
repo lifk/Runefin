@@ -50,6 +50,19 @@
   </screenshots>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.4.2" date="2026-11-27">
+      <description>
+        <p>
+          The Nocturne review pass. Card focus is a 2 pt ring just outside the card, painted by
+          the screen-level overlay so the rail cannot clip it, and it follows the 1.05 focus
+          scale. The guide focuses the first drawn programme, moves along the timeline and
+          changes channel with Down; its pinned preview follows the programme. The detail hero is
+          66 % with cast and related rows below, the action row stays on one line and dates are
+          written. The Libraries anchor stays lit on utility pages, A-Z reaches Z, HTML overviews
+          are flattened and the hero kicker is uppercase. Everything from 0.4.1 carries over.
+        </p>
+      </description>
+    </release>
     <release version="0.4.1" date="2026-11-27">
       <description>
         <p>

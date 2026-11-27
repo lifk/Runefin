@@ -2,11 +2,11 @@
 # Lower a ceiling when a file shrinks; scripts/guardrails.sh --update raises one.
 crates/jellyfin-api/src/client.rs 1845
 crates/runefin/src/demo.rs 2111
-crates/runefin/src/main.rs 9924
+crates/runefin/src/main.rs 9921
 crates/runefin/src/screens/detail.rs 2648
 crates/runefin/src/screens/in_app.rs 3457
 crates/runefin/src/screens/library.rs 1751
-crates/runefin/src/screens.rs 3303
+crates/runefin/src/screens.rs 3307
 crates/runefin/src/screens/seerr.rs 1599
 crates/runefin/src/screens/settings.rs 1940
 crates/runefin/src/state/in_app_state.rs 4039
