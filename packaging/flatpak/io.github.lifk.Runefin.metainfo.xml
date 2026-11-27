@@ -50,6 +50,16 @@
   </screenshots>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.4.1" date="2026-11-27">
+      <description>
+        <p>
+          Card focus is now drawn as a 2 pt edge inside the poster, above the art, for poster
+          cards, Continue watching cards and Seerr cards. The old ring ran around the whole cell
+          (art and title) and, at the 1.05 focus scale, no longer hugged the image. The rail,
+          buttons and chips keep their inset focus ring. Everything from 0.4.0 carries over.
+        </p>
+      </description>
+    </release>
     <release version="0.4.0" date="2026-11-27">
       <description>
         <p>
