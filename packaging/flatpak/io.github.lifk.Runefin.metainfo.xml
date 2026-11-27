@@ -50,6 +50,21 @@
   </screenshots>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.4.0" date="2026-11-27">
+      <description>
+        <p>
+          Nocturne: a 76 pt five-anchor rail and a Libraries hub replace the tall sidebar. Home
+          gains a 50 % billboard, one combined Recently added rail, the library strip and up to
+          four pinned library rails. The library is six columns with the A-Z gutter; the season
+          strip scrolls and the episode list pages ten rows at a time; the guide virtualizes rows
+          and pins a preview; Settings is a section list beside its pane. Motion is directional
+          and focus is a 2 pt inset edge. The D-pad zones follow each drawn page, and a test walks
+          every screen. Everything from 0.3.2 carries over, including the three SteamOS sessions,
+          the in-app keyboard, downloads, virtualized Home rails and scRGB HDR with its SDR
+          fallback.
+        </p>
+      </description>
+    </release>
     <release version="0.3.2" date="2026-11-24">
       <description>
         <p>
