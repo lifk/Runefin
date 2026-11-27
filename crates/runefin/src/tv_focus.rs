@@ -1357,19 +1357,20 @@ fn live_zones(s: &State) -> Vec<Zone> {
         },
     ];
     if s.live.guide_open {
-        let keys: Vec<String> = s
-            .live
-            .channels
-            .iter()
-            .map(|channel| format!("live-guide-row-{}", channel.id))
-            .collect();
-        if !keys.is_empty() {
-            zones.push(Zone {
-                keys,
-                columns: 1,
-                parent: Some(0),
-                parent_at: None,
-            });
+        // One zone per channel, one key per programme in the window: Left/Right walk the
+        // timeline and Down changes channel. A channel with no guide data keeps its row key
+        // so an empty guide is still reachable.
+        for channel in &s.live.channels {
+            let keys = crate::screens::live_guide_program_keys(s, channel);
+            if !keys.is_empty() {
+                let columns = keys.len();
+                zones.push(Zone {
+                    keys,
+                    columns,
+                    parent: Some(0),
+                    parent_at: None,
+                });
+            }
         }
         zones.push(Zone {
             keys: vec!["live-preview-watch".into()],
@@ -1703,6 +1704,28 @@ mod tests {
         // Down switches to the libraries strip, the next lane.
         let down = step(&state, Some(first), TvAction::Down).expect("a lane below");
         assert!(down.starts_with("home-library-"), "{down}");
+    }
+
+    #[test]
+    fn guide_programmes_move_in_the_timeline_and_down_the_channels() {
+        let mut state = home();
+        state.route = Route::LiveTv;
+        state.live.channels = crate::demo::live_channels();
+        state.live.guide = crate::demo::live_guide();
+        state.live.guide_open = true;
+        let first = crate::screens::live_guide_program_keys(&state, &state.live.channels[0]);
+        assert!(first.len() > 1, "the demo guide has a timeline");
+        assert!(contains(&state, &first[0]));
+        assert_eq!(
+            step(&state, Some(&first[0]), TvAction::Right).as_deref(),
+            Some(first[1].as_str())
+        );
+        let second_row = crate::screens::live_guide_program_keys(&state, &state.live.channels[1]);
+        assert_eq!(
+            step(&state, Some(&first[0]), TvAction::Down).as_deref(),
+            Some(second_row[0].as_str()),
+            "Down keeps the programme index in the next channel"
+        );
     }
 
     #[test]

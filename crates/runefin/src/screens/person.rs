@@ -65,7 +65,7 @@ pub(super) fn person_screen(s: &State, person: &PersonPage) -> El {
             ),
     );
     let header = header.children(person.biography.clone().map(|biography| {
-        text(biography)
+        text(crate::theme::plain_text(&biography))
             .key("person-biography")
             .font(type_::meta())
             .color(t.text_secondary)

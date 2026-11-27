@@ -3071,7 +3071,17 @@ impl State {
                 .map(|_| "seerr-detail-back".into()),
             Route::LiveTv => self.live.channels.first().map(|channel| {
                 if self.live.guide_open {
-                    format!("live-guide-row-{}", channel.id)
+                    // The first focus is the first programme the guide actually draws; an
+                    // empty channel is skipped rather than focused as a row.
+                    self.live
+                        .channels
+                        .iter()
+                        .find_map(|channel| {
+                            crate::screens::live_guide_program_keys(self, channel)
+                                .into_iter()
+                                .next()
+                        })
+                        .unwrap_or_else(|| "live-guide-toggle".to_string())
                 } else {
                     format!("live-channel-{}", channel.id)
                 }

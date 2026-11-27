@@ -379,7 +379,13 @@ pub fn extended_metadata(item: &Item) -> String {
         parts.push(original.clone());
     }
     if let Some(date) = &item.premiere_date {
-        parts.push(format!("Released {}", date.get(..10).unwrap_or(date)));
+        let day = crate::home::pretty_date(date);
+        let year = date.get(..4).unwrap_or("");
+        parts.push(if year.is_empty() {
+            format!("Released {day}")
+        } else {
+            format!("Released {day} {year}")
+        });
     }
     if let Some(status) = &item.status {
         parts.push(status.clone());
@@ -502,6 +508,17 @@ mod tests {
             primary_label(&detail),
             "Play",
             "a fresh episode is not resumed"
+        );
+    }
+
+    #[test]
+    fn the_release_date_is_written_not_iso() {
+        let mut item = item();
+        item.premiere_date = Some("2002-10-30T00:00:00.0000000Z".into());
+        assert!(
+            extended_metadata(&item).contains("Released 30 Oct 2002"),
+            "{}",
+            extended_metadata(&item)
         );
     }
 

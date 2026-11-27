@@ -586,13 +586,31 @@ fn guide_grid(s: &State, t: &tok::Theme) -> El {
 }
 
 fn live_preview(s: &State, t: &tok::Theme) -> Option<El> {
-    let channel = s
-        .focused_key
-        .as_deref()
-        .and_then(|key| key.strip_prefix("live-guide-row-"))
-        .and_then(|id| s.live.channels.iter().find(|channel| channel.id == id))
+    let focused = s.focused_key.as_deref();
+    let row_channel = focused.and_then(|key| key.strip_prefix("live-guide-row-"));
+    let block = focused
+        .and_then(|key| key.strip_prefix("live-guide-"))
+        .filter(|rest| !rest.starts_with("row-"))
+        .and_then(|rest| rest.split_once('-'));
+    let channel = block
+        .and_then(|(id, _)| s.live.channels.iter().find(|channel| channel.id == id))
+        .or_else(|| {
+            row_channel.and_then(|id| s.live.channels.iter().find(|channel| channel.id == id))
+        })
         .or_else(|| s.live.channels.first())?;
-    let (program_name, start_date, end_date) = if let Some(program) = &channel.current_program {
+    let focused_program = block.and_then(|(id, program)| {
+        s.live
+            .guide
+            .get(id)
+            .and_then(|programs| programs.iter().find(|item| item.id == program))
+    });
+    let (program_name, start_date, end_date) = if let Some(program) = focused_program {
+        (
+            program.name.clone(),
+            program.start_date.clone(),
+            program.end_date.clone(),
+        )
+    } else if let Some(program) = &channel.current_program {
         (
             program.name.clone(),
             program.start_date.clone(),
@@ -747,6 +765,27 @@ fn spans<'a>(programs: &'a [Item], now: i64, slice_seconds: i64) -> Vec<Span<'a>
     spans
 }
 
+/// The programme keys the guide draws in this window, in block order. The block builder and
+/// the focus zones both read this, so a focus key always names a block that exists on screen.
+pub(super) fn guide_program_keys(s: &State, channel: &Item) -> Vec<String> {
+    let now = now_seconds();
+    let window = s.live.guide_hours.max(1) * 3_600;
+    let slice_seconds = window / SLICES as i64;
+    let programs = s
+        .live
+        .guide
+        .get(&channel.id)
+        .map(Vec::as_slice)
+        .unwrap_or(&[]);
+    spans(programs, now, slice_seconds)
+        .into_iter()
+        .filter_map(|span| {
+            span.program
+                .map(|program| format!("live-guide-{}-{}", channel.id, program.id))
+        })
+        .collect()
+}
+
 fn guide_row(s: &State, channel: &Item, now: i64, slice_seconds: i64, t: &tok::Theme) -> El {
     let programs = s
         .live
@@ -761,6 +800,8 @@ fn guide_row(s: &State, channel: &Item, now: i64, slice_seconds: i64, t: &tok::T
     let id = channel.id.clone();
     let mut timeline = row().grow(1.0).min_w(0.0).h(58.0).gap(2.0);
     let guide_spans = spans(programs, now, slice_seconds);
+    // A programme is the focus target. A channel with no guide data has nothing to step
+    // through; its label stays a pointer affordance, not a big white focus box.
     if guide_spans.is_empty() {
         timeline = timeline.child(
             el().grow(SLICES as f32)
@@ -794,7 +835,13 @@ fn guide_row(s: &State, channel: &Item, now: i64, slice_seconds: i64, t: &tok::T
                         .as_deref()
                         .and_then(jellyfin_api::iso_seconds)
                         .is_some_and(|end| now < end);
-                el().grow(weight)
+                let block_key = format!("live-guide-{}-{}", channel.id, program.id);
+                let program_name = program.name.clone();
+                let play = channel.clone();
+                el().key(block_key)
+                    .role("button")
+                    .label(format!("{} on {}", program_name, channel.name))
+                    .grow(weight)
                     .min_w(0.0)
                     .h(58.0)
                     .px(7.0)
@@ -813,8 +860,15 @@ fn guide_row(s: &State, channel: &Item, now: i64, slice_seconds: i64, t: &tok::T
                             t.card_border
                         },
                     )
+                    .hover(t.hover)
+                    .motion(crate::theme::motion::CONTROL)
+                    .focusable(true)
+                    .focus_visual(2.0)
+                    .press_scale(0.995)
+                    .cursor(rune::Cursor::Pointer)
+                    .on_press(move |s: &mut State| s.play_live_channel(play.clone()))
                     .child(
-                        text(program.name.clone())
+                        text(program_name)
                             .font(type_::caption())
                             .color(t.text)
                             .max_lines(2)
@@ -838,8 +892,7 @@ fn guide_row(s: &State, channel: &Item, now: i64, slice_seconds: i64, t: &tok::T
         .items_center()
         .hover(t.hover)
         .motion(crate::theme::motion::CONTROL)
-        .focusable(true)
-        .focus_visual(2.0)
+        .focusable(false)
         .press_scale(0.995)
         .cursor(rune::Cursor::Pointer)
         .on_press(move |s: &mut State| {
@@ -856,6 +909,7 @@ fn guide_row(s: &State, channel: &Item, now: i64, slice_seconds: i64, t: &tok::T
         .child(
             col()
                 .w(CHANNEL_LABEL_W)
+                .radius(6.0)
                 .gap(2.0)
                 .child(
                     text(format!("#{number}"))

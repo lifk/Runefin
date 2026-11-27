@@ -623,7 +623,6 @@ pub(super) fn discover_card(item: &seerr_api::DiscoverItem, s: &State, t: &tok::
         .map(|info| info.media_status())
         .unwrap_or(seerr_api::MediaStatus::Unknown);
     let card_key = format!("seerr-card-{}-{}", item.media_type, item.id);
-    let focused = s.focused_key.as_deref() == Some(card_key.as_str());
     col()
         .key(card_key.clone())
         .role("button")
@@ -639,26 +638,23 @@ pub(super) fn discover_card(item: &seerr_api::DiscoverItem, s: &State, t: &tok::
         .label(item.title().to_string())
         .cursor(rune::Cursor::Pointer)
         .on_press(move |s: &mut State| s.open_seerr_detail(media_type.clone(), tmdb_id))
-        .child(
-            super::report_focused_rect(
-                el().w(CARD_W)
-                    .h(CARD_H)
-                    .radius(10.0)
-                    .clip_rounded(10.0)
-                    .fill(t.card)
-                    .inset_edge()
-                    .outline(1.0, 0.0, t.card_border)
-                    .shadow(10.0, 24.0, t.shadow_soft),
-                s,
-                &card_key,
-            )
-            .child(poster)
-            .children(
-                (state != seerr_api::MediaStatus::Unknown)
-                    .then(|| el().absolute(8.0, 8.0).child(status_chip(state, t))),
-            )
-            .children(focused.then(|| crate::theme::focus_edge(10.0))),
-        )
+        .child({
+            let poster_box = el()
+                .w(CARD_W)
+                .h(CARD_H)
+                .radius(10.0)
+                .clip_rounded(10.0)
+                .fill(t.card)
+                .inset_edge()
+                .outline(1.0, 0.0, t.card_border)
+                .shadow(10.0, 24.0, t.shadow_soft);
+            super::report_focused_rect(poster_box, s, &card_key)
+                .child(poster)
+                .children(
+                    (state != seerr_api::MediaStatus::Unknown)
+                        .then(|| el().absolute(8.0, 8.0).child(status_chip(state, t))),
+                )
+        })
         .child(
             text(item.title().to_string())
                 .font(type_::card_title())
@@ -1234,7 +1230,7 @@ fn detail_body(s: &State, t: &tok::Theme) -> El {
         .media_info()
         .map(|info| info.media_status())
         .unwrap_or(seerr_api::MediaStatus::Unknown);
-    let overview = details.overview().unwrap_or("No overview yet.");
+    let overview = crate::theme::plain_text(details.overview().unwrap_or("No overview yet."));
 
     let mut info = col().grow(1.0).min_w(0.0).gap(10.0).child(
         row()

@@ -19,12 +19,24 @@ const DETAIL_POSTER_H: f32 = 360.0;
 
 pub(super) fn detail_screen(s: &State, detail: &DetailState) -> El {
     let t = theme::colors();
+    // The spec's detail hero is 66 % of the page; a full-bleed backdrop put the cast and the
+    // related rows over the artwork instead of below it.
+    let hero_h = (s.window_size.1 * 0.66).clamp(300.0, 900.0);
     let page = el()
         .key("detail-screen")
         .w_full()
         .h_full()
         .fill(t.bg)
-        .child(backdrop(s, detail, &t))
+        .child(backdrop(s, detail, &t, hero_h))
+        .child(
+            el().absolute(0.0, (hero_h - 180.0).max(0.0))
+                .w_full()
+                .h(180.0)
+                .linear_gradient(
+                    std::f32::consts::PI,
+                    [(0.0, Color::TRANSPARENT), (1.0, t.bg)],
+                ),
+        )
         .child(
             el().absolute(0.0, 0.0)
                 .w_full()
@@ -716,17 +728,17 @@ pub(super) fn collection_picker(s: &State, item: Option<&Item>, t: &tok::Theme) 
         .child(panel)
 }
 
-fn backdrop(s: &State, detail: &DetailState, _t: &tok::Theme) -> El {
+fn backdrop(s: &State, detail: &DetailState, _t: &tok::Theme, height: f32) -> El {
     let image = s.detail_backdrop_key(&detail.item).and_then(|key| {
         super::poster_layers(s, &key, SurfaceFit::Fill).map(|layers| (key, layers))
     });
     let (top, bottom) = theme::palette(&detail.item.id);
     let mut layer = match image {
-        Some((_, layers)) => el().absolute(0.0, 0.0).w_full().h_full().child(layers),
+        Some((_, layers)) => el().absolute(0.0, 0.0).w_full().h(height).child(layers),
         None => el()
             .absolute(0.0, 0.0)
             .w_full()
-            .h_full()
+            .h(height)
             .fill(top)
             .linear_gradient(std::f32::consts::PI, [(0.0, top), (1.0, bottom)]),
     };
@@ -986,7 +998,7 @@ fn hero(s: &State, detail: &DetailState, t: &tok::Theme) -> El {
     let mut info = col()
         .grow(1.0)
         .min_w(0.0)
-        .max_w(760.0)
+        .max_w(900.0)
         .items_start()
         .gap(14.0)
         .child(title)
@@ -998,7 +1010,7 @@ fn hero(s: &State, detail: &DetailState, t: &tok::Theme) -> El {
                 .as_deref()
                 .filter(|tagline| !tagline.trim().is_empty())
                 .map(|tagline| {
-                    theme::readable_lines(tagline.to_string(), type_::overview(), t.text_secondary, 2)
+                    theme::readable_lines(theme::plain_text(tagline), type_::overview(), t.text_secondary, 2)
                         .key("detail-tagline")
                 }),
         )
@@ -1480,11 +1492,11 @@ fn overview(s: &State, detail: &DetailState, t: &tok::Theme) -> El {
     let Some(overview) = detail.item.overview.as_deref().filter(|o| !o.is_empty()) else {
         return col();
     };
+    let overview = theme::plain_text(overview);
     let long = overview.chars().count() > 420;
     let lines = if s.detail_overview_open { 24 } else { 4 };
     let mut block = col().max_w(720.0).gap(6.0).child(
-        theme::readable_lines(overview.to_string(), type_::overview(), t.text, lines)
-            .key("detail-overview"),
+        theme::readable_lines(overview, type_::overview(), t.text, lines).key("detail-overview"),
     );
     if long {
         block = block.child(
@@ -2316,7 +2328,9 @@ fn next_up(s: &State, detail: &DetailState, t: &tok::Theme) -> Option<El> {
                                 text(if guarded {
                                     "Spoiler hidden — play to reveal.".to_string()
                                 } else {
-                                    item.overview.clone().unwrap_or_default()
+                                    crate::theme::plain_text(
+                                        &item.overview.clone().unwrap_or_default(),
+                                    )
                                 })
                                 .font(type_::meta())
                                 .color(t.text_secondary)

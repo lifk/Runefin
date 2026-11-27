@@ -189,6 +189,10 @@ impl State {
 
     pub fn toggle_live_guide(&mut self) {
         self.live.guide_open = !self.live.guide_open;
+        if self.live.guide_open {
+            // The guide's first focus is its first programme, not the channel row.
+            self.focus_first = true;
+        }
     }
 
     pub fn toggle_guide_window(&mut self) {
@@ -257,6 +261,16 @@ impl State {
                 self.live.next = load.next;
                 self.live.guide = load.guide;
                 self.live.error = None;
+                // The guide opened before its programmes arrived and focused a channel row;
+                // now that the blocks exist, move the focus to the first programme.
+                if self.live.guide_open
+                    && self
+                        .focused_key
+                        .as_deref()
+                        .is_none_or(|key| key.starts_with("live-guide-row-"))
+                {
+                    self.focus_first = true;
+                }
                 self.request_live_images();
             }
             Err(message) => self.live.error = Some(message),

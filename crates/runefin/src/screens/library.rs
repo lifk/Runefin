@@ -1397,6 +1397,7 @@ fn library_list_row(item: &Item, s: &State, t: &tok::Theme) -> El {
 }
 
 fn letter_rail(library: &LibraryState, t: &tok::Theme) -> El {
+    // 26 letters must fit the 720-point body without clipping the Z: 18 + 1 pt each.
     let mut rail = col().key("letter-rail").w(28.0).gap(1.0).pt(2.0);
     for letter in 'A'..='Z' {
         let selected = library
@@ -1407,7 +1408,7 @@ fn letter_rail(library: &LibraryState, t: &tok::Theme) -> El {
             el().key(format!("letter-{letter}"))
                 .role("button")
                 .w(28.0)
-                .h(19.0)
+                .h(18.0)
                 .radius(4.0)
                 .center()
                 .fill(if selected {

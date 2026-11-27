@@ -1055,6 +1055,11 @@ fn home(s: &State) -> El {
 
 /// Every screen reserves the rail's width with this spacer. The rail itself is one overlay in
 /// `with_rail`, so it can expand over the page without reflowing a single card.
+/// The guide's drawn programme keys, for the D-pad zones and the first-focus request.
+pub(crate) fn live_guide_program_keys(s: &State, channel: &Item) -> Vec<String> {
+    live::guide_program_keys(s, channel)
+}
+
 pub(super) fn sidebar(_s: &State, _t: &tok::Theme) -> El {
     el().w(theme::SIDEBAR_W).h_full()
 }
@@ -1110,6 +1115,29 @@ pub(super) fn with_rail(s: &State, base: El) -> El {
         .child(nav_rail(s, &t, expanded))
 }
 
+/// The rail anchor a screen belongs to. Utility and sub-pages keep their parent lit, so
+/// Downloads, Remote, Seerr and a person page do not sit on the rail with nothing selected.
+pub(crate) fn active_nav(s: &State) -> &'static str {
+    match &s.route {
+        Route::Home => "nav-home",
+        Route::Search { .. } => "nav-search",
+        Route::Libraries
+        | Route::Library { .. }
+        | Route::Downloads
+        | Route::Remote
+        | Route::Seerr
+        | Route::SeerrDetail { .. } => "nav-libraries",
+        Route::LiveTv => "nav-live",
+        Route::Settings => "nav-settings",
+        Route::Detail { .. } | Route::Person { .. } | Route::SeerrPerson { .. } => {
+            match &s.detail_return {
+                Route::Library { .. } => "nav-libraries",
+                _ => "nav-home",
+            }
+        }
+    }
+}
+
 fn nav_rail(s: &State, t: &tok::Theme, expanded: bool) -> El {
     let width = if expanded {
         theme::RAIL_OPEN_W
@@ -1144,7 +1172,7 @@ fn nav_rail(s: &State, t: &tok::Theme, expanded: bool) -> El {
             "Home",
             "nav-home",
             &theme::icon::HOME,
-            matches!(s.route, Route::Home),
+            active_nav(s) == "nav-home",
             RailMode {
                 expanded,
                 focused: s.focused_key.as_deref() == Some("nav-home"),
@@ -1156,7 +1184,7 @@ fn nav_rail(s: &State, t: &tok::Theme, expanded: bool) -> El {
             "Search",
             "nav-search",
             &theme::icon::SEARCH,
-            matches!(s.route, Route::Search { .. }),
+            active_nav(s) == "nav-search",
             RailMode {
                 expanded,
                 focused: s.focused_key.as_deref() == Some("nav-search"),
@@ -1168,7 +1196,7 @@ fn nav_rail(s: &State, t: &tok::Theme, expanded: bool) -> El {
             "Libraries",
             "nav-libraries",
             &theme::icon::LIBRARY,
-            matches!(s.route, Route::Libraries | Route::Library { .. }),
+            active_nav(s) == "nav-libraries",
             RailMode {
                 expanded,
                 focused: s.focused_key.as_deref() == Some("nav-libraries"),
@@ -1180,7 +1208,7 @@ fn nav_rail(s: &State, t: &tok::Theme, expanded: bool) -> El {
             "Live TV",
             "nav-live",
             &theme::icon::ANTENNA,
-            matches!(s.route, Route::LiveTv),
+            active_nav(s) == "nav-live",
             RailMode {
                 expanded,
                 focused: s.focused_key.as_deref() == Some("nav-live"),
@@ -1193,7 +1221,7 @@ fn nav_rail(s: &State, t: &tok::Theme, expanded: bool) -> El {
             "Settings",
             "nav-settings",
             &theme::icon::SETTINGS,
-            matches!(s.route, Route::Settings),
+            active_nav(s) == "nav-settings",
             RailMode {
                 expanded,
                 focused: s.focused_key.as_deref() == Some("nav-settings"),
@@ -1494,7 +1522,11 @@ fn home_hero(s: &State, t: &tok::Theme) -> Option<El> {
                     .absolute(theme::gutter(), height - 164.0)
                     .w(560.0)
                     .gap(8.0)
-                    .child(text(kicker).font(type_::caption()).color(t.text_secondary))
+                    .child(
+                        text(kicker.to_uppercase())
+                            .font(type_::kicker())
+                            .color(t.text_secondary),
+                    )
                     .child(
                         theme::readable_text(title.clone(), hero_style(), t.text)
                             .key("home-hero-title"),
@@ -1951,7 +1983,7 @@ fn wide_card(item: &Item, rail: &str, s: &State, t: &tok::Theme, show_progress: 
         .hover(t.hover)
         .motion(theme::motion::CONTROL)
         .focusable(true)
-        // One edge, drawn over the art (see `focus_edge`), instead of a ring on the card box.
+        // One ring outside the card, as the mockup's `box-shadow: 0 0 0 2px`.
         .no_focus_ring()
         .press_scale(0.98)
         .cursor(rune::Cursor::Pointer)
@@ -1965,7 +1997,6 @@ fn wide_card(item: &Item, rail: &str, s: &State, t: &tok::Theme, show_progress: 
                 (1.0, Color::BLACK.alpha(0.88)),
             ],
         ))
-        .children(focused.then(|| crate::theme::focus_edge(10.0)))
         .child(
             col()
                 .absolute(10.0, RESUME_H - 44.0)
@@ -3023,9 +3054,6 @@ pub(super) fn card(item: &Item, rail: &str, s: &State, t: &tok::Theme) -> El {
                 .h(4.0)
                 .fill(crate::theme::accent()),
         );
-    }
-    if focused {
-        poster_box = poster_box.child(crate::theme::focus_edge(10.0));
     }
     let title = item.series_name.as_deref().unwrap_or(&item.name);
     col()

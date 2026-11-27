@@ -64,9 +64,7 @@ fn view(s: &State, cx: &mut Cx<State>) -> El {
     let screen = screens::view(s, cx);
     // The halo is a sibling of the whole screen, at the focused poster's window rect: the rail's
     // scroll viewport clips its own children, never this overlay.
-    let screen = if s.big_screen
-        && let Some(rect) = s.focused_card_rect
-    {
+    let screen = if let Some(rect) = s.focused_card_rect {
         screen.child(crate::theme::focus_glow(rect))
     } else {
         screen
@@ -3797,6 +3795,55 @@ mod tests {
         assert_eq!(
             state.take_focus_key().as_deref(),
             Some("quick-connect-cancel")
+        );
+    }
+
+    #[test]
+    fn utility_and_sub_pages_keep_their_rail_anchor_lit() {
+        let mut state = home_state();
+        for (route, expected) in [
+            (Route::Downloads, "nav-libraries"),
+            (Route::Remote, "nav-libraries"),
+            (Route::Seerr, "nav-libraries"),
+            (
+                Route::SeerrDetail {
+                    media_type: "movie".into(),
+                    tmdb_id: 438631,
+                },
+                "nav-libraries",
+            ),
+        ] {
+            state.route = route;
+            assert_eq!(crate::screens::active_nav(&state), expected);
+        }
+        state.route = Route::Person {
+            id: "mara-ellison".into(),
+        };
+        state.detail_return = Route::Library {
+            id: "movies".into(),
+        };
+        assert_eq!(crate::screens::active_nav(&state), "nav-libraries");
+        state.detail_return = Route::Home;
+        assert_eq!(crate::screens::active_nav(&state), "nav-home");
+    }
+
+    #[test]
+    fn the_library_letter_index_fits_the_720_point_body() {
+        let env = Env {
+            system_dark: true,
+            scale: 2.0,
+        };
+        let mut rt = Runtime::new(library_state(120), view, (1280.0, 720.0), env);
+        rt.frame(0.0);
+        let elements = rt.elements();
+        let z = elements
+            .iter()
+            .find(|element| element.key.as_deref() == Some("letter-Z"))
+            .expect("the index ends at Z");
+        assert!(
+            z.rect[1] + z.rect[3] <= 720.0,
+            "Z is clipped: bottom {}",
+            z.rect[1] + z.rect[3]
         );
     }
 
@@ -9688,6 +9735,7 @@ mod tv_reach_tests {
         state.route = Route::LiveTv;
         state.live.channels = demo::live_channels();
         state.live.next = demo::live_next();
+        state.live.guide = demo::live_guide();
         state.live.guide_open = true;
         check("live guide", state);
     }

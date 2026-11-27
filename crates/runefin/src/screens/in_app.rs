@@ -990,7 +990,7 @@ fn next_up_banner(s: &State, t: &tok::Theme) -> Option<El> {
                         .truncate(),
                 )
                 .children(next.overview.clone().map(|overview| {
-                    text(overview)
+                    text(crate::theme::plain_text(&overview))
                         .font(type_::overview())
                         .color(Color::WHITE.alpha(0.72))
                         .max_lines(2)

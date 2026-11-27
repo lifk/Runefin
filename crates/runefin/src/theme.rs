@@ -99,6 +99,13 @@ pub mod type_ {
     pub fn overview() -> TextStyle {
         scaled(OVERVIEW)
     }
+    /// The small uppercase line above a hero title.
+    pub fn kicker() -> TextStyle {
+        scaled(big(
+            TextStyle::new(10.5, 650.0).lh(14.0).tracking(1.6),
+            12.0,
+        ))
+    }
 }
 
 /// The motion ladder from `docs/design.md`. Rune's `SNAPPY` is 500 ms with bounce 0.15 —
@@ -188,6 +195,33 @@ pub const FOCUS: Color = Color {
     a: 1.0,
 };
 
+/// Flatten the HTML that Jellyfin and TMDb overviews carry into one plain line. Rune draws
+/// text, not markup, so `<br>` was visible in the overview and `&amp;` stayed encoded.
+pub fn plain_text(value: &str) -> String {
+    let mut out = String::with_capacity(value.len());
+    let mut in_tag = false;
+    for ch in value.chars() {
+        match ch {
+            '<' => in_tag = true,
+            '>' if in_tag => {
+                in_tag = false;
+                out.push(' ');
+            }
+            _ if !in_tag => out.push(ch),
+            _ => {}
+        }
+    }
+    let out = out
+        .replace("&nbsp;", " ")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'")
+        .replace("&apos;", "'")
+        .replace("&amp;", "&");
+    out.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
 /// A 2 pt ring is 3 px at 1080p. A near-white ring is the only one that survives both a dark
 /// poster and the dark theme; on the light theme it flips to near-black.
 pub fn focus_width() -> f32 {
@@ -272,30 +306,18 @@ impl SurfaceStyle for El {
 /// The focus halo, drawn at the window root so a rail's scroll clip cannot cut it. Four
 /// blurred bars form a frame outside the focused poster; the centre stays clear, so the card's
 /// artwork is never washed out.
-/// A 2 pt edge drawn inside an image area, above the art. A focus ring on a clipped poster is
-/// painted under the image; this overlay is the visible light edge the motion spec asks for.
-pub fn focus_edge(radius: f32) -> El {
-    el().absolute(0.0, 0.0)
-        .w_full()
-        .h_full()
-        .radius(radius)
-        .outline(focus_width(), -focus_width(), ring())
-        .no_focus_ring()
-}
-
-/// The lift under a focused card: a soft dark shadow, wider and lower than the card's own, so
-/// the focused poster sits above the rail. It used to be a white halo; on a clipped card that
-/// read as a pale line cut off at the rail's edge, not as lift.
+/// The focus ring for the card that holds focus, painted as a sibling of the whole screen.
+/// Drawn inside the rail it was clipped: the row has exactly the card's 2 pt less room than the
+/// ring. A border on this screen-level box sits just outside the card and cannot be cut by the
+/// rail's viewport.
 pub fn focus_glow(rect: [f32; 4]) -> El {
     let (x, y, w, h) = (rect[0], rect[1], rect[2], rect[3]);
-    let shadow = Color::BLACK.alpha(0.55);
     el().key("focus-glow")
-        .absolute(x - 8.0, y + 4.0)
-        .w(w + 16.0)
-        .h(h + 20.0)
-        .radius(14.0)
-        .fill(shadow)
-        .blur(22.0)
+        .absolute(x - 2.0, y - 2.0)
+        .w(w + 4.0)
+        .h(h + 4.0)
+        .radius(12.0)
+        .border(focus_width(), ring())
         .no_focus_ring()
 }
 
@@ -807,6 +829,16 @@ pub mod icon {
 
 #[cfg(test)]
 mod tests {
+    use super::plain_text;
+
+    #[test]
+    fn overviews_lose_their_markup_and_entities() {
+        assert_eq!(plain_text("a<br>b &amp; c"), "a b & c");
+        assert_eq!(plain_text("<p>One</p><p>Two</p>"), "One Two");
+        assert_eq!(plain_text("  spaced\n\tlines  "), "spaced lines");
+        assert_eq!(plain_text("Tom &amp; Jerry&#39;s"), "Tom & Jerry's");
+    }
+
     use super::*;
 
     #[test]
